@@ -203,7 +203,7 @@ async function generarPDF(data, resultados) {
     font: montserratFont,
   });
   y -= 25;
-  page.drawText('📞 +57 300 000 0000   ✉️ contacto@wattspower.com.co', {
+  page.drawText('📞 +57 300 000 0000   ✉️ contacto@solartech.com.co', {
     x: margin,
     y,
     size: 10,
@@ -283,7 +283,7 @@ async function generarPDF(data, resultados) {
     });
   });
 
-  page.drawText('Gracias por confiar en Wattspower, líderes en energía solar.', {
+  page.drawText('Gracias por confiar en Solartech Energy, líderes en energía solar.', {
     x: margin,
     y: 50,
     size: 10,

@@ -70,9 +70,9 @@ export default function CotizadorSolar() {
     <div className="page-bg">
       <div className="overlay">
         <div className="form-container">
-          <img src={logo} alt="Logo WattsPower" style={{ width: '200px', display: 'block', margin: '80px auto 1rem' }} />
+          <img src={logo} alt="Logo Solartech" style={{ width: '200px', display: 'block', margin: '80px auto 1rem' }} />
           
-          <h1 className="title">Cotiza tu Proyecto Solar:</h1>
+          <h1 className="title">Escribe los datos de tu cliente:</h1>
           <div className="step-indicator">
             <div className={`step ${step === 1 ? 'active' : ''}`}>1. Datos</div>
             <div className={`step ${step === 2 ? 'active' : ''}`}>2. Cotización</div>
@@ -81,36 +81,36 @@ export default function CotizadorSolar() {
           <form onSubmit={handleSubmit}>
             {step === 1 && (
               <>
-                <h2>¡Háblanos de ti! Queremos conocerte</h2>
+                <h2>PASO 1 DE 2:</h2>
                 <input name="nombre" placeholder="Nombre completo" className="input" onChange={handleChange} required />
                 <input name="correo" type="email" placeholder="Correo electrónico" className="input" onChange={handleChange} required />
                 <input name="telefono" type="tel" placeholder="Número de contacto" className="input" onChange={handleChange} required />
-                <input name="ubicacion" placeholder="En dónde tienes pensado el proyecto" className="input" onChange={handleChange} required />
+                <input name="ubicacion" placeholder="Ubicación del proyecto" className="input" onChange={handleChange} required />
 
-                <input name="consumoKwh" placeholder="¿Conoces cuanto es tu consumo kWh/mes?" className="input" onChange={handleChange} required />
-                <input name="costoKwh" placeholder="¿Conoces cual es el costo kWh/mes?" className="input" onChange={handleChange} required />
-                <input name="valorMensual" type="number" placeholder="¿Cuánto pagas de energía promedio al mes?" className="input" onChange={handleChange} required />
-                <input name="areaDisponible" type="number" placeholder="Area disponible para colocar los paneles" className="input" onChange={handleChange} required />
+                <input name="consumoKwh" placeholder="Consumo kWh/mes" className="input" onChange={handleChange} required />
+                <input name="costoKwh" placeholder="Costo kWh/mes" className="input" onChange={handleChange} required />
+                <input name="valorMensual" type="number" placeholder="Valor promedio de factura de energía" className="input" onChange={handleChange} required />
+                <input name="areaDisponible" type="number" placeholder="Area disponible para páneles" className="input" onChange={handleChange} required />
 
                 <select name="preferenciaContacto" className="input" onChange={handleChange} required>
-                  <option value="">¿Cómo prefieres ser contactado?</option>
+                  <option value="">Preferencias de contacto del cliente</option>
                   <option value="Llamada">Llamada</option>
                   <option value="WhatsApp">WhatsApp</option>
                 </select>
 
                 <select name="tipoSolicitud" className="input" onChange={handleChange} required>
-                  <option value="">¿Tu solicitud es para?</option>
+                  <option value="">Tipo de proyecto:</option>
                   <option value="Hogar">Hogar</option>
                   <option value="Comercial">Comercial</option>
                   <option value="Empresa">Empresa</option>
-                  <option value="Gran Escala">Gran Escala (Más de 5 MW)</option>
+                  <option value="Gran Escala">Granja Solar</option>
                 </select>
               </>
             )}
 
             {step === 2 && (
               <>
-                <h2>¡Diligencia los detalles de tu cotización!</h2>
+                <h2>PASO 2 DE 2:</h2>
 
                 <select name="tipoTecho" className="input" onChange={handleChange} required>
                   <option value="">Tipo de techo</option>
@@ -146,7 +146,8 @@ export default function CotizadorSolar() {
                     No
                   </label>
                 </div>
-
+                
+                <label className="label">Sistema de Interés:</label>
                 <select name="sistemaInteres" className="input" onChange={handleChange}>
                   <option value="">Sistema de interés</option>
                   <option>Interconectado</option>
@@ -169,10 +170,10 @@ export default function CotizadorSolar() {
                   <option>WhatsApp</option>
                 </select>
 
-                <label className="label">Adjunta una foto de tu factura:</label>
+                <label className="label">Adjunta una foto de la factura:</label>
                 <input type="file" name="facturaAdjunta" className="input" onChange={handleChange} />
 
-                <textarea name="notasAdicionales" placeholder="¿Debemos saber algo más de tu proyecto solar?" className="input" onChange={handleChange} />
+                <textarea name="notasAdicionales" placeholder="Notas del proyecto" className="input" onChange={handleChange} />
               </>
             )}
 

@@ -48,7 +48,7 @@ export default function Resultado() {
       <div className="overlay">
         <div className="form-container">
           {/* LOGO MARCA */}
-          <img src={logo} alt="Logo WattsPower" style={{ width: '200px', display: 'block', margin: '80px auto 1rem' }} />
+          <img src={logo} alt="Logo Solartech" style={{ width: '200px', display: 'block', margin: '80px auto 1rem' }} />
 
           <div>
             <h2 className='title'>Cotización N-{resultado.numeroCotizacion}</h2>
