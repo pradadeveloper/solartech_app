@@ -134,14 +134,14 @@ export default function Resultado() {
                 <Metric label="Potencia del sistema" value={`${resultado?.kwp ?? "—"} kWp`} />
                 <Metric label="Consumo mensual" value={`${money(resultado?.consumoKwh)} kWh/mes`} />
                 <Metric label="Producción mensual" value={`${money(resultado?.produccionDeEnergia)} kWh/mes`} />
+                <Metric label="Consumo promedio día" value={`${money(resultado?.wPromedioDia)} W/día`} />
                 <Metric label="Radiación promedio" value={`${resultado?.radiacionSolar ?? "—"}`} />
                 <Metric label="Área disponible" value={`${money(resultado?.areaDisponible)} m²`} />
-                <Metric label="Consumo promedio día" value={`${money(resultado?.wPromedioDia)} W/día`} />
                 <Metric label="Cobertura estimada" value={`${resultado?.porcentajeCoberturaProyecto ?? "—"}%`} />
-                <Metric
+                {/* <Metric
                   label={`Radiación con margen (${resultado?.margenCobertura ?? "—"}%)`}
                   value={`${resultado?.radiacionSolarCobertura ?? "—"}`}
-                />
+                /> */}
                 <Metric label="Área mínima requerida" value={`${resultado?.areaMinima ?? "—"} m²`} />
               </div>
             </Card>
@@ -155,7 +155,7 @@ export default function Resultado() {
                 <Metric label="Retorno de inversión" value={`${resultado?.tiempoRetorno ?? "—"} años`} />
                 <Metric label="Vida útil estimada" value={`25 años`} />
                 <Metric label="Descuento declaración de renta" value={`$ ${money(resultado?.descuentoDeclaracion)}`} />
-                <Metric label="Valor promedio por kWp" value={`$ ${money(resultado?.valorKwp)}`} />
+                {/* <Metric label="Valor promedio por kWp" value={`$ ${money(resultado?.valorKwp)}`} /> */}
                 <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultado?.ahorro10Anos)}`} />
                 <Metric label="Valorización aproximada" value={`4–10%`} />
               </div>
