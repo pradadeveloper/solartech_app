@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import './App.css';
+import './cotizadorSolar.css';
 import logo from './assets/logo_solartech.webp';
 import { useNavigate } from 'react-router-dom';
 
