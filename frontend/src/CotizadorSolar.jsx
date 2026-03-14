@@ -1,215 +1,348 @@
-import { useState } from 'react';
-import './App.css';
-import logo from './assets/logo_solartech.webp';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from "react";
+import "./cotizadorSolar.css";
+import logo from "./assets/logo_solartech.webp";
+import { useNavigate } from "react-router-dom";
 
 export default function CotizadorSolar() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-  nombre: 'Juan Pérez',
-  correo: 'juan@example.com',
-  telefono: '3001234567',
-  ubicacion: 'Medellín',
-  preferenciaContacto: 'WhatsApp',
-  tipoSolicitud: 'Hogar',
-  tipoTecho: 'Teja de barro',
-  recibeFactura: 'Sí',
-  sistemaInteres: 'Interconectado',
-  valorMensual: '1000000',
-  consumoKwh: '1000',
-  costoKwh: '800',
-  conociste: 'Instagram',
-  facturaAdjunta: null,
-  notasAdicionales: 'Solo pruebas técnicas',
-  areaDisponible: '100'
-});
+    nombre: "Juan Pérez",
+    correo: "juan@example.com",
+    telefono: "3001234567",
+    ubicacion: "Medellín",
+    preferenciaContacto: "WhatsApp",
+    tipoSolicitud: "Hogar",
+    tipoTecho: "Teja de barro",
+    recibeFactura: "Sí",
+    sistemaInteres: "Interconectado",
+    valorMensual: "1000000",
+    consumoKwh: "1000",
+    costoKwh: "800",
+    conociste: "Instagram",
+    facturaAdjunta: null,
+    notasAdicionales: "Solo pruebas técnicas",
+    areaDisponible: "100",
+  });
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, files, type } = e.target;
-    if (type === "file") {
-      setFormData({ ...formData, [name]: files[0] });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "file" ? files?.[0] ?? null : value,
+    }));
   };
 
+  const canGoNext = useMemo(() => {
+    // ✅ Validación simple (sin tocar backend)
+    const requiredStep1 = [
+      "nombre",
+      "correo",
+      "telefono",
+      "ubicacion",
+      "consumoKwh",
+      "costoKwh",
+      "valorMensual",
+      "areaDisponible",
+      "preferenciaContacto",
+      "tipoSolicitud",
+    ];
+    return requiredStep1.every((k) => String(formData[k] ?? "").trim().length > 0);
+  }, [formData]);
+
   const handleNext = () => {
-    if (step === 1) setStep(2);
+    if (step === 1 && canGoNext) setStep(2);
   };
 
   const handleBack = () => {
     if (step === 2) setStep(1);
   };
 
-  const navigate = useNavigate();
-  const nombreUsuario = localStorage.getItem('nombreUsuario');
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('nombreUsuario');
-    navigate('/login');
-  };
-
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
 
-    const formToSend = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      formToSend.append(key, value);
-    });
+  // ✅ Si estás en paso 1, NO calcules, solo pasa a paso 2
+  if (step === 1) {
+    if (canGoNext) setStep(2);
+    return;
+  }
 
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/calcular-proyecto`, {
-      method: 'POST',
-      body: formToSend
-    });
+  setLoading(true);
 
-    const data = await response.json();
-    setLoading(false);
+  const formToSend = new FormData();
+  Object.entries(formData).forEach(([key, value]) => formToSend.append(key, value));
 
-    // 🔁 Aquí rediriges y pasas los resultados a la nueva página
-    navigate('/resultado', { state: { resultado: data } });
-  };
+  const response = await fetch(`${process.env.REACT_APP_API_URL}/api/calcular-proyecto`, {
+    method: "POST",
+    body: formToSend,
+  });
+
+  const data = await response.json();
+  setLoading(false);
+
+  navigate("/resultado", { state: { resultado: data } });
+};
 
   return (
-    <div className="page-bg">
-      <div className="overlay">
-        <div className="form-container">
-          <img src={logo} alt="Logo Solartech" style={{ width: '200px', display: 'block', margin: '80px auto 1rem' }} />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Hola, {nombreUsuario}</span>
-            <button type="button" className="button-secondary" onClick={handleLogout} style={{ padding: '0.3rem 0.8rem', fontSize: '0.85rem' }}>
-              Cerrar sesión
-            </button>
+    <div className="cotizador">
+      <div className="cotizadorShell">
+        {/* Header */}
+        <header className="cotHeader">
+          <img src={logo} alt="Logo Solartech" className="cotLogo" />
+          <div className="cotHeaderText">
+            <h1 className="cotTitle">Nuevo Lead — Cotizador Solar</h1>
+            <p className="cotSubtitle">Completa los datos y genera la cotización en segundos.</p>
           </div>
 
-          <h1 className="title">Escribe los datos de tu cliente:</h1>
-          <div className="step-indicator">
-            <div className={`step ${step === 1 ? 'active' : ''}`}>1. Datos</div>
-            <div className={`step ${step === 2 ? 'active' : ''}`}>2. Cotización</div>
+          <div className="cotSteps">
+            <span className={`cotStep ${step === 1 ? "isActive" : ""}`}>1</span>
+            <span className="cotStepLine" />
+            <span className={`cotStep ${step === 2 ? "isActive" : ""}`}>2</span>
           </div>
+        </header>
 
-          <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="cotGrid">
+          {/* Left: Form */}
+          <section className="cotMain">
             {step === 1 && (
               <>
-                <h2>PASO 1 DE 2:</h2>
-                <input name="nombre" placeholder="Nombre completo" className="input" onChange={handleChange} required />
-                <input name="correo" type="email" placeholder="Correo electrónico" className="input" onChange={handleChange} required />
-                <input name="telefono" type="tel" placeholder="Número de contacto" className="input" onChange={handleChange} required />
-                <input name="ubicacion" placeholder="Ubicación del proyecto" className="input" onChange={handleChange} required />
+                <Card title="Datos del cliente">
+                  <div className="cotTwoCol">
+                    <Field label="Nombre completo">
+                      <input name="nombre" value={formData.nombre} onChange={handleChange} required />
+                    </Field>
 
-                <input name="consumoKwh" placeholder="Consumo kWh/mes" className="input" onChange={handleChange} required />
-                <input name="costoKwh" placeholder="Costo kWh/mes" className="input" onChange={handleChange} required />
-                <input name="valorMensual" type="number" placeholder="Valor promedio de factura de energía" className="input" onChange={handleChange} required />
-                <input name="areaDisponible" type="number" placeholder="Area disponible para páneles" className="input" onChange={handleChange} required />
+                    <Field label="Correo electrónico">
+                      <input name="correo" type="email" value={formData.correo} onChange={handleChange} required />
+                    </Field>
 
-                <select name="preferenciaContacto" className="input" onChange={handleChange} required>
-                  <option value="">Preferencias de contacto del cliente</option>
-                  <option value="Llamada">Llamada</option>
-                  <option value="WhatsApp">WhatsApp</option>
-                </select>
+                    <Field label="Teléfono">
+                      <input name="telefono" type="tel" value={formData.telefono} onChange={handleChange} required />
+                    </Field>
 
-                <select name="tipoSolicitud" className="input" onChange={handleChange} required>
-                  <option value="">Tipo de proyecto:</option>
-                  <option value="Hogar">Hogar</option>
-                  <option value="Comercial">Comercial</option>
-                  <option value="Empresa">Empresa</option>
-                  <option value="Gran Escala">Granja Solar</option>
-                </select>
+                    <Field label="Ubicación del proyecto">
+                      <input name="ubicacion" value={formData.ubicacion} onChange={handleChange} required />
+                    </Field>
+
+                    <Field label="Preferencia de contacto">
+                      <select name="preferenciaContacto" value={formData.preferenciaContacto} onChange={handleChange} required>
+                        <option value="">Selecciona</option>
+                        <option value="Llamada">Llamada</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Tipo de proyecto">
+                      <select name="tipoSolicitud" value={formData.tipoSolicitud} onChange={handleChange} required>
+                        <option value="">Selecciona</option>
+                        <option value="Hogar">Hogar</option>
+                        <option value="Comercial">Comercial</option>
+                        <option value="Empresa">Empresa</option>
+                        <option value="Gran Escala">Granja Solar</option>
+                      </select>
+                    </Field>
+                  </div>
+                </Card>
+
+                <Card title="Consumo y dimensionamiento rápido">
+                  <div className="cotTwoCol">
+                    <Field label="Consumo kWh/mes">
+                      <input name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} required />
+                    </Field>
+
+                    <Field label="Costo kWh (COP)">
+                      <input name="costoKwh" value={formData.costoKwh} onChange={handleChange} required />
+                    </Field>
+
+                    <Field label="Valor mensual factura (COP)">
+                      <input name="valorMensual" type="number" value={formData.valorMensual} onChange={handleChange} required />
+                    </Field>
+
+                    <Field label="Área disponible (m²)">
+                      <input name="areaDisponible" type="number" value={formData.areaDisponible} onChange={handleChange} required />
+                    </Field>
+                  </div>
+
+                  {!canGoNext && (
+                    <div className="cotHint">
+                      Completa los campos obligatorios para continuar.
+                    </div>
+                  )}
+                </Card>
               </>
             )}
 
             {step === 2 && (
               <>
-                <h2>PASO 2 DE 2:</h2>
+                <Card title="Detalles del proyecto">
+                  <div className="cotTwoCol">
+                    <Field label="Tipo de techo">
+                      <select name="tipoTecho" value={formData.tipoTecho} onChange={handleChange} required>
+                        <option value="">Selecciona</option>
+                        <option>Standing Seam</option>
+                        <option>Termoacústica</option>
+                        <option>Teja de barro</option>
+                        <option>Manto Asfáltico</option>
+                        <option>Teja Eternit</option>
+                        <option>Madera</option>
+                        <option>Zinc</option>
+                      </select>
+                    </Field>
 
-                <select name="tipoTecho" className="input" onChange={handleChange} required>
-                  <option value="">Tipo de techo</option>
-                  <option>Standing Seam</option>
-                  <option>Termoacústica</option>
-                  <option>Teja de barro</option>
-                  <option>Manto Asfáltico</option>
-                  <option>Teja Eternit</option>
-                  <option>Madera</option>
-                  <option>Zinc</option>
-                </select>
+                    <Field label="Sistema de interés">
+                      <select name="sistemaInteres" value={formData.sistemaInteres} onChange={handleChange}>
+                        <option value="">Selecciona</option>
+                        <option>Interconectado</option>
+                        <option>Aislado</option>
+                        <option>Híbrido</option>
+                      </select>
+                    </Field>
 
-                <label className="label">¿Recibe factura de energía?</label>
-                <div className="radio-group">
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="recibeFactura"
-                      value="Sí"
-                      checked={formData.recibeFactura === "Sí"}
+                    <Field label="¿Cómo nos conociste?">
+                      <select name="conociste" value={formData.conociste} onChange={handleChange}>
+                        <option value="">Selecciona</option>
+                        <option>Instagram</option>
+                        <option>Facebook</option>
+                        <option>LinkedIn</option>
+                        <option>Google</option>
+                        <option>Referido</option>
+                      </select>
+                    </Field>
+
+                    <div className="cotRadioBlock">
+                      <span className="cotLabel">¿Recibe factura de energía?</span>
+                      <div className="cotRadioRow">
+                        <label className="cotRadio">
+                          <input
+                            type="radio"
+                            name="recibeFactura"
+                            value="Sí"
+                            checked={formData.recibeFactura === "Sí"}
+                            onChange={handleChange}
+                          />
+                          <span>Sí</span>
+                        </label>
+
+                        <label className="cotRadio">
+                          <input
+                            type="radio"
+                            name="recibeFactura"
+                            value="No"
+                            checked={formData.recibeFactura === "No"}
+                            onChange={handleChange}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card title="Adjuntos y notas">
+                  <Field label="Adjunta una foto de la factura (opcional)">
+                    <input type="file" name="facturaAdjunta" onChange={handleChange} />
+                  </Field>
+
+                  <Field label="Notas adicionales">
+                    <textarea
+                      name="notasAdicionales"
+                      value={formData.notasAdicionales}
                       onChange={handleChange}
+                      placeholder="Ej: sombras, restricciones, urgencia, etc."
                     />
-                    Sí
-                  </label>
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="recibeFactura"
-                      value="No"
-                      checked={formData.recibeFactura === "No"}
-                      onChange={handleChange}
-                    />
-                    No
-                  </label>
-                </div>
-                
-                <label className="label">Sistema de Interés:</label>
-                <select name="sistemaInteres" className="input" onChange={handleChange}>
-                  <option value="">Sistema de interés</option>
-                  <option>Interconectado</option>
-                  <option>Aislado</option>
-                  <option>Híbrido</option>
-                </select>
-
-                <select name="conociste" className="input" onChange={handleChange}>
-                  <option value="">¿Cómo nos conociste?</option>
-                  <option>Periódicos</option>
-                  <option>Radio</option>
-                  <option>Televisión</option>
-                  <option>Referido</option>
-                  <option>Email</option>
-                  <option>Facebook</option>
-                  <option>Instagram</option>
-                  <option>LinkedIn</option>
-                  <option>Búsqueda de Google</option>
-                  <option>Ferias/Eventos</option>
-                  <option>WhatsApp</option>
-                </select>
-
-                <label className="label">Adjunta una foto de la factura:</label>
-                <input type="file" name="facturaAdjunta" className="input" onChange={handleChange} />
-
-                <textarea name="notasAdicionales" placeholder="Notas del proyecto" className="input" onChange={handleChange} />
+                  </Field>
+                </Card>
               </>
             )}
 
-            <div className="form-actions">
+            {/* Footer actions */}
+            <div className="cotActions">
               {step === 2 && (
-                <button type="button" className="button-secondary" onClick={handleBack}>
+                <button type="button" className="cotBtn cotBtnGhost" onClick={handleBack}>
                   Atrás
                 </button>
               )}
+
               {step === 1 ? (
-                <button type="button" className="button" onClick={handleNext}>
-                  Siguiente
+                <button
+                    type="button"
+                    className="cotBtn cotBtnPrimary"
+                    disabled={!canGoNext}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNext();
+                    }}
+                  >
+                    Siguiente
                 </button>
               ) : (
-                <button type="submit" className="button" disabled={loading}>
-                  {loading ? 'Calculando...' : 'Calcular'}
+                <button type="submit" className="cotBtn cotBtnPrimary" disabled={loading}>
+                  {loading ? "Calculando..." : "Calcular"}
                 </button>
               )}
             </div>
-          </form>
-        </div>
+          </section>
+
+          {/* Right: Summary */}
+          <aside className="cotSide">
+            <Card title="Resumen del lead">
+              <SummaryRow label="Cliente" value={formData.nombre} />
+              <SummaryRow label="Ciudad" value={formData.ubicacion} />
+              <SummaryRow label="kWh/mes" value={formData.consumoKwh} />
+              <SummaryRow label="Costo kWh" value={formData.costoKwh} />
+              <SummaryRow label="Factura mensual" value={formData.valorMensual} />
+              <SummaryRow label="Área (m²)" value={formData.areaDisponible} />
+              <div className="cotDivider" />
+              <SummaryRow label="Canal" value={formData.conociste || "—"} />
+              <SummaryRow label="Contacto" value={formData.preferenciaContacto || "—"} />
+              <SummaryRow label="Tipo" value={formData.tipoSolicitud || "—"} />
+            </Card>
+
+            <Card title="Tips rápidos">
+              <ul className="cotTips">
+                <li>Verifica consumo (kWh) y costo por kWh.</li>
+                <li>Si el área es baja, el sistema se limita por m².</li>
+                <li>Adjuntar factura acelera la precisión del cálculo.</li>
+              </ul>
+            </Card>
+          </aside>
+        </form>
       </div>
+    </div>
+  );
+}
+
+/* ---------- mini componentes UI ---------- */
+
+function Card({ title, children }) {
+  return (
+    <div className="cotCard">
+      <div className="cotCardHead">
+        <h2>{title}</h2>
+      </div>
+      <div className="cotCardBody">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div className="cotField">
+      <label className="cotLabel">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }) {
+  return (
+    <div className="cotSummaryRow">
+      <span className="cotSummaryLabel">{label}</span>
+      <span className="cotSummaryValue">{String(value ?? "—")}</span>
     </div>
   );
 }

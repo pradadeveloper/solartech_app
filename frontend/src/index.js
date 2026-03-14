@@ -9,7 +9,7 @@ function RutaProtegida({ children }) {
   return token ? children : <Navigate to="/login" replace />;
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
   <Router>

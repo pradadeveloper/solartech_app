@@ -1,0 +1,767 @@
+/* =========================================================
+   COTIZADOR SOLAR — CSS UNIFICADO (Legacy + Nuevo layout + Resultado)
+   ✅ No elimina estilos existentes
+   ✅ Evita “romper” el dashboard porque todo está scoped a .cotizador
+   ✅ Mantiene clases legacy (.page-bg, .overlay, .container, .button, etc.)
+   ✅ Agrega layout tipo SaaS (cards, grid, resumen lateral)
+   ✅ Agrega tablas “premium” para Resultado sin dañar tables legacy
+   ========================================================= */
+
+/* =============== Estilos base =============== */
+.cotizador {
+  font-family: "Segoe UI", sans-serif;
+  min-height: 100vh;
+  background-image: url("./assets/banner_1.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+/* Fondo translúcido (legacy) */
+.page-bg {
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay {
+  background-color: rgb(255 255 255/0%);
+  width: 100%;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Contenedor del formulario (legacy) */
+.form-container {
+  border-radius: 10px;
+  background-color: white;
+  width: 80%;
+  padding: 5%;
+}
+
+/* Contenedor legacy .container */
+.container {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 550px;
+  box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+/* Títulos legacy */
+.cotizador h1 {
+  color: #fff;
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.container h2 {
+  color: #ffffff;
+  margin-top: 1rem;
+  font-size: 1.2rem;
+  text-align: left;
+}
+
+/* Inputs generales (legacy) */
+.cotizador input,
+.cotizador select,
+.cotizador textarea {
+  width: 100%;
+  padding: 0.8rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+/* ✅ Dark-friendly select (para que se vean opciones) */
+.cotizador select {
+  background-color: #0f172a;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.cotizador select option {
+  background-color: #0f172a;
+  color: #ffffff;
+}
+
+/* IDs legacy */
+#etapasProyectoTiempo {
+  font-size: 14px;
+}
+
+/* Botones legacy */
+.button {
+  width: 100%;
+  padding: 1rem;
+  background-color: #d80902;
+  color: rgb(255, 255, 255);
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 1rem;
+  transition: background-color 0.3s;
+}
+
+.DetalleEquiposBotón {
+  padding: 10px;
+  background-color: #000000;
+  color: rgb(255, 255, 255);
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 1rem;
+  transition: background-color 0.3s;
+}
+
+.button:hover {
+  color: white;
+  background-color: #c00a04;
+}
+
+/* Etiquetas legacy */
+.cotizador label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+/* Textarea legacy */
+.cotizador textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Radios legacy */
+.cotizador input[type="radio"] {
+  margin-right: 6px;
+}
+
+/* Resultados legacy */
+.results {
+  background-color: #fff;
+  color: #000;
+  margin-top: 2rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  text-align: left;
+}
+
+.results h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.download-link {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.6rem 1rem;
+  background-color: #e70808;
+  color: rgb(255, 255, 255);
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+/* Logo legacy (⚠️ usado también en dashboard, por eso lo scopo) */
+.cotizador .logo {
+  width: 100%;
+  margin: 2rem auto 1rem;
+  display: block;
+}
+
+/* Step legacy */
+.step-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1rem 0 2rem;
+}
+.step {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  background-color: #ddd;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #333;
+  transition: all 0.3s ease;
+}
+.step.active {
+  background-color: #d82108;
+  color: rgb(255, 255, 255);
+}
+
+.radio-group {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  margin: 10px 0 20px;
+}
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+.radio-option input[type="radio"] {
+  accent-color: #ea0808;
+  width: 16px;
+  height: 16px;
+}
+.title {
+  color: #ea0808;
+}
+
+/* Tablas legacy (OJO: esto afecta cualquier table global, lo dejamos porque ya existía) */
+table {
+  border-collapse: separate;
+  border-radius: 8px;
+  width: 70%;
+  margin-bottom: 2rem;
+  font-size: 16px;
+  margin: auto;
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+td,
+th {
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  padding: 10px;
+  text-align: center;
+  color: rgb(255, 255, 255);
+}
+
+.resumenValorProyecto {
+  color: white;
+  background-color: #c00a04;
+  width: 340px;
+}
+
+/* Bloques legacy */
+.datoscliente,
+.calculosIniciales,
+.propuestaEconomicaContainer,
+.etapasProyectoContainer,
+.formasDePago,
+.impactoAmbiental,
+.marcasAliadasContainer,
+.condicionesComercialesContainer,
+.proyectosInstalados,
+.casosExitoColombia {
+  display: flex;
+  flex-direction: column;
+  margin: 70px 0px;
+}
+
+.fecha {
+  font-style: italic;
+  color: #444;
+}
+
+.containerPgenerales {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.generales {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+}
+.generalesBloque {
+  display: flex;
+  flex-direction: column;
+}
+
+.financiero {
+  display: flex;
+  flex-direction: column;
+}
+
+.pgenerales {
+  color: rgb(104, 104, 104);
+  background-color: #ffffff;
+  align-items: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 5px;
+}
+.pgeneralesDetalle {
+  text-align: center;
+}
+.condicionesComerciales {
+  color: gray;
+  text-align: justify;
+  font-size: 12px;
+}
+.Banner_Casos_mobile {
+  display: none;
+}
+.buttonDetalleEquipos {
+  display: flex;
+  justify-content: center;
+  margin: auto;
+}
+.container_casos_exito {
+  display: flex;
+  justify-content: center;
+}
+.marcasAliadas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border-radius: 8px;
+}
+.marcasAliadas img {
+  margin: 10px;
+  width: 20%;
+}
+.etapasProyecto,
+.garantiasContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+}
+.icono {
+  width: 200px;
+  margin: 10px;
+}
+.datosUsuario,
+.sistemaSolarContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  flex-direction: row-reverse;
+}
+
+.propuestaEconomica {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-around;
+}
+.resumenPropuestaEconomica {
+  margin: 20px;
+}
+
+.resultado {
+  color: #c00a04;
+}
+.resultadoGreen {
+  color: green;
+}
+
+/* =========================================================
+   ✅ NUEVO LAYOUT TIPO DASHBOARD (SaaS)
+   Usa estas clases si aplicas la nueva estructura JSX
+   ========================================================= */
+
+/* Shell */
+.cotizadorShell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 22px;
+}
+
+/* Header */
+.cotHeader {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.cotLogo,
+.cotizador-logo,
+.cotLogoSolartech {
+  width: 120px;
+  height: auto;
+}
+
+.cotHeaderText {
+  flex: 1;
+  min-width: 220px;
+}
+.cotTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+}
+.cotSubtitle {
+  margin: 4px 0 0;
+  opacity: 0.75;
+  color: #fff;
+  font-size: 13px;
+}
+
+/* Steps */
+.cotSteps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cotStep {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  opacity: 0.6;
+}
+.cotStep.isActive {
+  opacity: 1;
+  border-color: rgba(250, 204, 21, 0.85);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.12);
+}
+.cotStepLine {
+  width: 28px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Grid principal */
+.cotGrid {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+}
+
+.cotMain {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cotSide {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Cards */
+.cotCard {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+/* ✅ Se añade flex al head para soportar "right" buttons */
+.cotCardHead {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cotCardHead h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 14px;
+  opacity: 0.95;
+}
+.cotCardBody {
+  padding: 14px;
+}
+
+/* Campos */
+.cotTwoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cotField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cotLabel {
+  color: #fff;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* ✅ Inputs del nuevo layout (override suave sin romper legacy) */
+.cotizador .cotCard input,
+.cotizador .cotCard select,
+.cotizador .cotCard textarea {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0f172a;
+  color: #fff;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.cotizador .cotCard input:focus,
+.cotizador .cotCard select:focus,
+.cotizador .cotCard textarea:focus {
+  outline: none;
+  border: 1px solid rgba(250, 204, 21, 0.8);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2);
+}
+
+/* Hint */
+.cotHint {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.75;
+  color: #fff;
+}
+
+/* Radios */
+.cotRadioBlock {
+  grid-column: 1 / -1;
+}
+.cotRadioRow {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+}
+.cotRadio {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: #fff;
+  opacity: 0.9;
+}
+.cotRadio input {
+  accent-color: #facc15;
+}
+
+/* Actions */
+.cotActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.cotBtn {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  background: transparent;
+  color: #fff;
+}
+
+.cotBtnPrimary {
+  background: #facc15;
+  color: #111;
+  border-color: rgba(250, 204, 21, 0.85);
+  font-weight: 700;
+}
+
+.cotBtnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cotBtnGhost {
+  background: transparent;
+  color: #fff;
+}
+
+/* Resumen lateral */
+.cotSummaryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+}
+.cotSummaryLabel {
+  color: #fff;
+  opacity: 0.7;
+  font-size: 12px;
+}
+.cotSummaryValue {
+  color: #fff;
+  font-size: 12px;
+  text-align: right;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Divider (nuevo layout) */
+.cotDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 10px 0;
+}
+
+.cotTips {
+  margin: 0;
+  padding-left: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+}
+.cotTips li {
+  margin: 8px 0;
+}
+
+/* =========================================================
+   ✅ RESULTADO “PREMIUM” (tablas limpias dentro de cards)
+   IMPORTANTE: usamos .tableWrap y .table (NO "table" global)
+   para no romper el legacy.
+   ========================================================= */
+
+.cotizador .tableWrap {
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* tabla premium */
+.cotizador .table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+/* celdas premium (no afecta td/th global) */
+.cotizador .table th,
+.cotizador .table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  white-space: nowrap;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.cotizador .table th {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.25);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 700;
+}
+
+.cotizador .num {
+  text-align: right;
+}
+
+/* =========================================================
+   Responsivo (legacy + nuevo)
+   ========================================================= */
+@media (max-width: 1050px) {
+  .cotGrid {
+    grid-template-columns: 1fr;
+  }
+  .cotTwoCol {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .overlay {
+    padding: 0%;
+  }
+
+  .container {
+    padding: 1.5rem;
+  }
+
+  .form-container {
+    text-align: center;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  .button {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 0.95rem;
+  }
+
+  .etapasProyecto,
+  .garantiasContainer {
+    flex-direction: column;
+  }
+
+  .cotizador input,
+  .cotizador select,
+  .cotizador textarea {
+    font-size: 0.95rem;
+  }
+
+  .Banner_Casos_Desktop {
+    display: none;
+  }
+
+  .Banner_Casos_mobile {
+    display: block;
+    height: auto;
+    width: 100px;
+    margin: 10px;
+  }
+
+  .container_casos_exito {
+    align-items: center;
+  }
+
+  .container_casos_exito_2 {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+  }
+
+  .marcasAliadas {
+    flex-direction: column;
+  }
+
+  .marcasAliadas img {
+    flex-direction: column;
+    width: 50%;
+    margin: 10px;
+  }
+
+  .icono {
+    display: none;
+  }
+
+  /* premium table: en mobile no fuerces ancho grande */
+  .cotizador .table {
+    min-width: 520px;
+  }
+}
