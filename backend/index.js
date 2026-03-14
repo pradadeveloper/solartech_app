@@ -1,5 +1,6 @@
 // LOGICA DE CALCULOS
 // backend/index.js actualizado
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -9,7 +10,17 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { PDFDocument, rgb } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
+const jwt = require('jsonwebtoken');
 const contadorPath = path.join(__dirname, 'contador.json');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
+
+// Usuarios del sistema — agregar o quitar vendedores aquí
+const usuarios = [
+  { id: 1, nombre: 'Administrador', usuario: 'admin', password: 'solartech2024' },
+  { id: 2, nombre: 'Vendedor 1',    usuario: 'vendedor1', password: 'vendedor123' },
+  { id: 3, nombre: 'Vendedor 2',    usuario: 'vendedor2', password: 'vendedor456' },
+];
 
 const app = express();
 const PORT = 4000;
@@ -298,6 +309,29 @@ async function generarPDF(data, resultados) {
 
   return '/' + fileName;
 }
+
+// LOGIN
+app.post('/api/login', (req, res) => {
+  const { usuario, password } = req.body;
+
+  if (!usuario || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+  }
+
+  const user = usuarios.find(u => u.usuario === usuario && u.password === password);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+  }
+
+  const token = jwt.sign(
+    { id: user.id, nombre: user.nombre, usuario: user.usuario },
+    JWT_SECRET,
+    { expiresIn: '8h' }
+  );
+
+  res.json({ token, nombre: user.nombre });
+});
 
 app.post('/api/calcular-proyecto', upload.single('facturaAdjunta'), async (req, res) => {
   const data = req.body;

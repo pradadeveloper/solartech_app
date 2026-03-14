@@ -44,6 +44,13 @@ export default function CotizadorSolar() {
   };
 
   const navigate = useNavigate();
+  const nombreUsuario = localStorage.getItem('nombreUsuario');
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('nombreUsuario');
+    navigate('/login');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,7 +78,14 @@ export default function CotizadorSolar() {
       <div className="overlay">
         <div className="form-container">
           <img src={logo} alt="Logo Solartech" style={{ width: '200px', display: 'block', margin: '80px auto 1rem' }} />
-          
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Hola, {nombreUsuario}</span>
+            <button type="button" className="button-secondary" onClick={handleLogout} style={{ padding: '0.3rem 0.8rem', fontSize: '0.85rem' }}>
+              Cerrar sesión
+            </button>
+          </div>
+
           <h1 className="title">Escribe los datos de tu cliente:</h1>
           <div className="step-indicator">
             <div className={`step ${step === 1 ? 'active' : ''}`}>1. Datos</div>
