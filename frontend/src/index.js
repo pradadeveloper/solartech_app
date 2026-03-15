@@ -1,5 +1,7 @@
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import DashboardLayout from './DashboardLayout';
+import DashboardResumen from './DashboardResumen';
 import CotizadorSolar from './CotizadorSolar';
 import Resultado from './Resultado';
 import Login from './Login';
@@ -15,8 +17,11 @@ root.render(
   <Router>
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<RutaProtegida><CotizadorSolar /></RutaProtegida>} />
-      <Route path="/resultado" element={<RutaProtegida><Resultado /></RutaProtegida>} />
+      <Route path="/" element={<RutaProtegida><DashboardLayout /></RutaProtegida>}>
+        <Route index element={<DashboardResumen />} />
+        <Route path="cliente" element={<CotizadorSolar />} />
+        <Route path="resultado" element={<Resultado />} />
+      </Route>
     </Routes>
   </Router>
 );

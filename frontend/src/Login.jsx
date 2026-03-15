@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from './assets/logo_solartech.webp';
-import './App.css';
+import './login.css';
 
 export default function Login() {
   const [usuario, setUsuario] = useState('');
@@ -40,48 +40,46 @@ export default function Login() {
   };
 
   return (
-    <div className="page-bg">
-      <div className="overlay">
-        <div className="form-container">
-          <img
-            src={logo}
-            alt="Logo Solartech"
-            style={{ width: '200px', display: 'block', margin: '80px auto 1.5rem' }}
-          />
-          <h1 className="title">Iniciar Sesión</h1>
+    <div className="login-bg">
+      <div className="login-card">
+        <img src={logo} alt="Logo Solartech" className="login-logo" />
+        <h1 className="login-title">Bienvenido</h1>
+        <p className="login-subtitle">Ingresa tus credenciales para continuar</p>
 
-          <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
+          <div className="login-field">
+            <label className="login-label">Usuario</label>
             <input
-              className="input"
-              placeholder="Usuario"
+              className="login-input"
+              placeholder="Ej: admin"
               value={usuario}
               onChange={e => setUsuario(e.target.value)}
               required
               autoComplete="username"
             />
+          </div>
+
+          <div className="login-field">
+            <label className="login-label">Contraseña</label>
             <input
-              className="input"
+              className="login-input"
               type="password"
-              placeholder="Contraseña"
+              placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
               autoComplete="current-password"
             />
+          </div>
 
-            {error && (
-              <p style={{ color: '#e74c3c', textAlign: 'center', margin: '0.5rem 0' }}>
-                {error}
-              </p>
-            )}
+          {error && <div className="login-error">{error}</div>}
 
-            <div className="form-actions">
-              <button type="submit" className="button" disabled={loading}>
-                {loading ? 'Ingresando...' : 'Ingresar'}
-              </button>
-            </div>
-          </form>
-        </div>
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </button>
+        </form>
+
+        <p className="login-footer">Solartech Energy S.A.S &nbsp;·&nbsp; v1.0</p>
       </div>
     </div>
   );

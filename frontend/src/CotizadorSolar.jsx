@@ -62,29 +62,40 @@ export default function CotizadorSolar() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  // ✅ Si estás en paso 1, NO calcules, solo pasa a paso 2
-  if (step === 1) {
-    if (canGoNext) setStep(2);
-    return;
-  }
+    if (step === 1) {
+      if (canGoNext) setStep(2);
+      return;
+    }
 
-  setLoading(true);
+    setLoading(true);
 
-  const formToSend = new FormData();
-  Object.entries(formData).forEach(([key, value]) => formToSend.append(key, value));
+    try {
+      const formToSend = new FormData();
+      Object.entries(formData).forEach(([key, value]) => formToSend.append(key, value));
 
-  const response = await fetch(`${process.env.REACT_APP_API_URL}/api/calcular-proyecto`, {
-    method: "POST",
-    body: formToSend,
-  });
+      const apiUrl = `${process.env.REACT_APP_API_URL}/api/calcular-proyecto`;
+      console.log('🔗 Fetching:', apiUrl);
 
-  const data = await response.json();
-  setLoading(false);
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        body: formToSend,
+      });
 
-  navigate("/resultado", { state: { resultado: data } });
-};
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Error del servidor");
+      }
+
+      const data = await response.json();
+      navigate("/resultado", { state: { resultado: data } });
+    } catch (err) {
+      alert(`Error al calcular: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="cotizador">

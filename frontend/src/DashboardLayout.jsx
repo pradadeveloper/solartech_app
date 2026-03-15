@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import "./dashboardAdmon.css";
 
@@ -32,6 +32,17 @@ export default function DashboardLayout() {
         </nav>
 
         <div className="sidebar__footer">
+          <button
+            className="navItem"
+            style={{ color: '#e74c3c', marginTop: 'auto' }}
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('nombreUsuario');
+              navigate('/login');
+            }}
+          >
+            Cerrar sesión
+          </button>
           <small>v0.1</small>
         </div>
       </aside>
