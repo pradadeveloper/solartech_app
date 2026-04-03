@@ -18,9 +18,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
 
 // Usuarios del sistema — agregar o quitar vendedores aquí
 const usuarios = [
-  { id: 1, nombre: 'Administrador', usuario: 'admin', password: 'solartech2026' },
-  { id: 2, nombre: 'Vendedor 1',    usuario: 'vendedor1', password: 'vendedor123' },
-  { id: 3, nombre: 'Vendedor 2',    usuario: 'vendedor2', password: 'vendedor456' },
+  { id: 1, nombre: 'Administrador', apellido: '',      cargo: 'Administrador',    usuario: 'admin',     password: 'solartech2026' },
+  { id: 2, nombre: 'Vendedor',      apellido: 'Uno',   cargo: 'Asesor Comercial', usuario: 'vendedor1', password: 'vendedor123'   },
+  { id: 3, nombre: 'Vendedor',      apellido: 'Dos',   cargo: 'Asesor Comercial', usuario: 'vendedor2', password: 'vendedor456'   },
 ];
 
 const app = express();
@@ -59,7 +59,12 @@ function incrementarContador() {
 // ====== Leads ======
 function leerLeads() {
   if (!fs.existsSync(leadsPath)) return [];
-  return JSON.parse(fs.readFileSync(leadsPath, 'utf-8'));
+  try {
+    const raw = fs.readFileSync(leadsPath, 'utf-8').trim();
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
 }
 
 function guardarLead(lead) {
@@ -385,12 +390,12 @@ app.post('/api/login', (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, nombre: user.nombre, usuario: user.usuario },
+    { id: user.id, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, usuario: user.usuario },
     JWT_SECRET,
     { expiresIn: '8h' }
   );
 
-  res.json({ token, nombre: user.nombre });
+  res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo });
 });
 
 // ====== Endpoint ======
@@ -448,6 +453,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       id: uuidv4(),
       numeroCotizacion,
       vendedor,
+      estado: 'Nuevo',
       fecha: new Date().toISOString(),
       nombre: data.nombre,
       correo: data.correo,
@@ -455,9 +461,11 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       identificacion: data.identificacion || null,
       ubicacion: data.ubicacion,
       tipoSolicitud: data.tipoSolicitud,
+      consumoKwh: resultados.consumoKwh,
       kwp: resultados.kwp,
       costoProyectoMasIva: resultados.costoProyectoMasIva,
       pdfUrl,
+      opciones: [],
     });
 
     res.json({ ...resultados, numeroCotizacion, pdfUrl });
@@ -470,6 +478,75 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
 // ====== GET /api/leads ======
 app.get('/api/leads', (req, res) => {
   res.json(leerLeads());
+});
+
+// ====== GET /api/leads/buscar ======
+app.get('/api/leads/buscar', (req, res) => {
+  const { correo, telefono, identificacion } = req.query;
+  if (!correo && !telefono && !identificacion) {
+    return res.json({ encontrado: false });
+  }
+  const lead = leerLeads().find((l) =>
+    (correo && l.correo === correo) ||
+    (telefono && l.telefono === telefono) ||
+    (identificacion && l.identificacion && l.identificacion === identificacion)
+  );
+  if (lead) {
+    return res.json({ encontrado: true, vendedor: lead.vendedor, numeroCotizacion: lead.numeroCotizacion, nombre: lead.nombre });
+  }
+  res.json({ encontrado: false });
+});
+
+// ====== GET /api/asesores ======
+app.get('/api/asesores', (_req, res) => {
+  res.json(usuarios.map(u => ({
+    id: u.id,
+    nombre: u.nombre,
+    apellido: u.apellido,
+    cargo: u.cargo,
+    usuario: u.usuario,
+    rol: u.usuario === 'admin' ? 'Admin' : 'Asesor',
+  })));
+});
+
+// ====== PATCH /api/leads/:numeroCotizacion/estado ======
+app.patch('/api/leads/:numeroCotizacion/estado', express.json(), (req, res) => {
+  const num = Number(req.params.numeroCotizacion);
+  const { estado } = req.body;
+  const leads = leerLeads();
+  const idx = leads.findIndex((l) => l.numeroCotizacion === num);
+  if (idx === -1) return res.status(404).json({ error: 'Lead no encontrado' });
+  leads[idx].estado = estado;
+  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
+  res.json({ ok: true });
+});
+
+// ====== PATCH /api/leads/:numeroCotizacion/opciones ======
+app.patch('/api/leads/:numeroCotizacion/opciones', (req, res) => {
+  const num = Number(req.params.numeroCotizacion);
+  const { opciones } = req.body;
+  const leads = leerLeads();
+  const idx = leads.findIndex((l) => l.numeroCotizacion === num);
+  if (idx === -1) return res.status(404).json({ error: 'Lead no encontrado' });
+  leads[idx].opciones = opciones;
+  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
+  res.json({ ok: true });
+});
+
+// ====== POST /api/generar-pdf (solo PDF, sin guardar lead) ======
+app.post('/api/generar-pdf', express.json(), async (req, res) => {
+  try {
+    const data = req.body || {};
+    if (!data.consumoKwh || !data.costoKwh) {
+      return res.status(400).json({ error: 'consumoKwh y costoKwh son requeridos' });
+    }
+    const resultados = calcularProyecto(data);
+    const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '—' });
+    res.json({ pdfUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Error interno' });
+  }
 });
 
 app.listen(PORT, () => {

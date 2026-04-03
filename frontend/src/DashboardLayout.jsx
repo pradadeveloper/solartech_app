@@ -23,11 +23,10 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="sidebar__nav">
-          <button className="navItem navItem--active" onClick={() => navigate("/")}>Resumen</button>
-          <button className="navItem">Leads</button>
-          <button className="navItem">Cotizaciones</button>
+          <button className="navItem" onClick={() => navigate("/")}>Resumen</button>
+          <button className="navItem" onClick={() => navigate("/leads")}>Leads y Cotizaciones</button>
+          <button className="navItem" onClick={() => navigate("/asesores")}>Asesores</button>
           <button className="navItem">Proyectos</button>
-          <button className="navItem">Asesores</button>
           <button className="navItem">Configuración</button>
         </nav>
 

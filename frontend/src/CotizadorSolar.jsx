@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import "./cotizadorSolar.css";
 import logo from "./assets/logo_solartech.webp";
 import { useNavigate } from "react-router-dom";
@@ -69,6 +69,28 @@ export default function CotizadorSolar() {
     ];
     return requiredStep1.every((k) => String(formData[k] ?? "").trim().length > 0);
   }, [formData]);
+
+  const [clienteExistente, setClienteExistente] = useState(null); // { vendedor, numeroCotizacion, nombre }
+
+  useEffect(() => {
+    const { correo, telefono, identificacion } = formData;
+    if (!correo && !telefono && !identificacion) { setClienteExistente(null); return; }
+
+    const params = new URLSearchParams();
+    if (correo)        params.set('correo', correo);
+    if (telefono)      params.set('telefono', telefono);
+    if (identificacion) params.set('identificacion', identificacion);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/buscar?${params}`);
+        const data = await res.json();
+        setClienteExistente(data.encontrado ? data : null);
+      } catch (_) {}
+    }, 600); // debounce 600ms
+
+    return () => clearTimeout(timer);
+  }, [formData.correo, formData.telefono, formData.identificacion]);
 
   const handleNext = () => {
     if (step === 1 && canGoNext) setStep(2);
@@ -376,6 +398,22 @@ export default function CotizadorSolar() {
                   lineHeight: 1.5,
                 }}>
                   ⚠️ <b>Área insuficiente.</b> Se necesitan <b>{areaMinima} m²</b> para el 100% del consumo. El área actual es <b>{formData.areaDisponible} m²</b>.
+                </div>
+              )}
+
+              {clienteExistente && (
+                <div style={{
+                  marginTop: '12px',
+                  background: 'rgba(243, 156, 18, 0.15)',
+                  border: '1px solid #f39c12',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '0.82rem',
+                  lineHeight: 1.6,
+                }}>
+                  🔒 <b>Cliente ya registrado.</b><br />
+                  <b>{clienteExistente.nombre}</b> ya está siendo atendido por el asesor <b>{clienteExistente.vendedor}</b> (Cot. N-{clienteExistente.numeroCotizacion}).
                 </div>
               )}
             </Card>

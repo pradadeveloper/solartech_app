@@ -4,6 +4,8 @@ import DashboardLayout from './DashboardLayout';
 import DashboardResumen from './DashboardResumen';
 import CotizadorSolar from './CotizadorSolar';
 import Resultado from './Resultado';
+import LeadsCotizaciones from './LeadsCotizaciones';
+import Asesores from './Asesores';
 import Login from './Login';
 
 function RutaProtegida({ children }) {
@@ -21,6 +23,8 @@ root.render(
         <Route index element={<DashboardResumen />} />
         <Route path="cliente" element={<CotizadorSolar />} />
         <Route path="resultado" element={<Resultado />} />
+        <Route path="leads" element={<LeadsCotizaciones />} />
+        <Route path="asesores" element={<Asesores />} />
       </Route>
     </Routes>
   </Router>

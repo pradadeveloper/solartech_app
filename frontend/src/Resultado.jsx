@@ -3,11 +3,138 @@ import logo from "./assets/logo_solartech.webp";
 import { useMemo, useState } from "react";
 import "./cotizadorSolar.css"; // usa tu misma hoja
 
+// ── Replica las fórmulas del backend para calcular en el frontend ──
+function calcularLocal(consumoKwh, costoKwh, base = {}) {
+  const consumo = Number(consumoKwh);
+  const costoUnidad = Number(costoKwh);
+  if (!consumo || !costoUnidad) return null;
+
+  const potenciaPanel = 585;
+  const radiacionSolar = 3.8;
+  const margenCobertura = 0.8;
+  const capacidadInversor = 3000;
+  const costokWp = 3500000;
+  const longitudRiel = 4.7;
+  const cableSolar = 10;
+
+  const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
+  const wPromedioDia = Number((((consumo * 1000) * 12) / 365).toFixed(1));
+  const kwp = Number(((wPromedioDia / radiacionSolarCobertura) / 1000).toFixed(1));
+
+  const npaneles = Math.ceil(wPromedioDia / (potenciaPanel * radiacionSolarCobertura));
+  const ninversores = Math.ceil((potenciaPanel * npaneles) / capacidadInversor);
+  const riel47 = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
+  const midCland = Math.ceil((npaneles * 2) - 2);
+  const endCland = Math.ceil(npaneles / 2);
+  const lFoot = Math.ceil(riel47 * 3);
+  const groundingLoop = Math.round(riel47 / 2) * 2;
+  const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
+  const areaMinima = Math.round(npaneles * 1.13 * 2);
+
+  // Cobertura por área (conserva el área del resultado original)
+  const areaDisp = Number(base.areaDisponible ?? 0);
+  let porcentajeCoberturaProyecto = 0;
+  if (areaDisp > 0 && areaMinima > 0) {
+    const p = (areaDisp / areaMinima) * 100;
+    porcentajeCoberturaProyecto = p >= 100 ? 100 : Number(p.toFixed(1));
+  }
+
+  const costoProyecto = Math.round(kwp * costokWp);
+  const ivaProyecto = Math.round(costoProyecto * 0.05);
+  const costoProyectoMasIva = Math.round(costoProyecto + ivaProyecto);
+  const costokwpproyecto = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
+  const descuentoDeclaracion = Math.round(costoProyecto / 2);
+  const ahorroMensual = Math.round(consumo * costoUnidad);
+  const ahorroAnual = ahorroMensual * 12;
+  const ahorro10Anos = Math.round(ahorroAnual * 10);
+  const tiempoRetorno = ahorroAnual > 0 ? Number((costoProyecto / ahorroAnual).toFixed(1)) : null;
+
+  // Ambiental
+  const co2EvitadoToneladas = Number((kwp * 1.2 * 0.7 * 0.43).toFixed(2));
+  const arbolesEquivalentes = Math.round(co2EvitadoToneladas / 0.02);
+  const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
+
+  return {
+    consumoKwh: consumo, costoKwh: costoUnidad, wPromedioDia,
+    kwp, potenciaPanel, capacidadInversor, radiacionSolar, radiacionSolarCobertura, margenCobertura,
+    npaneles, ninversores, riel47, midCland, endCland, lFoot, groundingLoop, cableSolar,
+    produccionDeEnergia, areaMinima, porcentajeCoberturaProyecto,
+    costoProyecto, ivaProyecto, costoProyectoMasIva, costokwpproyecto,
+    descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
+    co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
+  };
+}
+
 export default function Resultado() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { resultado } = location.state || {};
+
+  const [opcionSeleccionada, setOpcionSeleccionada] = useState(0);
+  const [guardado, setGuardado] = useState(false);
+  const [resultadoActivo, setResultadoActivo] = useState(() => resultado ?? {});
+  const [pdfUrls, setPdfUrls] = useState(() => resultado ? [resultado.pdfUrl, null, null] : []);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+
+  const [opciones, setOpciones] = useState(() => resultado ? [
+    { label: "Opción A", consumoKwh: String(resultado.consumoKwh), costoKwh: String(resultado.costoKwh) },
+    { label: "Opción B", consumoKwh: "", costoKwh: String(resultado.costoKwh) },
+    { label: "Opción C", consumoKwh: "", costoKwh: String(resultado.costoKwh) },
+  ] : []);
+
+  const calculos = opciones.map((op) =>
+    op.consumoKwh ? calcularLocal(op.consumoKwh, op.costoKwh, resultado) : null
+  );
+
+  const actualizarOpcion = (idx, campo, valor) => {
+    setOpciones((prev) => prev.map((op, i) => i === idx ? { ...op, [campo]: valor } : op));
+    setGuardado(false);
+  };
+
+  const guardarOpciones = async () => {
+    // Actualiza los valores visibles con la opción seleccionada
+    const calc = calculos[opcionSeleccionada];
+    if (calc) {
+      setResultadoActivo({ ...resultado, ...calc });
+    }
+
+    // Guarda en backend
+    if (resultado?.numeroCotizacion) {
+      const token = localStorage.getItem('token');
+      await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${resultado.numeroCotizacion}/opciones`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ opciones: calculos.map((c, i) => ({ ...opciones[i], ...c, seleccionada: i === opcionSeleccionada })) }),
+      });
+    }
+    setGuardado(true);
+  };
+
+  const descargarPDF = async () => {
+    if (pdfUrls[opcionSeleccionada]) {
+      window.open(`${process.env.REACT_APP_API_URL}${pdfUrls[opcionSeleccionada]}`, '_blank');
+      return;
+    }
+    const calc = calculos[opcionSeleccionada];
+    if (!calc) return;
+    setGenerandoPdf(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ...resultado, consumoKwh: calc.consumoKwh, label: opciones[opcionSeleccionada].label }),
+      });
+      const data = await res.json();
+      setPdfUrls((prev) => prev.map((u, i) => i === opcionSeleccionada ? data.pdfUrl : u));
+      window.open(`${process.env.REACT_APP_API_URL}${data.pdfUrl}`, '_blank');
+    } catch (e) {
+      alert('Error generando PDF');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   const fechaPropuesta = useMemo(() => new Date().toLocaleDateString("es-CO"), []);
 
@@ -97,21 +224,127 @@ export default function Resultado() {
                 </p>
 
                 <div className="cotActions" style={{ marginTop: 14 }}>
-                  <a
-                    href={`${process.env.REACT_APP_API_URL}${resultado.pdfUrl}`}
-                    download
-                    className="cotBtn cotBtnPrimary"
-                    style={{ textDecoration: "none", display: "inline-flex", justifyContent: "center" }}
-                  >
-                    Descargar propuesta en PDF
-                  </a>
-
+                  <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
+                    {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} en PDF`}
+                  </button>
                   <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
                     Volver al formulario
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* ── COMPARADOR DE OPCIONES ── */}
+            <Card
+              title="Comparador de opciones"
+              right={
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {guardado && <span style={{ fontSize: '0.8rem', color: '#2ecc71' }}>✓ Guardado</span>}
+                  <button className="cotBtn cotBtnGhost" style={{ padding: '4px 12px', fontSize: '0.82rem' }} onClick={guardarOpciones}>
+                    Guardar cambios
+                  </button>
+                </div>
+              }
+            >
+              <p style={{ margin: '0 0 14px', opacity: 0.8, fontSize: '0.85rem' }}>
+                Edita el consumo kWh/mes de cada opción para comparar escenarios. Marca la opción a enviar al cliente.
+              </p>
+
+              {/* Inputs de cada opción */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+                {opciones.map((op, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => op.consumoKwh && setOpcionSeleccionada(idx)}
+                    style={{
+                      background: opcionSeleccionada === idx ? 'rgba(245,197,24,0.12)' : 'rgba(255,255,255,0.04)',
+                      border: opcionSeleccionada === idx ? '1.5px solid #f5c518' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 10,
+                      padding: '14px 12px',
+                      cursor: op.consumoKwh ? 'pointer' : 'default',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <b style={{ fontSize: '0.9rem' }}>{op.label}</b>
+                      {opcionSeleccionada === idx && (
+                        <span style={{ background: '#f5c518', color: '#000', fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: 20 }}>
+                          PRINCIPAL
+                        </span>
+                      )}
+                    </div>
+
+                    <label style={{ fontSize: '0.75rem', opacity: 0.7, display: 'block', marginBottom: 4 }}>Consumo kWh/mes</label>
+                    <input
+                      type="number"
+                      value={op.consumoKwh}
+                      placeholder="Ej: 800"
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => actualizarOpcion(idx, 'consumoKwh', e.target.value)}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: 6, padding: '6px 10px', color: '#fff', fontSize: '0.9rem',
+                      }}
+                    />
+
+                    {calculos[idx] ? (
+                      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <OpRow label="kWp" value={calculos[idx].kwp} accent />
+                        <OpRow label="Paneles" value={calculos[idx].npaneles} />
+                        <OpRow label="Inversores" value={calculos[idx].ninversores} />
+                        <OpRow label="Producción" value={`${calculos[idx].produccionDeEnergia} kWh/mes`} />
+                        <OpRow label="Área mínima" value={`${calculos[idx].areaMinima} m²`} />
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '4px 0' }} />
+                        <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
+                        <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
+                        <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} años`} />
+                      </div>
+                    ) : (
+                      <p style={{ margin: '12px 0 0', opacity: 0.4, fontSize: '0.8rem' }}>Ingresa el consumo para calcular</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Tabla comparativa */}
+              {calculos.some(Boolean) && (
+                <div className="tableWrap" style={{ marginTop: 4 }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Métrica</th>
+                        {opciones.map((op, i) => (
+                          <th key={i} className="num" style={{ color: opcionSeleccionada === i ? '#f5c518' : undefined }}>
+                            {op.label} {opcionSeleccionada === i ? '★' : ''}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: 'Consumo kWh/mes', key: 'consumoKwh' },
+                        { label: 'kWp', key: 'kwp' },
+                        { label: 'N° Paneles', key: 'npaneles' },
+                        { label: 'Inversión + IVA', key: 'costoProyectoMasIva', fmt: true },
+                        { label: 'Ahorro mensual', key: 'ahorroMensual', fmt: true },
+                        { label: 'Ahorro anual', key: 'ahorroAnual', fmt: true },
+                        { label: 'Retorno (años)', key: 'tiempoRetorno' },
+                      ].map(({ label, key, fmt }) => (
+                        <tr key={key}>
+                          <td>{label}</td>
+                          {calculos.map((c, i) => (
+                            <td key={i} className="num" style={{ color: opcionSeleccionada === i ? '#f5c518' : undefined }}>
+                              {c ? (fmt ? `$${Number(c[key]).toLocaleString('es-CO')}` : c[key]) : '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
 
             {/* INFO INICIAL */}
             <Card title="Información inicial">
@@ -131,32 +364,27 @@ export default function Resultado() {
             {/* TU SISTEMA SOLAR */}
             <Card title="Tu sistema solar">
               <div className="cotTwoCol">
-                <Metric label="Potencia del sistema" value={`${resultado?.kwp ?? "—"} kWp`} />
-                <Metric label="Consumo mensual" value={`${money(resultado?.consumoKwh)} kWh/mes`} />
-                <Metric label="Producción mensual" value={`${money(resultado?.produccionDeEnergia)} kWh/mes`} />
-                <Metric label="Consumo promedio día" value={`${money(resultado?.wPromedioDia)} W/día`} />
-                <Metric label="Radiación promedio" value={`${resultado?.radiacionSolar ?? "—"}`} />
-                <Metric label="Área disponible" value={`${money(resultado?.areaDisponible)} m²`} />
-                <Metric label="Cobertura estimada" value={`${resultado?.porcentajeCoberturaProyecto ?? "—"}%`} />
-                {/* <Metric
-                  label={`Radiación con margen (${resultado?.margenCobertura ?? "—"}%)`}
-                  value={`${resultado?.radiacionSolarCobertura ?? "—"}`}
-                /> */}
-                <Metric label="Área mínima requerida" value={`${resultado?.areaMinima ?? "—"} m²`} />
+                <Metric label="Potencia del sistema" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
+                <Metric label="Consumo mensual" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
+                <Metric label="Producción mensual" value={`${money(resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
+                <Metric label="Consumo promedio día" value={`${money(resultadoActivo?.wPromedioDia)} W/día`} />
+                <Metric label="Radiación promedio" value={`${resultadoActivo?.radiacionSolar ?? "—"}`} />
+                <Metric label="Área disponible" value={`${money(resultadoActivo?.areaDisponible)} m²`} />
+                <Metric label="Cobertura estimada" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
+                <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
               </div>
             </Card>
 
             {/* FINANCIERO */}
             <Card title="Análisis financiero">
               <div className="cotTwoCol">
-                <Metric label="Inversión estimada (con IVA)" value={`$ ${money(resultado?.costoProyectoMasIva)}`} />
-                <Metric label="Ahorro anual estimado" value={`$ ${money(resultado?.ahorroAnual)}`} />
-                <Metric label="Ahorro mensual estimado" value={`$ ${money(resultado?.ahorroMensual)}`} />
-                <Metric label="Retorno de inversión" value={`${resultado?.tiempoRetorno ?? "—"} años`} />
+                <Metric label="Inversión estimada (con IVA)" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
+                <Metric label="Ahorro anual estimado" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
+                <Metric label="Ahorro mensual estimado" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
+                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
                 <Metric label="Vida útil estimada" value={`25 años`} />
-                <Metric label="Descuento declaración de renta" value={`$ ${money(resultado?.descuentoDeclaracion)}`} />
-                {/* <Metric label="Valor promedio por kWp" value={`$ ${money(resultado?.valorKwp)}`} /> */}
-                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultado?.ahorro10Anos)}`} />
+                <Metric label="Descuento declaración de renta" value={`$ ${money(resultadoActivo?.descuentoDeclaracion)}`} />
+                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultadoActivo?.ahorro10Anos)}`} />
                 <Metric label="Valorización aproximada" value={`4–10%`} />
               </div>
             </Card>
@@ -183,8 +411,8 @@ export default function Resultado() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>Paneles {resultado.potenciaPanel}W</td><td className="num">{resultado.npaneles}</td></tr>
-                    <tr><td>Inversor {resultado.capacidadInversor}W</td><td className="num">{resultado.ninversores}</td></tr>
+                    <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
+                    <tr><td>Inversor {resultadoActivo.capacidadInversor}W</td><td className="num">{resultadoActivo.ninversores}</td></tr>
                     <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
                     <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
                     <tr><td>Pólizas</td><td className="num">1</td></tr>
@@ -206,10 +434,10 @@ export default function Resultado() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>Inversión del proyecto solar</td><td className="num">$ {money(resultado.costoProyecto)}</td></tr>
-                    <tr><td>IVA</td><td className="num">$ {money(resultado.ivaProyecto)}</td></tr>
-                    <tr><td><b>Total inversión</b></td><td className="num"><b>$ {money(resultado.costoProyectoMasIva)}</b></td></tr>
-                    <tr><td>$/kWp</td><td className="num"><b>$ {money(resultado.costokwpproyecto)}</b></td></tr>
+                    <tr><td>Inversión del proyecto solar</td><td className="num">$ {money(resultadoActivo.costoProyecto)}</td></tr>
+                    <tr><td>IVA</td><td className="num">$ {money(resultadoActivo.ivaProyecto)}</td></tr>
+                    <tr><td><b>Total inversión</b></td><td className="num"><b>$ {money(resultadoActivo.costoProyectoMasIva)}</b></td></tr>
+                    <tr><td>$/kWp</td><td className="num"><b>$ {money(resultadoActivo.costokwpproyecto)}</b></td></tr>
                   </tbody>
                 </table>
               </div>
@@ -237,9 +465,9 @@ export default function Resultado() {
             {/* IMPACTO AMBIENTAL */}
             <Card title="Impacto ambiental">
               <div className="cotTwoCol">
-                <Metric label="CO₂ evitado al año" value={`${money(resultado?.arbolesEquivalentes)} toneladas`} isGreen />
-                <Metric label="Equivalente en árboles sembrados" value={`${money(resultado?.galonesGasolinaEvitados)} árboles`} isGreen />
-                <Metric label="Gasolina no consumida" value={`${resultado?.co2EvitadoToneladas ?? "—"} galones`} isGreen />
+                <Metric label="CO₂ evitado al año" value={`${money(resultadoActivo?.arbolesEquivalentes)} toneladas`} isGreen />
+                <Metric label="Equivalente en árboles sembrados" value={`${money(resultadoActivo?.galonesGasolinaEvitados)} árboles`} isGreen />
+                <Metric label="Gasolina no consumida" value={`${resultadoActivo?.co2EvitadoToneladas ?? "—"} galones`} isGreen />
               </div>
             </Card>
 
@@ -315,18 +543,15 @@ export default function Resultado() {
               <p style={{ marginTop: 0, lineHeight: 1.6 }}>
                 ¡Muchas gracias! Estamos para atender tus dudas e inquietudes.
               </p>
-              <p style={{ margin: 0 }}><b>Martin Uribe</b></p>
-              <p style={{ margin: "6px 0 0", opacity: 0.9 }}>Director de Proyectos</p>
+              <p style={{ margin: 0 }}>
+                <b>{[localStorage.getItem('nombreUsuario'), localStorage.getItem('apellidoUsuario')].filter(Boolean).join(' ')}</b>
+              </p>
+              <p style={{ margin: "6px 0 0", opacity: 0.9 }}>{localStorage.getItem('cargoUsuario') || 'Asesor Comercial'}</p>
 
               <div className="cotActions" style={{ marginTop: 14 }}>
-                <a
-                  href={`${process.env.REACT_APP_API_URL}${resultado.pdfUrl}`}
-                  download
-                  className="cotBtn cotBtnPrimary"
-                  style={{ textDecoration: "none", display: "inline-flex", justifyContent: "center" }}
-                >
-                  Descargar propuesta en PDF
-                </a>
+                <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
+                  {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} en PDF`}
+                </button>
                 <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
                   Volver al formulario
                 </button>
@@ -341,25 +566,20 @@ export default function Resultado() {
               <SummaryRow label="Cliente" value={resultado.nombre} />
               <SummaryRow label="Ciudad" value={resultado.ubicacion} />
               <div className="cotDivider" />
-              <SummaryRow label="Potencia" value={`${resultado?.kwp ?? "—"} kWp`} />
-              <SummaryRow label="Producción" value={`${money(resultado?.produccionDeEnergia)} kWh/mes`} />
-              <SummaryRow label="Cobertura" value={`${resultado?.porcentajeCoberturaProyecto ?? "—"}%`} />
+              <SummaryRow label="Potencia" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
+              <SummaryRow label="Producción" value={`${money(resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
+              <SummaryRow label="Cobertura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
               <div className="cotDivider" />
-              <SummaryRow label="Total inversión" value={`$ ${money(resultado?.costoProyectoMasIva)}`} />
-              <SummaryRow label="Retorno" value={`${resultado?.tiempoRetorno ?? "—"} años`} />
-              <SummaryRow label="Ahorro anual" value={`$ ${money(resultado?.ahorroAnual)}`} />
+              <SummaryRow label="Total inversión" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
+              <SummaryRow label="Retorno" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+              <SummaryRow label="Ahorro anual" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
             </Card>
 
             <Card title="Acciones">
               <div className="cotActions" style={{ marginTop: 0 }}>
-                <a
-                  href={`${process.env.REACT_APP_API_URL}${resultado.pdfUrl}`}
-                  download
-                  className="cotBtn cotBtnPrimary"
-                  style={{ textDecoration: "none", display: "inline-flex", justifyContent: "center", width: "100%" }}
-                >
-                  Descargar PDF
-                </a>
+                <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf} style={{ width: '100%' }}>
+                  {generandoPdf ? 'Generando...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? ''} PDF`}
+                </button>
                 <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
                   Nueva cotización
                 </button>
@@ -383,23 +603,14 @@ export default function Resultado() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>Paneles {resultado.potenciaPanel}W</td><td className="num">{resultado.npaneles}</td></tr>
-                    <tr><td>Inversores {resultado.capacidadInversor}W</td><td className="num">{resultado.ninversores}</td></tr>
-                    <tr><td>Riel 47</td><td className="num">{resultado.riel47}</td></tr>
-
-                    <tr><td>Baterías Gel 100Ah</td><td className="num">{resultado.nbateriasGel100}</td></tr>
-                    <tr><td>Baterías Gel 150Ah</td><td className="num">{resultado.nbateriasGel150}</td></tr>
-                    <tr><td>Baterías Gel 200Ah</td><td className="num">{resultado.nbateriasGel200}</td></tr>
-
-                    <tr><td>Baterías Litio 100Ah</td><td className="num">{resultado.nbateriasLitio100}</td></tr>
-                    <tr><td>Baterías Litio 150Ah</td><td className="num">{resultado.nbateriasLitio150}</td></tr>
-                    <tr><td>Baterías Litio 200Ah</td><td className="num">{resultado.nbateriasLitio200}</td></tr>
-
-                    <tr><td>Mid Clamp</td><td className="num">{resultado.midCland}</td></tr>
-                    <tr><td>End Clamp</td><td className="num">{resultado.endCland}</td></tr>
-                    <tr><td>L-Foot</td><td className="num">{resultado.lFoot}</td></tr>
-                    <tr><td>Grounding Loop</td><td className="num">{resultado.groundingLoop}</td></tr>
-                    <tr><td>Cable solar</td><td className="num">{resultado.cableSolar}</td></tr>
+                    <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
+                    <tr><td>Inversores {resultadoActivo.capacidadInversor}W</td><td className="num">{resultadoActivo.ninversores}</td></tr>
+                    <tr><td>Riel 47</td><td className="num">{resultadoActivo.riel47}</td></tr>
+                    <tr><td>Mid Clamp</td><td className="num">{resultadoActivo.midCland}</td></tr>
+                    <tr><td>End Clamp</td><td className="num">{resultadoActivo.endCland}</td></tr>
+                    <tr><td>L-Foot</td><td className="num">{resultadoActivo.lFoot}</td></tr>
+                    <tr><td>Grounding Loop</td><td className="num">{resultadoActivo.groundingLoop}</td></tr>
+                    <tr><td>Cable solar</td><td className="num">{resultadoActivo.cableSolar}</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -449,6 +660,15 @@ function Metric({ label, value, isGreen }) {
           {value}
         </b>
       </p>
+    </div>
+  );
+}
+
+function OpRow({ label, value, accent }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+      <span style={{ opacity: 0.65 }}>{label}</span>
+      <b style={{ color: accent ? '#f5c518' : '#fff' }}>{value ?? '—'}</b>
     </div>
   );
 }
