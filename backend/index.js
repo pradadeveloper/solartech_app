@@ -18,7 +18,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
 
 // Usuarios del sistema — agregar o quitar vendedores aquí
 const usuarios = [
-  { id: 1, nombre: 'Administrador', usuario: 'admin', password: 'solartech2024' },
+  { id: 1, nombre: 'Administrador', usuario: 'admin', password: 'solartech2026' },
   { id: 2, nombre: 'Vendedor 1',    usuario: 'vendedor1', password: 'vendedor123' },
   { id: 3, nombre: 'Vendedor 2',    usuario: 'vendedor2', password: 'vendedor456' },
 ];

@@ -8,6 +8,7 @@ export default function CotizadorSolar() {
 
   const [formData, setFormData] = useState({
     nombre: "Juan Pérez",
+    contribucion: false,
     identificacion: "",
     correo: "juan@example.com",
     telefono: "3001234567",
@@ -36,6 +37,21 @@ export default function CotizadorSolar() {
       [name]: type === "file" ? files?.[0] ?? null : value,
     }));
   };
+
+  const areaMinima = useMemo(() => {
+    const consumo = Number(formData.consumoKwh);
+    if (!consumo || consumo <= 0) return null;
+    const wPromedioDia = ((consumo * 1000) * 12) / 365;
+    const radiacionSolarCobertura = 3.8 * 0.8; // 3.04
+    const potenciaPanel = 585;
+    const npaneles = Math.ceil(wPromedioDia / (potenciaPanel * radiacionSolarCobertura));
+    return Math.round(npaneles * 1.13 * 2);
+  }, [formData.consumoKwh]);
+
+  const areaInsuficiente = useMemo(() => {
+    const areaDisp = Number(formData.areaDisponible);
+    return areaMinima !== null && areaDisp > 0 && areaDisp < areaMinima;
+  }, [formData.areaDisponible, areaMinima]);
 
   const canGoNext = useMemo(() => {
     // ✅ Validación simple (sin tocar backend)
@@ -178,7 +194,21 @@ export default function CotizadorSolar() {
                       <input name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} required />
                     </Field>
 
-                    <Field label="Costo kWh (COP)">
+                    <Field label={
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Costo kWh (COP)
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal', fontSize: '0.82rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            name="contribucion"
+                            checked={formData.contribucion}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, contribucion: e.target.checked }))}
+                            style={{ accentColor: '#f5c518', width: '15px', height: '15px' }}
+                          />
+                          Contribución
+                        </label>
+                      </span>
+                    }>
                       <input name="costoKwh" value={formData.costoKwh} onChange={handleChange} required />
                     </Field>
 
@@ -333,6 +363,21 @@ export default function CotizadorSolar() {
                 <li>Si el área es baja, el sistema se limita por m².</li>
                 <li>Adjuntar factura acelera la precisión del cálculo.</li>
               </ul>
+
+              {areaInsuficiente && (
+                <div style={{
+                  marginTop: '12px',
+                  background: 'rgba(231, 76, 60, 0.15)',
+                  border: '1px solid #e74c3c',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '0.82rem',
+                  lineHeight: 1.5,
+                }}>
+                  ⚠️ <b>Área insuficiente.</b> Se necesitan <b>{areaMinima} m²</b> para el 100% del consumo. El área actual es <b>{formData.areaDisponible} m²</b>.
+                </div>
+              )}
             </Card>
           </aside>
         </form>
