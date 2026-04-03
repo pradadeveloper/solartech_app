@@ -8,6 +8,7 @@ export default function CotizadorSolar() {
 
   const [formData, setFormData] = useState({
     nombre: "Juan Pérez",
+    identificacion: "",
     correo: "juan@example.com",
     telefono: "3001234567",
     ubicacion: "Medellín",
@@ -78,10 +79,19 @@ export default function CotizadorSolar() {
       const apiUrl = `${process.env.REACT_APP_API_URL}/api/calcular-proyecto`;
       console.log('🔗 Fetching:', apiUrl);
 
+      const token = localStorage.getItem('token');
       const response = await fetch(apiUrl, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formToSend,
       });
+
+      if (response.status === 409) {
+        const err = await response.json();
+        alert(`⚠️ ${err.mensaje}`);
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         const err = await response.json();
@@ -124,6 +134,10 @@ export default function CotizadorSolar() {
                   <div className="cotTwoCol">
                     <Field label="Nombre completo">
                       <input name="nombre" value={formData.nombre} onChange={handleChange} required />
+                    </Field>
+
+                    <Field label="Cédula / NIT">
+                      <input name="identificacion" value={formData.identificacion} onChange={handleChange} placeholder="Ej: 1234567890" />
                     </Field>
 
                     <Field label="Correo electrónico">

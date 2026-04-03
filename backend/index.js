@@ -12,6 +12,7 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const jwt = require('jsonwebtoken');
 const contadorPath = path.join(__dirname, 'contador.json');
+const leadsPath = path.join(__dirname, 'leads.json');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
 
@@ -53,6 +54,27 @@ function incrementarContador() {
   json.numero += 1;
   fs.writeFileSync(contadorPath, JSON.stringify(json, null, 2));
   return json.numero;
+}
+
+// ====== Leads ======
+function leerLeads() {
+  if (!fs.existsSync(leadsPath)) return [];
+  return JSON.parse(fs.readFileSync(leadsPath, 'utf-8'));
+}
+
+function guardarLead(lead) {
+  const leads = leerLeads();
+  leads.push(lead);
+  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
+}
+
+function buscarLeadExistente(correo, telefono, identificacion) {
+  const leads = leerLeads();
+  return leads.find((l) =>
+    l.correo === correo ||
+    l.telefono === telefono ||
+    (identificacion && l.identificacion === identificacion)
+  ) || null;
 }
 
 // ====== Helpers ======
@@ -395,16 +417,59 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       return res.status(400).json({ error: "Faltan datos requeridos", missing });
     }
 
+    // ====== Validar lead duplicado ======
+    const leadExistente = buscarLeadExistente(data.correo, data.telefono, data.identificacion);
+    if (leadExistente) {
+      return res.status(409).json({
+        error: 'lead_duplicado',
+        mensaje: `El cliente ya existe y lo está atendiendo el vendedor ${leadExistente.vendedor}.`,
+        vendedor: leadExistente.vendedor,
+        cotizacion: leadExistente.numeroCotizacion,
+      });
+    }
+
     const numeroCotizacion = incrementarContador();
+
+    // Extraer vendedor del token JWT (si viene)
+    let vendedor = 'Sin asignar';
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+        vendedor = decoded.nombre || decoded.usuario;
+      } catch (_) {}
+    }
 
     const resultados = calcularProyecto(data);
     const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion });
+
+    // ====== Guardar lead ======
+    guardarLead({
+      id: uuidv4(),
+      numeroCotizacion,
+      vendedor,
+      fecha: new Date().toISOString(),
+      nombre: data.nombre,
+      correo: data.correo,
+      telefono: data.telefono,
+      identificacion: data.identificacion || null,
+      ubicacion: data.ubicacion,
+      tipoSolicitud: data.tipoSolicitud,
+      kwp: resultados.kwp,
+      costoProyectoMasIva: resultados.costoProyectoMasIva,
+      pdfUrl,
+    });
 
     res.json({ ...resultados, numeroCotizacion, pdfUrl });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || "Error interno" });
   }
+});
+
+// ====== GET /api/leads ======
+app.get('/api/leads', (req, res) => {
+  res.json(leerLeads());
 });
 
 app.listen(PORT, () => {

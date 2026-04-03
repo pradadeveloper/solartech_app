@@ -1,0 +1,17 @@
+[
+  {
+    "id": "c30e9aa2-c520-4961-8b38-b65c62aecc69",
+    "numeroCotizacion": 80,
+    "vendedor": "Administrador",
+    "fecha": "2026-04-02T21:49:34.179Z",
+    "nombre": "Juan Pérez",
+    "correo": "juan@example.com",
+    "telefono": "3001234567",
+    "identificacion": "1152689738",
+    "ubicacion": "Medellín",
+    "tipoSolicitud": "Hogar",
+    "kwp": 11,
+    "costoProyectoMasIva": 40425000,
+    "pdfUrl": "/propuesta-53554f98-93f3-4746-be0c-0114f8e50bab.pdf"
+  }
+]
