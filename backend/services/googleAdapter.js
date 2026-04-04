@@ -178,6 +178,7 @@ async function uploadPDF(fileName, fileBuffer) {
   const drive = google.drive({ version: 'v3', auth });
   const stream = Readable.from(Buffer.from(fileBuffer));
   const res = await drive.files.create({
+    supportsAllDrives: true,
     requestBody: {
       name: fileName,
       parents: [process.env.DRIVE_COTIZACIONES_FOLDER_ID],
@@ -187,6 +188,7 @@ async function uploadPDF(fileName, fileBuffer) {
     fields: 'id',
   });
   await drive.permissions.create({
+    supportsAllDrives: true,
     fileId: res.data.id,
     requestBody: { role: 'reader', type: 'anyone' },
   });
