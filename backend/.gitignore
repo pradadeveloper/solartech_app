@@ -4,3 +4,4 @@ uploads/
 *.json.bak
 propuesta-*.pdf
 public/propuesta-*.pdf
+public/cotizaciones/*.pdf

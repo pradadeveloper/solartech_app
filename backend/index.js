@@ -37,6 +37,7 @@ const montserratPath = path.join(__dirname, "fonts", "Montserrat-Regular.ttf");
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use('/cotizaciones', express.static(path.join(__dirname, 'public', 'cotizaciones')));
 
 // ====== Multer (uploads) ======
 const uploadsDir = path.join(__dirname, "uploads");
@@ -82,10 +83,11 @@ async function getNextContador() {
 }
 
 async function savePDFStorage(fileName, pdfBytes) {
-  if (USE_GOOGLE) return gAdapter.uploadPDF(fileName, pdfBytes);
-  const filePath = path.join(__dirname, 'public', fileName);
-  fs.writeFileSync(filePath, pdfBytes);
-  return '/' + fileName;
+  const cotizDir = path.join(__dirname, 'public', 'cotizaciones');
+  if (!fs.existsSync(cotizDir)) fs.mkdirSync(cotizDir, { recursive: true });
+  fs.writeFileSync(path.join(cotizDir, fileName), pdfBytes);
+  const base = (process.env.BACKEND_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+  return `${base}/cotizaciones/${fileName}`;
 }
 
 // ====== Config ======

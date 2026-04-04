@@ -1,6 +1,5 @@
 'use strict';
 const { google } = require('googleapis');
-const { Readable } = require('stream');
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -172,27 +171,4 @@ async function incrementContador() {
   return total;
 }
 
-// ─── DRIVE PDF ────────────────────────────────────────────────────────────────
-async function uploadPDF(fileName, fileBuffer) {
-  const auth = await getAuth().getClient();
-  const drive = google.drive({ version: 'v3', auth });
-  const stream = Readable.from(Buffer.from(fileBuffer));
-  const res = await drive.files.create({
-    supportsAllDrives: true,
-    requestBody: {
-      name: fileName,
-      parents: [process.env.DRIVE_COTIZACIONES_FOLDER_ID],
-      mimeType: 'application/pdf',
-    },
-    media: { mimeType: 'application/pdf', body: stream },
-    fields: 'id',
-  });
-  await drive.permissions.create({
-    supportsAllDrives: true,
-    fileId: res.data.id,
-    requestBody: { role: 'reader', type: 'anyone' },
-  });
-  return `https://drive.google.com/file/d/${res.data.id}/view`;
-}
-
-module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador, uploadPDF };
+module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador };
