@@ -42,7 +42,7 @@ export default function Login() {
   };
 
   const bgStyle = {
-    backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${process.env.PUBLIC_URL}/logos/casos_exito.jpg)`,
+    backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${process.env.PUBLIC_URL}/assets/banner_solartech.jpg)`,
   };
 
   return (
