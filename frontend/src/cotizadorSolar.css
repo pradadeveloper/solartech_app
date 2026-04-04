@@ -1,10 +1,9 @@
 /* =========================================================
-   COTIZADOR SOLAR — CSS UNIFICADO (Legacy + Nuevo layout + Resultado)
-   ✅ No elimina estilos existentes
-   ✅ Evita “romper” el dashboard porque todo está scoped a .cotizador
-   ✅ Mantiene clases legacy (.page-bg, .overlay, .container, .button, etc.)
-   ✅ Agrega layout tipo SaaS (cards, grid, resumen lateral)
-   ✅ Agrega tablas “premium” para Resultado sin dañar tables legacy
+   COTIZADOR SOLAR — CSS UNIFICADO
+   El cotizador y resultado usan fondo oscuro (imagen de fondo)
+   por eso mantienen texto blanco dentro de .cotizador.
+   Las reglas globales (td, th) se scopean aquí para no
+   afectar las tablas del dashboard.
    ========================================================= */
 
 /* =============== Estilos base =============== */
@@ -54,7 +53,7 @@
   text-align: center;
 }
 
-/* Títulos legacy */
+/* Títulos dentro del cotizador (scoped) */
 .cotizador h1 {
   color: #fff;
   text-align: center;
@@ -83,7 +82,7 @@
   box-sizing: border-box;
 }
 
-/* ✅ Dark-friendly select (para que se vean opciones) */
+/* Select oscuro dentro del cotizador */
 .cotizador select {
   background-color: #0f172a;
   color: #ffffff;
@@ -103,8 +102,8 @@
 .button {
   width: 100%;
   padding: 1rem;
-  background-color: #d80902;
-  color: rgb(255, 255, 255);
+  background-color: #B03A22;
+  color: #ffffff;
   font-weight: bold;
   border: none;
   border-radius: 8px;
@@ -117,7 +116,7 @@
 .DetalleEquiposBotón {
   padding: 10px;
   background-color: #000000;
-  color: rgb(255, 255, 255);
+  color: #ffffff;
   font-weight: bold;
   border: none;
   border-radius: 8px;
@@ -129,7 +128,7 @@
 
 .button:hover {
   color: white;
-  background-color: #c00a04;
+  background-color: #8B2D1A;
 }
 
 /* Etiquetas legacy */
@@ -171,14 +170,14 @@
   display: inline-block;
   margin-top: 1rem;
   padding: 0.6rem 1rem;
-  background-color: #e70808;
-  color: rgb(255, 255, 255);
+  background-color: #B03A22;
+  color: #ffffff;
   text-decoration: none;
   border-radius: 6px;
   font-weight: bold;
 }
 
-/* Logo legacy (⚠️ usado también en dashboard, por eso lo scopo) */
+/* Logo legacy */
 .cotizador .logo {
   width: 100%;
   margin: 2rem auto 1rem;
@@ -202,8 +201,8 @@
   transition: all 0.3s ease;
 }
 .step.active {
-  background-color: #d82108;
-  color: rgb(255, 255, 255);
+  background-color: #B03A22;
+  color: #ffffff;
 }
 
 .radio-group {
@@ -219,16 +218,16 @@
   font-weight: 500;
 }
 .radio-option input[type="radio"] {
-  accent-color: #ea0808;
+  accent-color: #B03A22;
   width: 16px;
   height: 16px;
 }
 .title {
-  color: #ea0808;
+  color: #B03A22;
 }
 
-/* Tablas legacy (OJO: esto afecta cualquier table global, lo dejamos porque ya existía) */
-table {
+/* Tablas legacy — SCOPED a .cotizador para no afectar el dashboard */
+.cotizador table {
   border-collapse: separate;
   border-radius: 8px;
   width: 70%;
@@ -239,18 +238,18 @@ table {
   padding: 10px;
   text-align: left;
 }
-td,
-th {
+.cotizador td,
+.cotizador th {
   border-radius: 8px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid rgba(255,255,255,0.12);
   padding: 10px;
   text-align: center;
-  color: rgb(255, 255, 255);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .resumenValorProyecto {
   color: white;
-  background-color: #c00a04;
+  background-color: #B03A22;
   width: 340px;
 }
 
@@ -365,15 +364,15 @@ th {
 }
 
 .resultado {
-  color: #c00a04;
+  color: #B03A22;
 }
 .resultadoGreen {
   color: green;
 }
 
 /* =========================================================
-   ✅ NUEVO LAYOUT TIPO DASHBOARD (SaaS)
-   Usa estas clases si aplicas la nueva estructura JSX
+   NUEVO LAYOUT TIPO DASHBOARD (SaaS)
+   Usa estas clases con la nueva estructura JSX
    ========================================================= */
 
 /* Shell */
@@ -438,8 +437,8 @@ th {
 }
 .cotStep.isActive {
   opacity: 1;
-  border-color: rgba(250, 204, 21, 0.85);
-  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.12);
+  border-color: rgba(176, 58, 34, 0.85);
+  box-shadow: 0 0 0 2px rgba(176, 58, 34, 0.2);
 }
 .cotStepLine {
   width: 28px;
@@ -474,7 +473,6 @@ th {
   backdrop-filter: blur(10px);
 }
 
-/* ✅ Se añade flex al head para soportar "right" buttons */
 .cotCardHead {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -512,7 +510,7 @@ th {
   opacity: 0.8;
 }
 
-/* ✅ Inputs del nuevo layout (override suave sin romper legacy) */
+/* Inputs del nuevo layout */
 .cotizador .cotCard input,
 .cotizador .cotCard select,
 .cotizador .cotCard textarea {
@@ -529,8 +527,8 @@ th {
 .cotizador .cotCard select:focus,
 .cotizador .cotCard textarea:focus {
   outline: none;
-  border: 1px solid rgba(250, 204, 21, 0.8);
-  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2);
+  border: 1px solid rgba(176, 58, 34, 0.8);
+  box-shadow: 0 0 0 2px rgba(176, 58, 34, 0.2);
 }
 
 /* Hint */
@@ -558,7 +556,7 @@ th {
   opacity: 0.9;
 }
 .cotRadio input {
-  accent-color: #facc15;
+  accent-color: #B03A22;
 }
 
 /* Actions */
@@ -579,9 +577,9 @@ th {
 }
 
 .cotBtnPrimary {
-  background: #facc15;
-  color: #111;
-  border-color: rgba(250, 204, 21, 0.85);
+  background: #B03A22;
+  color: #fff;
+  border-color: rgba(176, 58, 34, 0.85);
   font-weight: 700;
 }
 
@@ -618,7 +616,7 @@ th {
   white-space: nowrap;
 }
 
-/* Divider (nuevo layout) */
+/* Divider */
 .cotDivider {
   height: 1px;
   background: rgba(255, 255, 255, 0.1);
@@ -636,9 +634,7 @@ th {
 }
 
 /* =========================================================
-   ✅ RESULTADO “PREMIUM” (tablas limpias dentro de cards)
-   IMPORTANTE: usamos .tableWrap y .table (NO "table" global)
-   para no romper el legacy.
+   RESULTADO — tablas dentro de .cotizador (ya scoped arriba)
    ========================================================= */
 
 .cotizador .tableWrap {
@@ -648,14 +644,12 @@ th {
   background: rgba(0, 0, 0, 0.18);
 }
 
-/* tabla premium */
 .cotizador .table {
   width: 100%;
   border-collapse: collapse;
   min-width: 620px;
 }
 
-/* celdas premium (no afecta td/th global) */
 .cotizador .table th,
 .cotizador .table td {
   padding: 10px 12px;
@@ -680,7 +674,7 @@ th {
 }
 
 /* =========================================================
-   Responsivo (legacy + nuevo)
+   Responsivo
    ========================================================= */
 @media (max-width: 1050px) {
   .cotGrid {
@@ -704,7 +698,7 @@ th {
     text-align: center;
   }
 
-  table {
+  .cotizador table {
     width: 100%;
   }
 
@@ -760,7 +754,6 @@ th {
     display: none;
   }
 
-  /* premium table: en mobile no fuerces ancho grande */
   .cotizador .table {
     min-width: 520px;
   }

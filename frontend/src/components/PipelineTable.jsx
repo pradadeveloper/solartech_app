@@ -9,18 +9,12 @@ const formatCOP = (value) =>
 
 const statusBadgeClass = (status) => {
   switch (status) {
-    case "Nuevo":
-      return "badge badge--new";
-    case "Cotizado":
-      return "badge badge--quoted";
-    case "En negociación":
-      return "badge badge--negotiation";
-    case "Cerrado":
-      return "badge badge--closed";
-    case "Perdido":
-      return "badge badge--lost";
-    default:
-      return "badge";
+    case "Nuevo":          return "badge badge--new";
+    case "Cotizado":       return "badge badge--quoted";
+    case "En negociación": return "badge badge--negotiation";
+    case "Cerrado":        return "badge badge--closed";
+    case "Perdido":        return "badge badge--lost";
+    default:               return "badge";
   }
 };
 
@@ -28,15 +22,14 @@ export default function PipelineTable({
   title = "Pipeline (CRM) — Clientes cotizados y estado",
   rows = [],
   onView,
+  onVerTodos,
 }) {
-  // ✅ filtros
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState("Todos");
   const [ciudad, setCiudad] = useState("Todas");
   const [kwhMin, setKwhMin] = useState("");
   const [kwhMax, setKwhMax] = useState("");
-  const [sortBy, setSortBy] = useState("reciente"); // mock
-  const [sortDir, setSortDir] = useState("desc");
+  const [sortBy, setSortBy] = useState("reciente");
 
   const estadosDisponibles = useMemo(() => {
     const s = new Set(rows.map((r) => r.estado).filter(Boolean));
@@ -50,7 +43,6 @@ export default function PipelineTable({
 
   const filteredRows = useMemo(() => {
     const term = q.trim().toLowerCase();
-
     const min = kwhMin === "" ? null : Number(kwhMin);
     const max = kwhMax === "" ? null : Number(kwhMax);
 
@@ -60,30 +52,23 @@ export default function PipelineTable({
         String(r.cliente ?? "").toLowerCase().includes(term) ||
         String(r.ciudad ?? "").toLowerCase().includes(term) ||
         String(r.id ?? "").toLowerCase().includes(term);
-
-      const matchEstado = estado === "Todos" ? true : r.estado === estado;
-      const matchCiudad = ciudad === "Todas" ? true : r.ciudad === ciudad;
-
+      const matchEstado = estado === "Todos" || r.estado === estado;
+      const matchCiudad = ciudad === "Todas" || r.ciudad === ciudad;
       const kwh = Number(r.kwh ?? 0);
-      const matchMin = min == null ? true : kwh >= min;
-      const matchMax = max == null ? true : kwh <= max;
-
+      const matchMin = min == null || kwh >= min;
+      const matchMax = max == null || kwh <= max;
       return matchQ && matchEstado && matchCiudad && matchMin && matchMax;
     });
 
-    // ✅ orden
-    const dir = sortDir === "asc" ? 1 : -1;
-
     list = [...list].sort((a, b) => {
-      if (sortBy === "valor") return (Number(a.valorCOP ?? 0) - Number(b.valorCOP ?? 0)) * dir;
-      if (sortBy === "kwh") return (Number(a.kwh ?? 0) - Number(b.kwh ?? 0)) * dir;
-      if (sortBy === "cliente") return String(a.cliente ?? "").localeCompare(String(b.cliente ?? "")) * dir;
-      // "reciente" sin fecha real: usa id como fallback
-      return String(a.id ?? "").localeCompare(String(b.id ?? "")) * dir;
+      if (sortBy === "valor")   return Number(b.valorCOP ?? 0) - Number(a.valorCOP ?? 0);
+      if (sortBy === "kwh")     return Number(b.kwh ?? 0) - Number(a.kwh ?? 0);
+      if (sortBy === "cliente") return String(a.cliente ?? "").localeCompare(String(b.cliente ?? ""));
+      return String(b.id ?? "").localeCompare(String(a.id ?? "")); // reciente desc
     });
 
     return list;
-  }, [rows, q, estado, ciudad, kwhMin, kwhMax, sortBy, sortDir]);
+  }, [rows, q, estado, ciudad, kwhMin, kwhMax, sortBy]);
 
   const onReset = () => {
     setQ("");
@@ -92,23 +77,30 @@ export default function PipelineTable({
     setKwhMin("");
     setKwhMax("");
     setSortBy("reciente");
-    setSortDir("desc");
   };
 
   return (
     <div className="panel">
       <div className="panel__head">
         <h2>{title}</h2>
-
-        <div className="panelActions">
+        <div className="panelActions" style={{ display: "flex", gap: 8 }}>
           <button className="btn btn--ghost" type="button" onClick={onReset}>
             Limpiar filtros
           </button>
+          {onVerTodos && (
+            <button
+              className="btn btn--primary"
+              type="button"
+              onClick={onVerTodos}
+            >
+              Ver todos →
+            </button>
+          )}
         </div>
       </div>
 
       <div className="panel__body">
-        {/* ✅ Filtros */}
+        {/* Filtros */}
         <div className="filters pipelineFilters">
           <div className="field">
             <label>Buscar</label>
@@ -123,9 +115,7 @@ export default function PipelineTable({
             <label>Estado</label>
             <select value={estado} onChange={(e) => setEstado(e.target.value)}>
               {estadosDisponibles.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
@@ -134,9 +124,7 @@ export default function PipelineTable({
             <label>Ciudad</label>
             <select value={ciudad} onChange={(e) => setCiudad(e.target.value)}>
               {ciudadesDisponibles.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
@@ -164,25 +152,17 @@ export default function PipelineTable({
           </div>
 
           <div className="field">
-            <label>Ordenar</label>
+            <label>Ordenar por</label>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="reciente">Reciente</option>
-              <option value="valor">Valor</option>
-              <option value="kwh">kWh</option>
-              <option value="cliente">Cliente</option>
-            </select>
-          </div>
-
-          <div className="field">
-            <label>Dirección</label>
-            <select value={sortDir} onChange={(e) => setSortDir(e.target.value)}>
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
+              <option value="reciente">Más reciente</option>
+              <option value="valor">Mayor valor</option>
+              <option value="kwh">Mayor kWh</option>
+              <option value="cliente">Cliente A–Z</option>
             </select>
           </div>
         </div>
 
-        {/* ✅ Tabla */}
+        {/* Tabla */}
         <div className="tableWrap">
           <table className="table">
             <thead>
@@ -196,7 +176,6 @@ export default function PipelineTable({
                 <th />
               </tr>
             </thead>
-
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
@@ -216,13 +195,26 @@ export default function PipelineTable({
                       <span className={statusBadgeClass(r.estado)}>{r.estado}</span>
                     </td>
                     <td className="actions">
-                      <button
-                        className="btn btn--tiny"
-                        type="button"
-                        onClick={() => onView?.(r)}
-                      >
-                        Ver
-                      </button>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <button
+                          className="btn btn--tiny"
+                          type="button"
+                          onClick={() => onView?.(r)}
+                        >
+                          Ver
+                        </button>
+                        {r.pdfUrl && (
+                          <a
+                            href={`${process.env.REACT_APP_API_URL}${r.pdfUrl}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn--tiny btn--primary"
+                            style={{ textDecoration: "none", fontWeight: 700 }}
+                          >
+                            ↓ PDF
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -231,7 +223,7 @@ export default function PipelineTable({
           </table>
         </div>
 
-        <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
+        <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12, color: "var(--muted)" }}>
           Mostrando {filteredRows.length} de {rows.length}
         </div>
       </div>

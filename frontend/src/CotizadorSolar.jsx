@@ -213,7 +213,7 @@ export default function CotizadorSolar() {
                 <Card title="Consumo y dimensionamiento rápido">
                   <div className="cotTwoCol">
                     <Field label="Consumo kWh/mes">
-                      <input name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} required />
+                      <FormattedInput name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} suffix="kWh/mes" required />
                     </Field>
 
                     <Field label={
@@ -231,15 +231,15 @@ export default function CotizadorSolar() {
                         </label>
                       </span>
                     }>
-                      <input name="costoKwh" value={formData.costoKwh} onChange={handleChange} required />
+                      <FormattedInput name="costoKwh" value={formData.costoKwh} onChange={handleChange} prefix="$" required />
                     </Field>
 
                     <Field label="Valor mensual factura (COP)">
-                      <input name="valorMensual" type="number" value={formData.valorMensual} onChange={handleChange} required />
+                      <FormattedInput name="valorMensual" value={formData.valorMensual} onChange={handleChange} prefix="$" required />
                     </Field>
 
                     <Field label="Área disponible (m²)">
-                      <input name="areaDisponible" type="number" value={formData.areaDisponible} onChange={handleChange} required />
+                      <FormattedInput name="areaDisponible" value={formData.areaDisponible} onChange={handleChange} suffix="m²" required />
                     </Field>
                   </div>
 
@@ -369,10 +369,10 @@ export default function CotizadorSolar() {
             <Card title="Resumen del lead">
               <SummaryRow label="Cliente" value={formData.nombre} />
               <SummaryRow label="Ciudad" value={formData.ubicacion} />
-              <SummaryRow label="kWh/mes" value={formData.consumoKwh} />
-              <SummaryRow label="Costo kWh" value={formData.costoKwh} />
-              <SummaryRow label="Factura mensual" value={formData.valorMensual} />
-              <SummaryRow label="Área (m²)" value={formData.areaDisponible} />
+              <SummaryRow label="kWh/mes" value={formData.consumoKwh ? `${Number(formData.consumoKwh).toLocaleString("es-CO")} kWh/mes` : "—"} />
+              <SummaryRow label="Costo kWh" value={formData.costoKwh ? `$${Number(formData.costoKwh).toLocaleString("es-CO")}` : "—"} />
+              <SummaryRow label="Factura mensual" value={formData.valorMensual ? `$${Number(formData.valorMensual).toLocaleString("es-CO")}` : "—"} />
+              <SummaryRow label="Área (m²)" value={formData.areaDisponible ? `${Number(formData.areaDisponible).toLocaleString("es-CO")} m²` : "—"} />
               <div className="cotDivider" />
               <SummaryRow label="Canal" value={formData.conociste || "—"} />
               <SummaryRow label="Contacto" value={formData.preferenciaContacto || "—"} />
@@ -389,8 +389,8 @@ export default function CotizadorSolar() {
               {areaInsuficiente && (
                 <div style={{
                   marginTop: '12px',
-                  background: 'rgba(231, 76, 60, 0.15)',
-                  border: '1px solid #e74c3c',
+                  background: 'rgba(176, 58, 34, 0.12)',
+                  border: '1px solid #B03A22',
                   borderRadius: '8px',
                   padding: '10px 12px',
                   color: '#fff',
@@ -404,7 +404,7 @@ export default function CotizadorSolar() {
               {clienteExistente && (
                 <div style={{
                   marginTop: '12px',
-                  background: 'rgba(243, 156, 18, 0.15)',
+                  background: 'rgba(243, 156, 18, 0.18)',
                   border: '1px solid #f39c12',
                   borderRadius: '8px',
                   padding: '10px 12px',
@@ -425,6 +425,31 @@ export default function CotizadorSolar() {
 }
 
 /* ---------- mini componentes UI ---------- */
+
+// ── Input con formato visual (muestra unidades/$ al perder foco) ──────────
+function FormattedInput({ name, value, onChange, required, prefix, suffix }) {
+  const [focused, setFocused] = useState(false);
+
+  const display = (() => {
+    const raw = String(value).replace(/[^\d]/g, "");
+    const num = Number(raw);
+    if (!raw || isNaN(num)) return value;
+    const formatted = num.toLocaleString("es-CO");
+    return `${prefix ?? ""}${formatted}${suffix ? ` ${suffix}` : ""}`;
+  })();
+
+  return (
+    <input
+      name={name}
+      value={focused ? value : display}
+      onChange={onChange}
+      onFocus={(e) => { setFocused(true); setTimeout(() => e.target.select(), 0); }}
+      onBlur={() => setFocused(false)}
+      required={required}
+      inputMode="numeric"
+    />
+  );
+}
 
 function Card({ title, children }) {
   return (

@@ -11,14 +11,15 @@ export default function DashboardLayout() {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <div className="brandMark">⚡</div>
+          <div className="brandMark">
+            <span style={{ fontWeight: 900, fontSize: "1rem", color: "var(--accent)" }}>ST</span>
+          </div>
           <div className="brandText">
             <img
-              src="/logos/logo_solartech_negativo.png"
+              src="/logos/logo_solartech.webp"
               alt="Logo SolarTech Energy"
               className="sidebar__logo"
             />
-            <small>Dashboard Admin</small>
           </div>
         </div>
 
@@ -27,13 +28,13 @@ export default function DashboardLayout() {
           <button className="navItem" onClick={() => navigate("/leads")}>Leads y Cotizaciones</button>
           <button className="navItem" onClick={() => navigate("/asesores")}>Asesores</button>
           <button className="navItem">Proyectos</button>
-          <button className="navItem">Configuración</button>
+          <button className="navItem" onClick={() => navigate("/configuracion")}>Configuración</button>
         </nav>
 
         <div className="sidebar__footer">
           <button
             className="navItem"
-            style={{ color: '#e74c3c', marginTop: 'auto' }}
+            style={{ color: 'var(--accent)', marginTop: 'auto' }}
             onClick={() => {
               localStorage.removeItem('token');
               localStorage.removeItem('nombreUsuario');

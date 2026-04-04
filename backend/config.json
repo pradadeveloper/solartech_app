@@ -1,0 +1,22 @@
+{
+  "costokWp": 3500000,
+  "potenciaPanel": 585,
+  "capacidadInversor": 3000,
+  "radiacionSolar": 3.8,
+  "margenCobertura": 0.8,
+  "longitudRiel": 4.7,
+  "cableSolar": 10,
+  "ivaPct": 5,
+  "descuentoRentaPct": 50,
+  "factorCO2": 0.3612,
+  "factorArboles": 0.02,
+  "factorGalones": 117.6,
+  "empresa": {
+    "nombre": "Solartech Energy Systems",
+    "telefono": "+57 300 000 0000",
+    "email": "info@solartech.com.co",
+    "web": "www.solartechenergysystems.com",
+    "nit": "900.123.456-7",
+    "ciudad": "Medellin, Colombia"
+  }
+}

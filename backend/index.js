@@ -13,6 +13,7 @@ const fontkit = require('@pdf-lib/fontkit');
 const jwt = require('jsonwebtoken');
 const contadorPath = path.join(__dirname, 'contador.json');
 const leadsPath = path.join(__dirname, 'leads.json');
+const configPath = path.join(__dirname, 'config.json');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
 
@@ -82,6 +83,30 @@ function buscarLeadExistente(correo, telefono, identificacion) {
   ) || null;
 }
 
+// ====== Config ======
+const CONFIG_DEFAULT = {
+  costokWp: 3500000, potenciaPanel: 585, capacidadInversor: 3000,
+  radiacionSolar: 3.8, margenCobertura: 0.8, longitudRiel: 4.7, cableSolar: 10,
+  ivaPct: 5, descuentoRentaPct: 50,
+  factorCO2: 0.3612, factorArboles: 0.02, factorGalones: 117.6,
+  empresa: { nombre: 'Solartech Energy Systems', telefono: '+57 300 000 0000',
+    email: 'info@solartech.com.co', web: 'www.solartechenergysystems.com',
+    nit: '900.123.456-7', ciudad: 'Medellin, Colombia' },
+};
+
+function leerConfig() {
+  try {
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    return { ...CONFIG_DEFAULT, ...JSON.parse(raw) };
+  } catch (_) {
+    return { ...CONFIG_DEFAULT };
+  }
+}
+
+function guardarConfig(cfg) {
+  fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
+}
+
 // ====== Helpers ======
 function toNumber(v) {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -108,7 +133,7 @@ function calcularProyecto({
   valorMensual,
   consumoKwh,
   costoKwh,
-}) {
+}, cfg = {}) {
   const consumo = toNumber(consumoKwh);       // kWh/mes
   const costoUnidad = toNumber(costoKwh);     // COP/kWh
   const gastoMensual = toNumber(valorMensual);
@@ -118,14 +143,19 @@ function calcularProyecto({
     throw new Error("Valores numéricos inválidos: consumoKwh, costoKwh o valorMensual");
   }
 
-  // Constantes
-  const potenciaPanel = 585;     // W
-  const radiacionSolar = 3.8;    // kWh/m2/día (aprox)
-  const margenCobertura = 0.8;
-  const capacidadInversor = 3000; // W
-  const costokWp = 3500000;      // COP por kWp
-  const longitudRiel = 4.7;
-  const cableSolar = 10;
+  // Parámetros desde config (con fallback a defaults)
+  const potenciaPanel    = cfg.potenciaPanel    || 585;
+  const radiacionSolar   = cfg.radiacionSolar   || 3.8;
+  const margenCobertura  = cfg.margenCobertura  || 0.8;
+  const capacidadInversor= cfg.capacidadInversor|| 3000;
+  const costokWp         = cfg.costokWp         || 3500000;
+  const longitudRiel     = cfg.longitudRiel     || 4.7;
+  const cableSolar       = cfg.cableSolar       || 10;
+  const ivaPct           = cfg.ivaPct           ?? 5;
+  const descuentoRentaPct= cfg.descuentoRentaPct?? 50;
+  const factorCO2        = cfg.factorCO2        || 0.3612;
+  const factorArboles    = cfg.factorArboles    || 0.02;
+  const factorGalones    = cfg.factorGalones    || 117.6;
 
   // Derivados
   const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
@@ -143,11 +173,11 @@ function calcularProyecto({
   const ahorro10Anos = Math.round(ahorroAnual * 10);
 
   const costoProyecto = Math.round(kwp * costokWp);
-  const ivaProyecto = Math.round(costoProyecto * 0.05);
+  const ivaProyecto = Math.round(costoProyecto * (ivaPct / 100));
   const costoProyectoMasIva = Math.round(costoProyecto + ivaProyecto);
 
   const costokwpproyecto = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
-  const descuentoDeclaracion = Math.round(costoProyecto / 2);
+  const descuentoDeclaracion = Math.round(costoProyecto * (descuentoRentaPct / 100));
   const tiempoRetorno = ahorroAnual > 0 ? Number((costoProyecto / ahorroAnual).toFixed(1)) : null;
   const valorKwp = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
 
@@ -175,9 +205,9 @@ function calcularProyecto({
   }
 
   // Ambiental
-  const co2EvitadoToneladas = Number((kwp * 1.2 * 0.7 * 0.43).toFixed(2));
-  const arbolesEquivalentes = Math.round(co2EvitadoToneladas / 0.02);
-  const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
+  const co2EvitadoToneladas = Number((kwp * factorCO2).toFixed(2));
+  const arbolesEquivalentes = Math.round(co2EvitadoToneladas / factorArboles);
+  const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * factorGalones);
 
   const equipos = ["Paneles solares", "Inversor", "Estructuras", "Cableado"];
 
@@ -230,6 +260,7 @@ function calcularProyecto({
     ahorro10Anos,
 
     equipos,
+    areaMinima,
 
     arbolesEquivalentes,
     galonesGasolinaEvitados,
@@ -238,141 +269,402 @@ function calcularProyecto({
 }
 
 // ====== PDF ======
-async function generarPDF(data, resultados) {
+async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
+  const empresa = cfg.empresa || {};
+  const empNombre  = empresa.nombre   || 'Solartech Energy Systems';
+  const empTel     = empresa.telefono || '+57 300 000 0000';
+  const empEmail   = empresa.email    || 'info@solartech.com.co';
+  const empWeb     = empresa.web      || 'www.solartechenergysystems.com';
+  const empNit     = empresa.nit      || '900.123.456-7';
+  const empCiudad  = empresa.ciudad   || 'Medellin, Colombia';
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
   const fontBytes = fs.readFileSync(montserratPath);
-  // const fontBoldBytes = fs.readFileSync(montserratBoldPath);
   const font = await pdfDoc.embedFont(fontBytes);
-  // const fontBold = await pdfDoc.embedFont(fontBoldBytes);
 
-  const COLOR_BG = rgb(0.06, 0.09, 0.12);
-  const COLOR_PANEL = rgb(0.10, 0.14, 0.20);
-  const COLOR_BORDER = rgb(0.20, 0.25, 0.33);
-  const COLOR_TEXT = rgb(0.95, 0.96, 0.98);
-  const COLOR_MUTED = rgb(0.70, 0.74, 0.80);
-  const COLOR_ACCENT = rgb(0.96, 0.78, 0.10);
-
-  const page = pdfDoc.addPage([595, 842]);
-  const { width, height } = page.getSize();
+  const W = 595, H = 842;
   const margin = 42;
-  let y = height - margin;
+  const cW = W - margin * 2;
+  const headerH = 80;
+  const footerH = 30;
 
-  // Background
-  page.drawRectangle({ x: 0, y: 0, width, height, color: COLOR_BG });
+  const COLOR_ACCENT  = rgb(0.690, 0.227, 0.133);
+  const COLOR_TEXT    = rgb(0.102, 0.102, 0.102);
+  const COLOR_MUTED   = rgb(0.353, 0.353, 0.353);
+  const COLOR_WHITE   = rgb(1, 1, 1);
+  const COLOR_BORDER  = rgb(0.871, 0.871, 0.871);
+  const COLOR_LIGHT   = rgb(0.965, 0.965, 0.965);
+  const COLOR_ACLIGHT = rgb(0.980, 0.940, 0.930);
 
-  // Banner (opcional)
-  const bannerPath = path.join(__dirname, "public", "assets", "banner_resultadospdF.jpg");
-  if (fs.existsSync(bannerPath)) {
-    const bytes = fs.readFileSync(bannerPath);
-    const img = await pdfDoc.embedJpg(bytes);
-
-    const bannerH = 130;
-    page.drawImage(img, { x: 0, y: height - bannerH, width, height: bannerH });
-
-    page.drawRectangle({
-      x: 0, y: height - bannerH, width, height: bannerH,
-      color: rgb(0, 0, 0), opacity: 0.35,
-    });
-
-    y = height - bannerH - 18;
+  let logoImg = null;
+  const logoPath = path.join(__dirname, 'public', 'assets', 'logo_solartech.png');
+  if (fs.existsSync(logoPath)) {
+    try { logoImg = await pdfDoc.embedPng(fs.readFileSync(logoPath)); } catch (_) {}
   }
 
-  // Header
-  page.drawText("Solartech Energy S.A.S", { x: margin, y, size: 18, color: COLOR_ACCENT });
-  y -= 18;
-  page.drawText("📞 +57 300 000 0000   ✉️ contacto@solartech.com.co", { x: margin, y, size: 10, font, color: COLOR_MUTED });
+  let bannerImg = null;
+  const bannerPath = path.join(__dirname, 'public', 'assets', 'banner_resultadospdf.jpg');
+  if (fs.existsSync(bannerPath)) {
+    try { bannerImg = await pdfDoc.embedJpg(fs.readFileSync(bannerPath)); } catch (_) {}
+  }
+
+  // Logos de marcas aliadas
+  const frontendLogos = path.join(__dirname, '..', 'frontend', 'public', 'logos');
+  const brandLogos = {};
+  for (const [key, file] of [['longi', 'logo_longi.png'], ['growatt', 'growatt.png']]) {
+    const lp = path.join(frontendLogos, file);
+    if (fs.existsSync(lp)) {
+      try { brandLogos[key] = await pdfDoc.embedPng(fs.readFileSync(lp)); } catch (_) {}
+    }
+  }
+
+  let page;
+  let y;
+
+  function newPage() {
+    page = pdfDoc.addPage([W, H]);
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: COLOR_WHITE });
+
+    // Header rojo
+    page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: COLOR_ACCENT });
+
+    if (logoImg) {
+      const lW = 150;
+      const lH = (logoImg.height / logoImg.width) * lW;
+      page.drawImage(logoImg, { x: margin, y: H - headerH + (headerH - lH) / 2, width: lW, height: lH });
+    } else {
+      page.drawText('SOLARTECH ENERGY', { x: margin, y: H - headerH + 32, size: 14, font, color: COLOR_WHITE });
+    }
+
+    const cx = W - margin - 190;
+    page.drawText(`${empTel}  |  ${empEmail}`, { x: cx, y: H - headerH + 52, size: 7.5, font, color: COLOR_WHITE });
+    page.drawText(empWeb, { x: cx, y: H - headerH + 38, size: 7.5, font, color: rgb(1, 0.85, 0.80) });
+    page.drawText(`NIT: ${empNit}  |  ${empCiudad}`, { x: cx, y: H - headerH + 24, size: 7, font, color: rgb(1, 0.85, 0.80) });
+
+    // Footer
+    page.drawRectangle({ x: 0, y: 0, width: W, height: footerH, color: COLOR_LIGHT });
+    page.drawLine({ start: { x: 0, y: footerH }, end: { x: W, y: footerH }, thickness: 0.5, color: COLOR_BORDER });
+    page.drawText(`${empNombre}  -  Propuesta Tecnica y Comercial  -  Documento confidencial`, {
+      x: margin, y: 9, size: 7, font, color: COLOR_MUTED,
+    });
+    page.drawText(`N-${resultados?.numeroCotizacion ?? '-'}`, {
+      x: W - margin - 40, y: 9, size: 7.5, font, color: COLOR_MUTED,
+    });
+
+    y = H - headerH - 18;
+  }
+
+  function checkY(needed) {
+    if (y - needed < footerH + 16) newPage();
+  }
+
+  const safe = (v) => (v == null || v === '' ? '-' : String(v));
+  const cop = (v) => `$${Number(v || 0).toLocaleString('es-CO')}`;
+
+  function sectionHeader(title) {
+    checkY(46);
+    y -= 8;
+    page.drawRectangle({ x: margin, y: y - 28, width: cW, height: 28, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 0.5 });
+    page.drawRectangle({ x: margin, y: y - 28, width: 5, height: 28, color: COLOR_ACCENT });
+    page.drawText(title, { x: margin + 14, y: y - 18, size: 11, font, color: COLOR_ACCENT });
+    y -= 36;
+  }
+
+  function infoRow(label, value, highlight) {
+    const rH = 22;
+    checkY(rH);
+    if (highlight) {
+      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_ACLIGHT, borderColor: COLOR_ACCENT, borderWidth: 0.5 });
+    } else {
+      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: rgb(0.99, 0.99, 0.99), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+    }
+    page.drawText(String(label), { x: margin + 10, y: y - 14, size: 9, font, color: highlight ? COLOR_ACCENT : COLOR_MUTED });
+    page.drawText(String(value ?? '-'), { x: margin + cW / 2, y: y - 14, size: 10, font, color: highlight ? COLOR_ACCENT : COLOR_TEXT });
+    y -= rH;
+  }
+
+  function infoRow2(l1, v1, l2, v2) {
+    const rH = 22;
+    const half = (cW - 6) / 2;
+    checkY(rH);
+    page.drawRectangle({ x: margin, y: y - rH, width: half, height: rH, color: rgb(0.99, 0.99, 0.99), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+    page.drawText(String(l1), { x: margin + 8, y: y - 14, size: 8.5, font, color: COLOR_MUTED });
+    page.drawText(String(v1 ?? '-'), { x: margin + 8 + half / 2, y: y - 14, size: 9.5, font, color: COLOR_TEXT });
+    const rx = margin + half + 6;
+    page.drawRectangle({ x: rx, y: y - rH, width: half, height: rH, color: rgb(0.99, 0.99, 0.99), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+    page.drawText(String(l2), { x: rx + 8, y: y - 14, size: 8.5, font, color: COLOR_MUTED });
+    page.drawText(String(v2 ?? '-'), { x: rx + 8 + half / 2, y: y - 14, size: 9.5, font, color: COLOR_TEXT });
+    y -= rH;
+  }
+
+  function para(text, indent, size, color) {
+    indent = indent || 0;
+    size = size || 9.5;
+    color = color || COLOR_TEXT;
+    const maxW = cW - indent - 8;
+    const words = String(text).split(' ');
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(test, size) > maxW && line) {
+        checkY(size + 4);
+        page.drawText(line, { x: margin + indent, y, size, font, color });
+        y -= size + 4;
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) {
+      checkY(size + 4);
+      page.drawText(line, { x: margin + indent, y, size, font, color });
+      y -= size + 4;
+    }
+  }
+
+  function bullet(text, indent) {
+    indent = indent || 10;
+    checkY(18);
+    page.drawRectangle({ x: margin + indent, y: y - 9, width: 5, height: 5, color: COLOR_ACCENT });
+    page.drawText(text, { x: margin + indent + 12, y: y - 10, size: 9.5, font, color: COLOR_TEXT });
+    y -= 18;
+  }
+
+  const gap = (n) => { y -= (n || 10); };
+
+  // ─── INICIO ───
+  newPage();
+
+  // Banner imagen — pegado al borde inferior del header rojo
+  const bannerH = 155;
+  if (bannerImg) {
+    page.drawImage(bannerImg, { x: 0, y: H - headerH - bannerH, width: W, height: bannerH });
+    y = H - headerH - bannerH - 24; // espacio entre banner y título
+  } else {
+    y -= 10;
+  }
+
+  page.drawText('PROPUESTA TECNICA Y COMERCIAL', { x: margin, y, size: 15, font, color: COLOR_ACCENT });
+  y -= 16;
+  const fecha = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  page.drawText(`Cotizacion N-${resultados?.numeroCotizacion ?? '-'}   |   Fecha: ${fecha}`, { x: margin, y, size: 9, font, color: COLOR_MUTED });
+  y -= 8;
+  page.drawLine({ start: { x: margin, y }, end: { x: W - margin, y }, thickness: 1, color: COLOR_ACCENT });
+  y -= 16;
+
+  const asesorNombre = `${asesor.nombre || ''} ${asesor.apellido || ''}`.trim() || 'Asesor Comercial';
+
+  // 1. CLIENTE
+  sectionHeader('DATOS DEL CLIENTE');
+  infoRow2('Nombre completo', safe(data.nombre), 'Identificacion', safe(data.identificacion));
+  infoRow2('Correo electronico', safe(data.correo), 'Telefono', safe(data.telefono));
+  infoRow2('Municipio / Ubicacion', safe(data.ubicacion), 'Preferencia contacto', safe(data.preferenciaContacto));
+  infoRow2('Tipo de solicitud', safe(data.tipoSolicitud), 'Tipo de techo', safe(data.tipoTecho));
+  infoRow2('Recibe factura', safe(data.recibeFactura), 'Sistema de interes', safe(data.sistemaInteres));
+  gap(6);
+
+  // 3. SISTEMA SOLAR
+  sectionHeader('TU SISTEMA SOLAR');
+  infoRow2('Potencia del sistema', `${safe(resultados.kwp)} kWp`, 'Numero de paneles', `${safe(resultados.npaneles)} paneles`);
+  infoRow2('Numero de inversores', `${safe(resultados.ninversores)} und`, 'Potencia por panel', `${safe(resultados.potenciaPanel)} W`);
+  infoRow2('Produccion estimada', `${safe(resultados.produccionDeEnergia)} kWh/mes`, 'Cobertura del sistema', `${safe(resultados.porcentajeCoberturaProyecto)}%`);
+  infoRow2('Consumo del cliente', `${safe(resultados.consumoKwh)} kWh/mes`, 'Area minima requerida', `${safe(resultados.areaMinima)} m2`);
+  infoRow2('Area disponible declarada', `${safe(data.areaDisponible)} m2`, 'Radiacion solar local', `${safe(resultados.radiacionSolar)} kWh/m2/dia`);
+  gap(6);
+
+  // 4. ANALISIS FINANCIERO
+  sectionHeader('ANALISIS FINANCIERO');
+  infoRow('Ahorro mensual estimado', cop(resultados.ahorroMensual));
+  infoRow('Ahorro anual estimado', cop(resultados.ahorroAnual));
+  infoRow('Ahorro proyectado a 10 anos', cop(resultados.ahorro10Anos));
+  infoRow('Tiempo de retorno de la inversion', `${safe(resultados.tiempoRetorno)} anos`);
+  gap(6);
+
+  // 5. PROPUESTA ECONOMICA
+  sectionHeader('PROPUESTA ECONOMICA');
+  infoRow('Costo del sistema (sin IVA)', cop(resultados.costoProyecto));
+  infoRow('IVA aplicable (5%)', cop(resultados.ivaProyecto));
+  infoRow('TOTAL CON IVA - PRECIO FINAL', cop(resultados.costoProyectoMasIva), true);
+  infoRow('Descuento declaracion de renta (Ley 1715)', cop(resultados.descuentoDeclaracion));
+  infoRow('Costo por kWp instalado', cop(resultados.valorKwp));
+  gap(6);
+
+  // 6. RESUMEN INVERSION
+  sectionHeader('RESUMEN DE LA INVERSION');
+  checkY(20);
+  page.drawText('Componentes e items incluidos en el proyecto:', { x: margin + 10, y, size: 9, font, color: COLOR_TEXT });
   y -= 14;
-
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: COLOR_BORDER });
-  y -= 18;
-
-  page.drawText("Propuesta Técnica y Comercial", { x: margin, y, size: 16, color: COLOR_TEXT });
-  y -= 18;
-
-  const fecha = new Date().toLocaleDateString("es-CO");
-  page.drawText(`Cotización: N-${resultados?.numeroCotizacion ?? "—"}   ·   Fecha: ${fecha}`, {
-    x: margin, y, size: 10, font, color: COLOR_MUTED,
-  });
-  y -= 22;
-
-  // Card helper (sin borderRadius)
-  const card = ({ title, bodyLines, x, yTop, w, h }) => {
-    page.drawRectangle({
-      x, y: yTop - h, width: w, height: h,
-      color: COLOR_PANEL,
-      borderColor: COLOR_BORDER,
-      borderWidth: 1,
-      opacity: 0.96,
-    });
-
-    page.drawText(title, { x: x + 14, y: yTop - 18, size: 12, color: COLOR_TEXT });
-
-    let yy = yTop - 44;
-    bodyLines.forEach((line) => {
-      page.drawText(line, { x: x + 14, y: yy, size: 10, font, color: COLOR_MUTED });
-      yy -= 14;
-    });
-  };
-
-  const safe = (v) => (v === null || v === undefined || v === "" ? "—" : String(v));
-
-  // Datos cliente (solo algunos campos clave)
-  const clienteLines = [
-    `Nombre: ${safe(data.nombre)}`,
-    `Correo: ${safe(data.correo)}`,
-    `Teléfono: ${safe(data.telefono)}`,
-    `Ubicación: ${safe(data.ubicacion)}`,
-    `Contacto: ${safe(data.preferenciaContacto)}`,
-    `Tipo: ${safe(data.tipoSolicitud)}`,
+  const componentes = [
+    `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi / JA Solar)`,
+    `${resultados.ninversores} inversor(es) de ${(resultados.capacidadInversor / 1000).toFixed(1)} kW (Huawei / Growatt / GoodWe)`,
+    `${resultados.riel47} rieles de aluminio 4.7 m para estructura de montaje`,
+    `${resultados.midCland} mid clamps y ${resultados.endCland} end clamps de fijacion`,
+    `${resultados.lFoot} L-Foot de anclaje a cubierta`,
+    `${resultados.cableSolar} m de cable solar 10 mm2`,
+    `${resultados.groundingLoop} m grounding loop puesta a tierra`,
+    'Cableado de AC/DC, protecciones electricas y fusibles',
+    'Instalacion, puesta en marcha y configuracion de monitoreo remoto',
+    'Capacitacion al usuario y entrega de manual de operacion',
   ];
+  componentes.forEach((c) => bullet(c, 10));
+  gap(6);
 
-  const cardW = width - margin * 2;
-  card({ title: "Datos del cliente", bodyLines: clienteLines, x: margin, yTop: y, w: cardW, h: 130 });
-  y -= 130 + 16;
-
-  // Resultados
-  const colGap = 12;
-  const colW = (cardW - colGap) / 2;
-
-  card({
-    title: "Resumen técnico",
-    bodyLines: [
-      `kWp estimado: ${safe(resultados.kwp)}`,
-      `Producción (kWh/mes): ${safe(resultados.produccionDeEnergia)}`,
-      `Cobertura: ${safe(resultados.porcentajeCoberturaProyecto)}%`,
-      `Área mínima: ${safe(resultados.areaMinima)} m²`,
-    ],
-    x: margin,
-    yTop: y,
-    w: colW,
-    h: 140,
+  // 7. FORMAS DE PAGO
+  sectionHeader('FORMAS DE PAGO');
+  const formasPago = [
+    { t: '1. Pago de contado', d: 'Pago total antes de iniciar la instalacion. Garantiza disponibilidad inmediata de equipos y posible descuento por pronto pago.' },
+    { t: '2. Credito bancario', d: 'Financiacion directa con su entidad bancaria. Solartech entrega la documentacion tecnica requerida para la solicitud.' },
+    { t: '3. Financiacion interna', d: 'Plan de cuotas mensuales acordado directamente con Solartech Energy Systems. Solicite condiciones personalizadas.' },
+    { t: '4. Leasing solar', d: 'Arrendamiento financiero del sistema fotovoltaico con opcion de compra al finalizar el contrato pactado.' },
+    { t: '5. Subsidio / Fondo Emprender', d: 'Para proyectos que apliquen, gestionamos el acceso a fondos de cofinanciacion FNCER y subsidios gubernamentales.' },
+  ];
+  formasPago.forEach(({ t, d }) => {
+    checkY(42);
+    page.drawText(t, { x: margin + 10, y, size: 9, font, color: COLOR_ACCENT });
+    y -= 13;
+    para(d, 14, 8.5, COLOR_MUTED);
+    gap(3);
   });
+  gap(6);
 
-  card({
-    title: "Resumen financiero",
-    bodyLines: [
-      `Total (con IVA): $${safe(resultados.costoProyectoMasIva)}`,
-      `Ahorro mensual: $${safe(resultados.ahorroMensual)}`,
-      `Ahorro anual: $${safe(resultados.ahorroAnual)}`,
-      `Retorno: ${safe(resultados.tiempoRetorno)} años`,
-    ],
-    x: margin + colW + colGap,
-    yTop: y,
-    w: colW,
-    h: 140,
+  // 8. IMPACTO AMBIENTAL
+  sectionHeader('IMPACTO AMBIENTAL');
+  infoRow2('Arboles equivalentes al ano', `${safe(resultados.arbolesEquivalentes)} arboles`, 'CO2 evitado anualmente', `${safe(resultados.co2EvitadoToneladas)} toneladas`);
+  infoRow('Galones de gasolina ahorrados al ano', `${safe(resultados.galonesGasolinaEvitados)} galones`);
+  gap(4);
+  para('Al elegir energia solar contribuye activamente a la reduccion de emisiones de CO2 y a la independencia energetica de Colombia. Su sistema generara energia limpia por mas de 25 anos.', 10, 8.5, COLOR_MUTED);
+  gap(6);
+
+  // 9. ETAPAS DEL PROYECTO
+  sectionHeader('ETAPAS DEL PROYECTO');
+  const etapas = [
+    { n: '01', t: 'Visita tecnica', d: 'Inspeccion del sitio, medicion de area disponible y evaluacion estructural de la cubierta.' },
+    { n: '02', t: 'Diseno e ingenieria', d: 'Elaboracion de planos, memorias de calculo, diseno electrico y simulacion de produccion solar.' },
+    { n: '03', t: 'Aprobacion UPME / RETIE', d: 'Gestion de permisos ante el operador de red local y cumplimiento de normativa RETIE vigente.' },
+    { n: '04', t: 'Adquisicion de equipos', d: 'Compra e importacion de paneles, inversores y materiales de instalacion de marcas aliadas.' },
+    { n: '05', t: 'Instalacion y montaje', d: 'Ejecucion de obra, montaje de estructura, instalacion de paneles y conexiones electricas certificadas.' },
+    { n: '06', t: 'Puesta en marcha y entrega', d: 'Pruebas del sistema, configuracion del monitoreo remoto, capacitacion y entrega de documentacion.' },
+  ];
+  etapas.forEach(({ n, t, d }) => {
+    checkY(34);
+    page.drawRectangle({ x: margin + 10, y: y - 24, width: 24, height: 24, color: COLOR_ACCENT });
+    page.drawText(n, { x: margin + 14, y: y - 16, size: 8.5, font, color: COLOR_WHITE });
+    page.drawText(t, { x: margin + 42, y: y - 9, size: 9, font, color: COLOR_TEXT });
+    page.drawText(d, { x: margin + 42, y: y - 21, size: 7.5, font, color: COLOR_MUTED });
+    y -= 32;
   });
+  gap(6);
 
-  // Footer
-  page.drawText("Gracias por confiar en Solartech Energy.", { x: margin, y: 28, size: 9, font, color: COLOR_MUTED });
+  // 10. GARANTIAS
+  sectionHeader('GARANTIAS');
+  const garantias = [
+    ['Paneles solares - rendimiento', 'Garantia de producto 12 anos. Rendimiento mayor al 80% por 25 anos.'],
+    ['Inversor', 'Garantia de fabrica 5 anos (extensible a 10 segun fabricante).'],
+    ['Estructura de montaje', 'Garantia estructural 10 anos contra corrosion y deformacion.'],
+    ['Instalacion electrica', 'Garantia de mano de obra 2 anos segun norma RETIE.'],
+    ['Soporte post-instalacion', '12 meses de soporte tecnico y monitoreo remoto incluidos.'],
+  ];
+  garantias.forEach(([label, desc]) => {
+    checkY(26);
+    page.drawRectangle({ x: margin + 10, y: y - 5, width: 6, height: 6, color: COLOR_ACCENT });
+    page.drawText(`${label}:`, { x: margin + 22, y: y - 5, size: 8.5, font, color: COLOR_ACCENT });
+    y -= 14;
+    page.drawText(desc, { x: margin + 22, y, size: 8.5, font, color: COLOR_TEXT });
+    y -= 15;
+  });
+  gap(6);
+
+  // 11. MARCAS ALIADAS
+  sectionHeader('MARCAS ALIADAS');
+  checkY(20);
+  page.drawText('Trabajamos con marcas lideres del mercado solar mundial con presencia certificada en Colombia:', {
+    x: margin + 10, y, size: 9.5, font, color: COLOR_MUTED,
+  });
+  y -= 18;
+  const marcas = [
+    { key: 'longi',   nombre: 'LONGi Solar',   desc: 'Paneles - N1 mundial'          },
+    { key: null,      nombre: 'JA Solar',       desc: 'Paneles - Top 3 mundial'       },
+    { key: null,      nombre: 'Huawei Solar',   desc: 'Inversores inteligentes'       },
+    { key: 'growatt', nombre: 'Growatt',        desc: 'Inversores residencial/com.'   },
+    { key: null,      nombre: 'GoodWe',         desc: 'Soluciones hibridas'           },
+  ];
+  const mCols = 3;
+  const mGap = 10;
+  const mColW = (cW - mGap * (mCols - 1)) / mCols;
+  const mBH = 60;
+  const mRows2 = Math.ceil(marcas.length / mCols);
+  checkY(mRows2 * (mBH + mGap));
+  marcas.forEach((m, i) => {
+    const col = i % mCols;
+    const row = Math.floor(i / mCols);
+    const bx = margin + col * (mColW + mGap);
+    const by = y - row * (mBH + mGap);
+    page.drawRectangle({ x: bx, y: by - mBH, width: mColW, height: mBH, color: COLOR_WHITE, borderColor: COLOR_BORDER, borderWidth: 0.75 });
+    page.drawRectangle({ x: bx, y: by - mBH, width: 5, height: mBH, color: COLOR_ACCENT });
+    const img = m.key ? brandLogos[m.key] : null;
+    if (img) {
+      const iH = mBH - 16;
+      const iW = Math.min((img.width / img.height) * iH, mColW - 20);
+      const ix = bx + 12 + (mColW - 20 - iW) / 2;
+      page.drawImage(img, { x: ix, y: by - mBH + 8, width: iW, height: iH });
+    } else {
+      page.drawText(m.nombre, { x: bx + 14, y: by - 24, size: 10, font, color: COLOR_TEXT });
+      page.drawText(m.desc,   { x: bx + 14, y: by - 38, size: 8.5, font, color: COLOR_MUTED });
+    }
+  });
+  y -= mRows2 * (mBH + mGap) + 4;
+  gap(6);
+
+  // 12. CONDICIONES COMERCIALES
+  sectionHeader('CONDICIONES COMERCIALES');
+  const condiciones = [
+    'Esta cotizacion tiene validez de 30 dias calendario desde la fecha de emision.',
+    'Los precios incluyen IVA del 5% segun Ley 1715 de 2014 sobre energias renovables.',
+    'Valores en COP sujetos a variacion por tasa de cambio USD/COP para equipos importados.',
+    'El inicio de obra requiere un anticipo del 50% del valor total del proyecto aprobado.',
+    'El plazo estimado de instalacion es de 15 a 30 dias habiles tras aprobacion y anticipo.',
+    'No se incluyen adecuaciones electricas previas, obras civiles adicionales ni tramites notariales.',
+    'Solartech se reserva el derecho de ajustar la propuesta si la visita tecnica evidencia condiciones distintas a las declaradas.',
+  ];
+  condiciones.forEach((c, i) => {
+    checkY(30);
+    page.drawText(`${i + 1}.`, { x: margin + 10, y, size: 8.5, font, color: COLOR_ACCENT });
+    para(c, 22, 8.5, COLOR_TEXT);
+    gap(2);
+  });
+  gap(8);
+
+  // 13. DATOS DEL ASESOR COMERCIAL
+  sectionHeader('DATOS DEL ASESOR COMERCIAL');
+  infoRow2('Nombre del asesor', asesorNombre, 'Cargo', safe(asesor.cargo));
+  infoRow2('Usuario sistema', safe(asesor.usuario), 'Empresa', 'Solartech Energy Systems');
+  gap(8);
+
+  // 14. CIERRE
+  sectionHeader('GRACIAS POR CONFIAR EN SOLARTECH ENERGY SYSTEMS');
+  checkY(100);
+  page.drawText('Estamos comprometidos a brindarle la mejor solucion de energia solar adaptada a sus necesidades.', {
+    x: margin + 10, y, size: 10, font, color: COLOR_TEXT,
+  });
+  y -= 16;
+  page.drawText('Para aceptar esta propuesta o resolver cualquier consulta, comuniquese con su asesor:', {
+    x: margin + 10, y, size: 9.5, font, color: COLOR_MUTED,
+  });
+  y -= 26;
+
+  const sigX = margin + 10;
+  page.drawRectangle({ x: sigX, y: y - 66, width: 220, height: 66, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 0.5 });
+  page.drawRectangle({ x: sigX, y: y - 66, width: 5, height: 66, color: COLOR_ACCENT });
+  page.drawText(asesorNombre, { x: sigX + 14, y: y - 18, size: 11, font, color: COLOR_TEXT });
+  page.drawText(safe(asesor.cargo || 'Asesor Comercial'), { x: sigX + 14, y: y - 33, size: 9.5, font, color: COLOR_MUTED });
+  page.drawText('Solartech Energy Systems', { x: sigX + 14, y: y - 48, size: 9.5, font, color: COLOR_ACCENT });
 
   const pdfBytes = await pdfDoc.save();
   const fileName = `propuesta-${uuidv4()}.pdf`;
-  const filePath = path.join(__dirname, "public", fileName);
+  const filePath = path.join(__dirname, 'public', fileName);
   fs.writeFileSync(filePath, pdfBytes);
-
-  return "/" + fileName;
+  return '/' + fileName;
 }
 
 // LOGIN
@@ -437,16 +729,19 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
 
     // Extraer vendedor del token JWT (si viene)
     let vendedor = 'Sin asignar';
+    let asesorPDF = {};
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
         vendedor = decoded.nombre || decoded.usuario;
+        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario };
       } catch (_) {}
     }
 
-    const resultados = calcularProyecto(data);
-    const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion });
+    const cfg = leerConfig();
+    const resultados = calcularProyecto(data, cfg);
+    const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion }, asesorPDF, cfg);
 
     // ====== Guardar lead ======
     guardarLead({
@@ -460,8 +755,15 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       telefono: data.telefono,
       identificacion: data.identificacion || null,
       ubicacion: data.ubicacion,
+      preferenciaContacto: data.preferenciaContacto || null,
       tipoSolicitud: data.tipoSolicitud,
+      tipoTecho: data.tipoTecho || null,
+      recibeFactura: data.recibeFactura || null,
+      sistemaInteres: data.sistemaInteres || null,
       consumoKwh: resultados.consumoKwh,
+      costoKwh: resultados.costoKwh,
+      valorMensual: resultados.valorMensual,
+      areaDisponible: resultados.areaDisponible,
       kwp: resultados.kwp,
       costoProyectoMasIva: resultados.costoProyectoMasIva,
       pdfUrl,
@@ -473,6 +775,29 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
     console.error(err);
     res.status(500).json({ error: err.message || "Error interno" });
   }
+});
+
+// ====== GET /api/config ======
+app.get('/api/config', (req, res) => {
+  res.json(leerConfig());
+});
+
+// ====== PUT /api/config ======
+app.put('/api/config', express.json(), (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  try {
+    jwt.verify(authHeader.slice(7), JWT_SECRET);
+  } catch (_) {
+    return res.status(401).json({ error: 'Token inválido' });
+  }
+  const actual = leerConfig();
+  const nueva = { ...actual, ...req.body };
+  if (req.body.empresa) nueva.empresa = { ...actual.empresa, ...req.body.empresa };
+  guardarConfig(nueva);
+  res.json({ ok: true, config: nueva });
 });
 
 // ====== GET /api/leads ======
@@ -540,8 +865,17 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
     if (!data.consumoKwh || !data.costoKwh) {
       return res.status(400).json({ error: 'consumoKwh y costoKwh son requeridos' });
     }
-    const resultados = calcularProyecto(data);
-    const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '—' });
+    let asesorPDF = {};
+    const authPDF = req.headers['authorization'];
+    if (authPDF && authPDF.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authPDF.slice(7), JWT_SECRET);
+        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario };
+      } catch (_) {}
+    }
+    const cfg = leerConfig();
+    const resultados = calcularProyecto(data, cfg);
+    const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '-' }, asesorPDF, cfg);
     res.json({ pdfUrl });
   } catch (err) {
     console.error(err);

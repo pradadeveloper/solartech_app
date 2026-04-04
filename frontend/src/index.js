@@ -6,6 +6,7 @@ import CotizadorSolar from './CotizadorSolar';
 import Resultado from './Resultado';
 import LeadsCotizaciones from './LeadsCotizaciones';
 import Asesores from './Asesores';
+import Configuracion from './Configuracion';
 import Login from './Login';
 
 function RutaProtegida({ children }) {
@@ -25,6 +26,7 @@ root.render(
         <Route path="resultado" element={<Resultado />} />
         <Route path="leads" element={<LeadsCotizaciones />} />
         <Route path="asesores" element={<Asesores />} />
+        <Route path="configuracion" element={<Configuracion />} />
       </Route>
     </Routes>
   </Router>
