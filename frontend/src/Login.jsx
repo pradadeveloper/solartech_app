@@ -41,8 +41,12 @@ export default function Login() {
     }
   };
 
+  const bgStyle = {
+    backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${process.env.PUBLIC_URL}/logos/casos_exito.jpg)`,
+  };
+
   return (
-    <div className="login-bg">
+    <div className="login-bg" style={bgStyle}>
       <div className="login-card">
         <img src={logo} alt="Logo Solartech" className="login-logo" />
         <h1 className="login-title">Bienvenido</h1>
