@@ -90,6 +90,7 @@ export default function CotizadorSolar() {
     }, 600); // debounce 600ms
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.correo, formData.telefono, formData.identificacion]);
 
   const handleNext = () => {
