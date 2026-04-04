@@ -113,7 +113,8 @@ export default function Resultado() {
 
   const descargarPDF = async () => {
     if (pdfUrls[opcionSeleccionada]) {
-      window.open(`${process.env.REACT_APP_API_URL}${pdfUrls[opcionSeleccionada]}`, '_blank');
+      const u = pdfUrls[opcionSeleccionada];
+      window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
       return;
     }
     const calc = calculos[opcionSeleccionada];
@@ -128,7 +129,8 @@ export default function Resultado() {
       });
       const data = await res.json();
       setPdfUrls((prev) => prev.map((u, i) => i === opcionSeleccionada ? data.pdfUrl : u));
-      window.open(`${process.env.REACT_APP_API_URL}${data.pdfUrl}`, '_blank');
+      const u = data.pdfUrl;
+      window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
     } catch (e) {
       alert('Error generando PDF');
     } finally {

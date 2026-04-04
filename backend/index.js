@@ -11,6 +11,9 @@ const { v4: uuidv4 } = require('uuid');
 const { PDFDocument, rgb } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const jwt = require('jsonwebtoken');
+const USE_GOOGLE = !!process.env.GOOGLE_SERVICE_ACCOUNT;
+const gAdapter = USE_GOOGLE ? require('./services/googleAdapter') : null;
+if (USE_GOOGLE) console.log('[storage] Google Sheets + Drive activado');
 const contadorPath = path.join(__dirname, 'contador.json');
 const leadsPath = path.join(__dirname, 'leads.json');
 const configPath = path.join(__dirname, 'config.json');
@@ -45,42 +48,44 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ====== Contador ======
-function incrementarContador() {
-  if (!fs.existsSync(contadorPath)) {
-    fs.writeFileSync(contadorPath, JSON.stringify({ numero: 0 }, null, 2));
-  }
-  const raw = fs.readFileSync(contadorPath, "utf-8");
+// ====== Almacenamiento unificado (local o Google Sheets/Drive) ======
+async function getAllLeads() {
+  if (USE_GOOGLE) return gAdapter.getAllLeads();
+  if (!fs.existsSync(leadsPath)) return [];
+  try { const raw = fs.readFileSync(leadsPath, 'utf-8').trim(); return raw ? JSON.parse(raw) : []; } catch { return []; }
+}
+
+async function saveLeadStorage(lead) {
+  if (USE_GOOGLE) return gAdapter.saveLead(lead);
+  const leads = await getAllLeads();
+  leads.push(lead);
+  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
+}
+
+async function updateLeadField(numeroCotizacion, fields) {
+  if (USE_GOOGLE) return gAdapter.updateLead(numeroCotizacion, fields);
+  const leads = await getAllLeads();
+  const idx = leads.findIndex(l => l.numeroCotizacion === numeroCotizacion);
+  if (idx === -1) throw new Error('Lead no encontrado');
+  Object.assign(leads[idx], fields);
+  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
+}
+
+async function getNextContador() {
+  if (USE_GOOGLE) return gAdapter.incrementContador();
+  if (!fs.existsSync(contadorPath)) fs.writeFileSync(contadorPath, JSON.stringify({ numero: 0 }, null, 2));
+  const raw = fs.readFileSync(contadorPath, 'utf-8');
   const json = JSON.parse(raw);
   json.numero += 1;
   fs.writeFileSync(contadorPath, JSON.stringify(json, null, 2));
   return json.numero;
 }
 
-// ====== Leads ======
-function leerLeads() {
-  if (!fs.existsSync(leadsPath)) return [];
-  try {
-    const raw = fs.readFileSync(leadsPath, 'utf-8').trim();
-    return raw ? JSON.parse(raw) : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function guardarLead(lead) {
-  const leads = leerLeads();
-  leads.push(lead);
-  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
-}
-
-function buscarLeadExistente(correo, telefono, identificacion) {
-  const leads = leerLeads();
-  return leads.find((l) =>
-    l.correo === correo ||
-    l.telefono === telefono ||
-    (identificacion && l.identificacion === identificacion)
-  ) || null;
+async function savePDFStorage(fileName, pdfBytes) {
+  if (USE_GOOGLE) return gAdapter.uploadPDF(fileName, pdfBytes);
+  const filePath = path.join(__dirname, 'public', fileName);
+  fs.writeFileSync(filePath, pdfBytes);
+  return '/' + fileName;
 }
 
 // ====== Config ======
@@ -662,9 +667,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   const pdfBytes = await pdfDoc.save();
   const fileName = `propuesta-${uuidv4()}.pdf`;
-  const filePath = path.join(__dirname, 'public', fileName);
-  fs.writeFileSync(filePath, pdfBytes);
-  return '/' + fileName;
+  return savePDFStorage(fileName, pdfBytes);
 }
 
 // LOGIN
@@ -715,7 +718,12 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
     }
 
     // ====== Validar lead duplicado ======
-    const leadExistente = buscarLeadExistente(data.correo, data.telefono, data.identificacion);
+    const todosLeads = await getAllLeads();
+    const leadExistente = todosLeads.find((l) =>
+      l.correo === data.correo ||
+      l.telefono === data.telefono ||
+      (data.identificacion && l.identificacion === data.identificacion)
+    ) || null;
     if (leadExistente) {
       return res.status(409).json({
         error: 'lead_duplicado',
@@ -725,7 +733,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       });
     }
 
-    const numeroCotizacion = incrementarContador();
+    const numeroCotizacion = await getNextContador();
 
     // Extraer vendedor del token JWT (si viene)
     let vendedor = 'Sin asignar';
@@ -744,7 +752,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
     const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion }, asesorPDF, cfg);
 
     // ====== Guardar lead ======
-    guardarLead({
+    await saveLeadStorage({
       id: uuidv4(),
       numeroCotizacion,
       vendedor,
@@ -801,25 +809,25 @@ app.put('/api/config', express.json(), (req, res) => {
 });
 
 // ====== GET /api/leads ======
-app.get('/api/leads', (req, res) => {
-  res.json(leerLeads());
+app.get('/api/leads', async (_req, res) => {
+  try { res.json(await getAllLeads()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ====== GET /api/leads/buscar ======
-app.get('/api/leads/buscar', (req, res) => {
+app.get('/api/leads/buscar', async (req, res) => {
   const { correo, telefono, identificacion } = req.query;
-  if (!correo && !telefono && !identificacion) {
-    return res.json({ encontrado: false });
-  }
-  const lead = leerLeads().find((l) =>
-    (correo && l.correo === correo) ||
-    (telefono && l.telefono === telefono) ||
-    (identificacion && l.identificacion && l.identificacion === identificacion)
-  );
-  if (lead) {
-    return res.json({ encontrado: true, vendedor: lead.vendedor, numeroCotizacion: lead.numeroCotizacion, nombre: lead.nombre });
-  }
-  res.json({ encontrado: false });
+  if (!correo && !telefono && !identificacion) return res.json({ encontrado: false });
+  try {
+    const leads = await getAllLeads();
+    const lead = leads.find((l) =>
+      (correo && l.correo === correo) ||
+      (telefono && l.telefono === telefono) ||
+      (identificacion && l.identificacion && l.identificacion === identificacion)
+    );
+    if (lead) return res.json({ encontrado: true, vendedor: lead.vendedor, numeroCotizacion: lead.numeroCotizacion, nombre: lead.nombre });
+    res.json({ encontrado: false });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ====== GET /api/asesores ======
@@ -835,27 +843,27 @@ app.get('/api/asesores', (_req, res) => {
 });
 
 // ====== PATCH /api/leads/:numeroCotizacion/estado ======
-app.patch('/api/leads/:numeroCotizacion/estado', express.json(), (req, res) => {
+app.patch('/api/leads/:numeroCotizacion/estado', express.json(), async (req, res) => {
   const num = Number(req.params.numeroCotizacion);
   const { estado } = req.body;
-  const leads = leerLeads();
-  const idx = leads.findIndex((l) => l.numeroCotizacion === num);
-  if (idx === -1) return res.status(404).json({ error: 'Lead no encontrado' });
-  leads[idx].estado = estado;
-  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
-  res.json({ ok: true });
+  try {
+    await updateLeadField(num, { estado });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
+  }
 });
 
 // ====== PATCH /api/leads/:numeroCotizacion/opciones ======
-app.patch('/api/leads/:numeroCotizacion/opciones', (req, res) => {
+app.patch('/api/leads/:numeroCotizacion/opciones', express.json(), async (req, res) => {
   const num = Number(req.params.numeroCotizacion);
   const { opciones } = req.body;
-  const leads = leerLeads();
-  const idx = leads.findIndex((l) => l.numeroCotizacion === num);
-  if (idx === -1) return res.status(404).json({ error: 'Lead no encontrado' });
-  leads[idx].opciones = opciones;
-  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
-  res.json({ ok: true });
+  try {
+    await updateLeadField(num, { opciones });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
+  }
 });
 
 // ====== POST /api/generar-pdf (solo PDF, sin guardar lead) ======

@@ -319,7 +319,7 @@ export default function LeadsCotizaciones() {
                           </button>
                           {pdf ? (
                             <a
-                              href={`${process.env.REACT_APP_API_URL}${pdf}`}
+                              href={pdf?.startsWith('http') ? pdf : `${process.env.REACT_APP_API_URL}${pdf}`}
                               target="_blank"
                               rel="noreferrer"
                               style={{
