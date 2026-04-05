@@ -12,11 +12,33 @@ const NUM_KEYS = [
   'descuentoRentaPct', 'factorCO2', 'factorArboles', 'factorGalones',
 ];
 
-const LEAD_HEADERS = [
-  'id', 'numeroCotizacion', 'vendedor', 'estado', 'fecha',
-  'nombre', 'correo', 'telefono', 'identificacion', 'ubicacion',
-  'tipoSolicitud', 'consumoKwh', 'kwp', 'costoProyectoMasIva', 'pdfUrl', 'opciones',
-];
+// Mapeo: columna del Sheets → propiedad interna del lead
+const SHEET_TO_LEAD = {
+  nombre:        'nombre',
+  email:         'correo',
+  telefono:      'telefono',
+  consumo_kwh:   'consumoKwh',
+  potencia_kw:   'kwp',
+  inversion_cop: 'costoProyectoMasIva',
+  roi_meses:     'tiempoRetorno',   // guardado en meses
+  fecha:         'fecha',
+  asesor:        'vendedor',
+  estado:        'estado',
+  ciudad:        'ubicacion',
+  tipo:          'tipoSolicitud',
+  canal:         'preferenciaContacto',
+  contacto:      'numeroCotizacion', // número de cotización
+  kwh:           'id',               // UUID para identificación interna
+  pdf_url:       'pdfUrl',
+};
+
+// Columnas del Sheets en el orden exacto de la hoja
+const SHEETS_COLS = Object.keys(SHEET_TO_LEAD);
+
+// Mapeo inverso: propiedad interna → columna del Sheets
+const LEAD_TO_SHEET = Object.fromEntries(
+  Object.entries(SHEET_TO_LEAD).map(([col, prop]) => [prop, col])
+);
 
 function getAuth() {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
@@ -79,16 +101,24 @@ async function getAllLeads() {
     });
     const [headers, ...rows] = res.data.values || [[]];
     if (!headers || !headers.length) return [];
+
     return rows.map(row => {
-      const obj = {};
-      headers.forEach((h, i) => {
-        let val = row[i] ?? '';
-        if (h === 'numeroCotizacion') val = Number(val) || 0;
-        if (['consumoKwh', 'kwp', 'costoProyectoMasIva'].includes(h)) val = Number(val) || 0;
-        if (h === 'opciones') { try { val = val ? JSON.parse(val) : []; } catch { val = []; } }
-        obj[h] = val;
+      // Construir objeto con columnas del Sheets
+      const sheetObj = {};
+      headers.forEach((h, i) => { sheetObj[h] = row[i] ?? ''; });
+
+      // Traducir columnas Sheets → propiedades internas
+      const lead = { opciones: [], identificacion: null };
+      Object.entries(SHEET_TO_LEAD).forEach(([col, prop]) => {
+        let val = sheetObj[col] ?? '';
+        if (prop === 'numeroCotizacion') val = Number(val) || 0;
+        if (['consumoKwh', 'kwp', 'costoProyectoMasIva'].includes(prop)) val = Number(val) || 0;
+        if (prop === 'tiempoRetorno' && val !== '') val = Number(val) / 12; // meses → años
+        lead[prop] = val;
       });
-      return obj;
+
+      if (!lead.id) lead.id = String(lead.numeroCotizacion || Math.random());
+      return lead;
     });
   } catch (err) {
     console.error('[googleAdapter] getAllLeads error:', err.message);
@@ -99,24 +129,34 @@ async function getAllLeads() {
 async function saveLead(lead) {
   const auth = await getAuth().getClient();
   const sheets = google.sheets({ version: 'v4', auth });
-  // Ensure header row exists
+
+  // Leer encabezados actuales (el usuario puede haber configurado el Sheets manualmente)
   const headerRes = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
     range: 'leads!A1:P1',
   });
-  if (!headerRes.data.values?.[0]?.length) {
+  const actualHeaders = headerRes.data.values?.[0];
+
+  if (!actualHeaders || !actualHeaders.length) {
+    // Primera vez: escribir encabezados canónicos
     await sheets.spreadsheets.values.update({
       spreadsheetId: process.env.SHEET_ID,
       range: 'leads!A1',
       valueInputOption: 'RAW',
-      requestBody: { values: [LEAD_HEADERS] },
+      requestBody: { values: [SHEETS_COLS] },
     });
   }
-  const row = LEAD_HEADERS.map(h => {
-    const v = lead[h];
-    if (h === 'opciones') return JSON.stringify(v ?? []);
-    return v ?? '';
+
+  // Construir fila respetando el orden real del Sheets
+  const headers = actualHeaders && actualHeaders.length ? actualHeaders : SHEETS_COLS;
+  const row = headers.map(col => {
+    const prop = SHEET_TO_LEAD[col];
+    if (!prop) return '';
+    const val = lead[prop];
+    if (col === 'roi_meses') return val != null ? Math.round(Number(val) * 12) : '';
+    return val ?? '';
   });
+
   await sheets.spreadsheets.values.append({
     spreadsheetId: process.env.SHEET_ID,
     range: 'leads!A1',
@@ -133,16 +173,26 @@ async function updateLead(numeroCotizacion, fields) {
     range: 'leads!A1:P',
   });
   const [headers, ...rows] = res.data.values || [[]];
-  const numIdx = headers.indexOf('numeroCotizacion');
-  const rowIdx = rows.findIndex(r => Number(r[numIdx]) === Number(numeroCotizacion));
+
+  // La columna 'contacto' almacena numeroCotizacion
+  const contIdx = headers.indexOf('contacto');
+  if (contIdx === -1) throw new Error('Columna contacto no encontrada en Sheets');
+
+  const rowIdx = rows.findIndex(r => Number(r[contIdx]) === Number(numeroCotizacion));
   if (rowIdx === -1) throw new Error('Lead no encontrado');
+
   const sheetRow = rowIdx + 2;
   const updatedRow = [...rows[rowIdx]];
   while (updatedRow.length < headers.length) updatedRow.push('');
-  Object.entries(fields).forEach(([key, val]) => {
-    const idx = headers.indexOf(key);
-    if (idx !== -1) updatedRow[idx] = key === 'opciones' ? JSON.stringify(val) : String(val ?? '');
+
+  Object.entries(fields).forEach(([prop, val]) => {
+    const col = LEAD_TO_SHEET[prop];
+    if (!col) return;
+    const colIdx = headers.indexOf(col);
+    if (colIdx === -1) return;
+    updatedRow[colIdx] = String(val ?? '');
   });
+
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.SHEET_ID,
     range: `leads!A${sheetRow}:P${sheetRow}`,
