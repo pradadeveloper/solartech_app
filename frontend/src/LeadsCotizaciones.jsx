@@ -16,6 +16,12 @@ const BADGE = {
 const money = (v) =>
   typeof v === "number" ? `$${v.toLocaleString("es-CO")}` : (v ?? "—");
 
+const safeDate = (str) => {
+  if (!str) return "—";
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? str : d.toLocaleDateString("es-CO");
+};
+
 const FILTRO_INIT = {
   cot: "", fechaOrden: "desc",
   cliente: "", ciudad: "", kwhMin: "", kwhMax: "",
@@ -160,15 +166,28 @@ export default function LeadsCotizaciones() {
             <thead>
               {/* Fila de encabezados */}
               <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>
-                {["Cot.", "Fecha", "Cliente", "Ciudad", "kWh", "kWp", "Sistema", "Valor", "Opción principal", "Estado", "Asesor", "Acciones"].map((h) => (
-                  <th key={h} style={{ padding: "10px 12px", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                {[
+                  { label: "Cot.",             hide: true  },
+                  { label: "Fecha",            hide: false },
+                  { label: "Cliente",          hide: false },
+                  { label: "Ciudad",           hide: false },
+                  { label: "kWh",              hide: true  },
+                  { label: "kWp",              hide: true  },
+                  { label: "Sistema",          hide: false },
+                  { label: "Valor",            hide: false },
+                  { label: "Opción principal", hide: true  },
+                  { label: "Estado",           hide: false },
+                  { label: "Asesor",           hide: true  },
+                  { label: "Acciones",         hide: false },
+                ].map(({ label, hide }) => (
+                  <th key={label} className={hide ? "col-hide-mobile" : ""} style={{ padding: "10px 12px", fontWeight: 600, whiteSpace: "nowrap" }}>{label}</th>
                 ))}
               </tr>
 
               {/* Fila de filtros por columna */}
               <tr style={{ borderBottom: "2px solid var(--accent)", background: "rgba(245,197,24,.04)" }}>
                 {/* Cot. */}
-                <td style={{ padding: "6px 8px" }}>
+                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
                   <input style={inputStyle} placeholder="Nº" value={f.cot} onChange={set("cot")} />
                 </td>
 
@@ -193,7 +212,7 @@ export default function LeadsCotizaciones() {
                 </td>
 
                 {/* kWh min / max */}
-                <td style={{ padding: "6px 8px", minWidth: 100 }}>
+                <td className="col-hide-mobile" style={{ padding: "6px 8px", minWidth: 100 }}>
                   <div style={{ display: "flex", gap: 4 }}>
                     <input style={{ ...inputStyle, width: "50%" }} type="number" placeholder="Min" value={f.kwhMin} onChange={set("kwhMin")} min="0" />
                     <input style={{ ...inputStyle, width: "50%" }} type="number" placeholder="Max" value={f.kwhMax} onChange={set("kwhMax")} min="0" />
@@ -201,7 +220,7 @@ export default function LeadsCotizaciones() {
                 </td>
 
                 {/* kWp min */}
-                <td style={{ padding: "6px 8px", minWidth: 70 }}>
+                <td className="col-hide-mobile" style={{ padding: "6px 8px", minWidth: 70 }}>
                   <input style={inputStyle} type="number" placeholder="Min" value={f.kwpMin} onChange={set("kwpMin")} min="0" />
                 </td>
 
@@ -218,7 +237,7 @@ export default function LeadsCotizaciones() {
                 </td>
 
                 {/* Opción principal — sin filtro */}
-                <td style={{ padding: "6px 8px" }} />
+                <td className="col-hide-mobile" style={{ padding: "6px 8px" }} />
 
                 {/* Estado */}
                 <td style={{ padding: "6px 8px" }}>
@@ -228,7 +247,7 @@ export default function LeadsCotizaciones() {
                 </td>
 
                 {/* Asesor */}
-                <td style={{ padding: "6px 8px" }}>
+                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
                   <select style={selectStyle} value={f.asesor} onChange={set("asesor")}>
                     {asesores.map((a) => <option key={a} value={a}>{a || "Todos"}</option>)}
                   </select>
@@ -258,22 +277,22 @@ export default function LeadsCotizaciones() {
                       onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel)"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                     >
-                      <td style={{ padding: "10px 12px", color: "var(--accent)", fontWeight: 700 }}>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--accent)", fontWeight: 700 }}>
                         N-{lead.numeroCotizacion}
                       </td>
                       <td style={{ padding: "10px 12px", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        {new Date(lead.fecha).toLocaleDateString("es-CO")}
+                        {safeDate(lead.fecha)}
                       </td>
                       <td style={{ padding: "10px 12px", fontWeight: 600 }}>{lead.nombre}</td>
                       <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.ubicacion}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right" }}>{lead.consumoKwh ?? "—"}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--accent)" }}>{lead.kwp ?? "—"}</td>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right" }}>{lead.consumoKwh ?? "—"}</td>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right", color: "var(--accent)" }}>{lead.kwp ?? "—"}</td>
                       <td style={{ padding: "10px 12px" }}>{lead.tipoSolicitud}</td>
                       <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
                         {money(lead.costoProyectoMasIva)}
                       </td>
 
-                      <td style={{ padding: "10px 12px" }}>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px" }}>
                         {op ? (
                           <div>
                             <span style={{ color: "var(--accent)", fontWeight: 700 }}>{op.label}</span>
@@ -301,7 +320,7 @@ export default function LeadsCotizaciones() {
                         </select>
                       </td>
 
-                      <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.vendedor}</td>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.vendedor}</td>
 
                       <td style={{ padding: "10px 12px" }}>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>

@@ -13,6 +13,7 @@
   background-image: url("./assets/banner_1.webp");
   background-size: cover;
   background-position: center;
+  overflow-x: hidden;
 }
 
 /* Fondo translúcido (legacy) */
@@ -380,6 +381,8 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 22px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -686,6 +689,33 @@
 }
 
 @media (max-width: 600px) {
+  .cotizadorShell {
+    padding: 12px;
+  }
+
+  .cotGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .cotTwoCol {
+    grid-template-columns: 1fr;
+  }
+
+  .cotBtnPrimary,
+  .cotBtnSecondary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cotSteps {
+    gap: 6px;
+  }
+
+  .cotStep {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
   .overlay {
     padding: 0%;
   }
