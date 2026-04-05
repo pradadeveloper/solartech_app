@@ -76,11 +76,11 @@ export default function LeadsCotizaciones() {
     return lista;
   }, [leads, f]);
 
-  const actualizarEstado = async (numeroCotizacion, estado) => {
+  const actualizarEstado = async (lead, estado) => {
     setLeads((prev) =>
-      prev.map((l) => l.numeroCotizacion === numeroCotizacion ? { ...l, estado } : l)
+      prev.map((l) => l.id === lead.id ? { ...l, estado } : l)
     );
-    await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${numeroCotizacion}/estado`, {
+    await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${lead.numeroCotizacion}/estado`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado }),
@@ -308,7 +308,7 @@ export default function LeadsCotizaciones() {
                       <td style={{ padding: "10px 12px" }}>
                         <select
                           value={lead.estado ?? "Nuevo"}
-                          onChange={(e) => actualizarEstado(lead.numeroCotizacion, e.target.value)}
+                          onChange={(e) => actualizarEstado(lead, e.target.value)}
                           style={{
                             background: badge.bg, color: badge.color,
                             border: `1px solid ${badge.color}`,

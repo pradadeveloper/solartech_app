@@ -168,7 +168,7 @@ export default function Resultado() {
 
   if (!resultado) {
     return (
-      <div className="cotizador">
+      <div className="cotizador cotizador--light">
         <div className="cotizadorShell">
           <div className="cotCard">
             <div className="cotCardBody" style={{ textAlign: "center" }}>
@@ -188,7 +188,7 @@ export default function Resultado() {
     typeof v === "number" ? v.toLocaleString("es-CO") : (v ?? "—");
 
   return (
-    <div className="cotizador">
+    <div className="cotizador cotizador--light">
       <div className="cotizadorShell">
         {/* Header */}
         <header className="cotHeader">
@@ -253,14 +253,14 @@ export default function Resultado() {
               </p>
 
               {/* Inputs de cada opción */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+              <div className="opcionesGrid">
                 {opciones.map((op, idx) => (
                   <div
                     key={idx}
                     onClick={() => op.consumoKwh && setOpcionSeleccionada(idx)}
                     style={{
-                      background: opcionSeleccionada === idx ? 'rgba(245,197,24,0.12)' : 'rgba(255,255,255,0.04)',
-                      border: opcionSeleccionada === idx ? '1.5px solid #f5c518' : '1px solid rgba(255,255,255,0.1)',
+                      background: opcionSeleccionada === idx ? 'rgba(176,58,34,0.08)' : '#f8f9fa',
+                      border: opcionSeleccionada === idx ? '1.5px solid #b03a22' : '1px solid #e0e0e0',
                       borderRadius: 10,
                       padding: '14px 12px',
                       cursor: op.consumoKwh ? 'pointer' : 'default',
@@ -268,15 +268,15 @@ export default function Resultado() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <b style={{ fontSize: '0.9rem' }}>{op.label}</b>
+                      <b style={{ fontSize: '0.9rem', color: '#1a1a1a' }}>{op.label}</b>
                       {opcionSeleccionada === idx && (
-                        <span style={{ background: '#f5c518', color: '#000', fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: 20 }}>
+                        <span style={{ background: '#b03a22', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: 20 }}>
                           PRINCIPAL
                         </span>
                       )}
                     </div>
 
-                    <label style={{ fontSize: '0.75rem', opacity: 0.7, display: 'block', marginBottom: 4 }}>Consumo kWh/mes</label>
+                    <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>Consumo kWh/mes</label>
                     <input
                       type="number"
                       value={op.consumoKwh}
@@ -285,8 +285,8 @@ export default function Resultado() {
                       onChange={(e) => actualizarOpcion(idx, 'consumoKwh', e.target.value)}
                       style={{
                         width: '100%', boxSizing: 'border-box',
-                        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: 6, padding: '6px 10px', color: '#fff', fontSize: '0.9rem',
+                        background: '#fff', border: '1px solid #dedede',
+                        borderRadius: 6, padding: '6px 10px', color: '#1a1a1a', fontSize: '0.9rem',
                       }}
                     />
 
@@ -297,7 +297,7 @@ export default function Resultado() {
                         <OpRow label="Inversores" value={calculos[idx].ninversores} />
                         <OpRow label="Producción" value={`${calculos[idx].produccionDeEnergia} kWh/mes`} />
                         <OpRow label="Área mínima" value={`${calculos[idx].areaMinima} m²`} />
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '4px 0' }} />
+                        <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                         <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
                         <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
                         <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} años`} />
@@ -317,7 +317,7 @@ export default function Resultado() {
                       <tr>
                         <th>Métrica</th>
                         {opciones.map((op, i) => (
-                          <th key={i} className="num" style={{ color: opcionSeleccionada === i ? '#f5c518' : undefined }}>
+                          <th key={i} className="num" style={{ color: opcionSeleccionada === i ? '#b03a22' : undefined }}>
                             {op.label} {opcionSeleccionada === i ? '★' : ''}
                           </th>
                         ))}
@@ -336,7 +336,7 @@ export default function Resultado() {
                         <tr key={key}>
                           <td>{label}</td>
                           {calculos.map((c, i) => (
-                            <td key={i} className="num" style={{ color: opcionSeleccionada === i ? '#f5c518' : undefined }}>
+                            <td key={i} className="num" style={{ color: opcionSeleccionada === i ? '#b03a22' : undefined }}>
                               {c ? (fmt ? `$${Number(c[key]).toLocaleString('es-CO')}` : c[key]) : '—'}
                             </td>
                           ))}
@@ -669,8 +669,8 @@ function Metric({ label, value, isGreen }) {
 function OpRow({ label, value, accent }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-      <span style={{ opacity: 0.65 }}>{label}</span>
-      <b style={{ color: accent ? '#f5c518' : '#fff' }}>{value ?? '—'}</b>
+      <span style={{ color: '#5a5a5a' }}>{label}</span>
+      <b style={{ color: accent ? '#b03a22' : '#1a1a1a' }}>{value ?? '—'}</b>
     </div>
   );
 }

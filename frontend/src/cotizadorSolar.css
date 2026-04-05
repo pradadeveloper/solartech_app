@@ -58,7 +58,7 @@
 .cotizador h1 {
   color: #fff;
   text-align: center;
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   margin-bottom: 1rem;
 }
 
@@ -787,4 +787,127 @@
   .cotizador .table {
     min-width: 520px;
   }
+  .opcionesGrid {
+    grid-template-columns: 1fr !important;
+  }
+  .cotActions {
+    flex-wrap: wrap;
+  }
+  .cotActions .cotBtn {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+}
+
+/* =========================================================
+   COMPARADOR: grid de 3 opciones con colapso mobile
+   ========================================================= */
+.opcionesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .opcionesGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   TEMA CLARO — Resultado.jsx (.cotizador--light)
+   ========================================================= */
+.cotizador--light {
+  background-image: none;
+  background: #f8f9fa;
+}
+
+.cotizador--light .cotHeader {
+  background: #1a1a2e;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.cotizador--light .cotCard {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  backdrop-filter: none;
+}
+
+.cotizador--light .cotCardHead {
+  background: #f7f7f7;
+  border-bottom-color: #e0e0e0;
+}
+
+.cotizador--light .cotCardHead h2 {
+  color: #1a1a1a;
+}
+
+.cotizador--light .cotCardBody {
+  color: #1a1a1a;
+}
+
+.cotizador--light .cotSummaryRow {
+  border-bottom-color: #e0e0e0;
+}
+
+.cotizador--light .cotSummaryLabel {
+  color: #5a5a5a;
+}
+
+.cotizador--light .cotSummaryValue {
+  color: #1a1a1a;
+}
+
+.cotizador--light .cotDivider {
+  background: #e0e0e0;
+}
+
+.cotizador--light .cotBtnGhost {
+  color: #1a1a1a;
+  border-color: #dedede;
+}
+
+.cotizador--light .tableWrap {
+  border-color: #e0e0e0;
+  background: transparent;
+}
+
+.cotizador--light .table th,
+.cotizador--light .table td {
+  color: #1a1a1a;
+  border-bottom-color: #e0e0e0;
+}
+
+.cotizador--light .table th {
+  color: #5a5a5a;
+  background: #f7f7f7;
+}
+
+.cotizador--light .cotCard input,
+.cotizador--light .cotCard select,
+.cotizador--light .cotCard textarea {
+  background: #f8f9fa;
+  color: #1a1a1a;
+  border-color: #dedede;
+}
+
+.cotizador--light select {
+  background-color: #f8f9fa;
+  color: #1a1a1a;
+  border: 1px solid #dedede;
+}
+
+.cotizador--light select option {
+  background-color: #ffffff;
+  color: #1a1a1a;
+}
+
+.cotizador--light .condicionesComerciales {
+  color: #5a5a5a;
+}
+
+.cotizador--light p {
+  color: #1a1a1a;
 }
