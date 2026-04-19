@@ -4,24 +4,24 @@ import { useMemo, useState } from "react";
 import "./cotizadorSolar.css"; // usa tu misma hoja
 
 // ── Replica las fórmulas del backend para calcular en el frontend ──
-function calcularLocal(consumoKwh, costoKwh, base = {}) {
-  const consumo = Number(consumoKwh);
+function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
+  const kwp = Number(kwpInput);
   const costoUnidad = Number(costoKwh);
-  if (!consumo || !costoUnidad) return null;
+  const costokWp = Number(costokWpInput) > 0 ? Number(costokWpInput) : 3500000;
+  if (!kwp || !costoUnidad) return null;
 
   const potenciaPanel = 585;
   const radiacionSolar = 3.8;
   const margenCobertura = 0.8;
   const capacidadInversor = 3000;
-  const costokWp = 3500000;
   const longitudRiel = 4.7;
   const cableSolar = 10;
 
   const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
-  const wPromedioDia = Number((((consumo * 1000) * 12) / 365).toFixed(1));
-  const kwp = Number(((wPromedioDia / radiacionSolarCobertura) / 1000).toFixed(1));
+  const wPromedioDia = Number((kwp * radiacionSolarCobertura * 1000).toFixed(1));
+  const consumo = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
 
-  const npaneles = Math.ceil(wPromedioDia / (potenciaPanel * radiacionSolarCobertura));
+  const npaneles = Math.ceil((kwp * 1000) / potenciaPanel);
   const ninversores = Math.ceil((potenciaPanel * npaneles) / capacidadInversor);
   const riel47 = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
   const midCland = Math.ceil((npaneles * 2) - 2);
@@ -46,6 +46,7 @@ function calcularLocal(consumoKwh, costoKwh, base = {}) {
   const descuentoDeclaracion = Math.round(costoProyecto / 2);
   const ahorroMensual = Math.round(consumo * costoUnidad);
   const ahorroAnual = ahorroMensual * 12;
+  const consumoKwh = consumo;
   const ahorro10Anos = Math.round(ahorroAnual * 10);
   const tiempoRetorno = ahorroAnual > 0 ? Number((costoProyecto / ahorroAnual).toFixed(1)) : null;
 
@@ -55,7 +56,7 @@ function calcularLocal(consumoKwh, costoKwh, base = {}) {
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
 
   return {
-    consumoKwh: consumo, costoKwh: costoUnidad, wPromedioDia,
+    consumoKwh, costoKwh: costoUnidad, wPromedioDia,
     kwp, potenciaPanel, capacidadInversor, radiacionSolar, radiacionSolarCobertura, margenCobertura,
     npaneles, ninversores, riel47, midCland, endCland, lFoot, groundingLoop, cableSolar,
     produccionDeEnergia, areaMinima, porcentajeCoberturaProyecto,
@@ -78,13 +79,13 @@ export default function Resultado() {
   const [generandoPdf, setGenerandoPdf] = useState(false);
 
   const [opciones, setOpciones] = useState(() => resultado ? [
-    { label: "Opción A", consumoKwh: String(resultado.consumoKwh), costoKwh: String(resultado.costoKwh) },
-    { label: "Opción B", consumoKwh: "", costoKwh: String(resultado.costoKwh) },
-    { label: "Opción C", consumoKwh: "", costoKwh: String(resultado.costoKwh) },
+    { label: "Opción A", kwp: String(resultado.kwp ?? ""), costokWp: "3500000" },
+    { label: "Opción B", kwp: "", costokWp: "3500000" },
+    { label: "Opción C", kwp: "", costokWp: "3500000" },
   ] : []);
 
   const calculos = opciones.map((op) =>
-    op.consumoKwh ? calcularLocal(op.consumoKwh, op.costoKwh, resultado) : null
+    op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, resultado) : null
   );
 
   const actualizarOpcion = (idx, campo, valor) => {
@@ -125,7 +126,7 @@ export default function Resultado() {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ...resultado, consumoKwh: calc.consumoKwh, label: opciones[opcionSeleccionada].label }),
+        body: JSON.stringify({ ...resultado, ...calc, kwp: calc.kwp, consumoKwh: calc.consumoKwh, label: opciones[opcionSeleccionada].label }),
       });
       const data = await res.json();
       setPdfUrls((prev) => prev.map((u, i) => i === opcionSeleccionada ? data.pdfUrl : u));
@@ -249,7 +250,7 @@ export default function Resultado() {
               }
             >
               <p style={{ margin: '0 0 14px', opacity: 0.8, fontSize: '0.85rem' }}>
-                Edita el consumo kWh/mes de cada opción para comparar escenarios. Marca la opción a enviar al cliente.
+                Edita el kWp y el costo por kWp de cada opción para comparar escenarios. Marca la opción a enviar al cliente.
               </p>
 
               {/* Inputs de cada opción */}
@@ -257,13 +258,13 @@ export default function Resultado() {
                 {opciones.map((op, idx) => (
                   <div
                     key={idx}
-                    onClick={() => op.consumoKwh && setOpcionSeleccionada(idx)}
+                    onClick={() => op.kwp && setOpcionSeleccionada(idx)}
                     style={{
                       background: opcionSeleccionada === idx ? 'rgba(176,58,34,0.08)' : '#f8f9fa',
                       border: opcionSeleccionada === idx ? '1.5px solid #b03a22' : '1px solid #e0e0e0',
                       borderRadius: 10,
                       padding: '14px 12px',
-                      cursor: op.consumoKwh ? 'pointer' : 'default',
+                      cursor: op.kwp ? 'pointer' : 'default',
                       transition: 'all 0.2s',
                     }}
                   >
@@ -276,13 +277,27 @@ export default function Resultado() {
                       )}
                     </div>
 
-                    <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>Consumo kWh/mes</label>
+                    <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>kWp del sistema</label>
                     <input
                       type="number"
-                      value={op.consumoKwh}
-                      placeholder="Ej: 800"
+                      value={op.kwp}
+                      placeholder="Ej: 11"
                       onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => actualizarOpcion(idx, 'consumoKwh', e.target.value)}
+                      onChange={(e) => actualizarOpcion(idx, 'kwp', e.target.value)}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: '#fff', border: '1px solid #dedede',
+                        borderRadius: 6, padding: '6px 10px', color: '#1a1a1a', fontSize: '0.9rem',
+                        marginBottom: 8,
+                      }}
+                    />
+                    <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>Costo base por kWp ($)</label>
+                    <input
+                      type="number"
+                      value={op.costokWp}
+                      placeholder="Ej: 3500000"
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => actualizarOpcion(idx, 'costokWp', e.target.value)}
                       style={{
                         width: '100%', boxSizing: 'border-box',
                         background: '#fff', border: '1px solid #dedede',
@@ -292,7 +307,7 @@ export default function Resultado() {
 
                     {calculos[idx] ? (
                       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <OpRow label="kWp" value={calculos[idx].kwp} accent />
+                        <OpRow label="Consumo kWh/mes" value={`${calculos[idx].consumoKwh} kWh/mes`} accent />
                         <OpRow label="Paneles" value={calculos[idx].npaneles} />
                         <OpRow label="Inversores" value={calculos[idx].ninversores} />
                         <OpRow label="Producción" value={`${calculos[idx].produccionDeEnergia} kWh/mes`} />
@@ -303,7 +318,7 @@ export default function Resultado() {
                         <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} años`} />
                       </div>
                     ) : (
-                      <p style={{ margin: '12px 0 0', opacity: 0.4, fontSize: '0.8rem' }}>Ingresa el consumo para calcular</p>
+                      <p style={{ margin: '12px 0 0', opacity: 0.4, fontSize: '0.8rem' }}>Ingresa el kWp para calcular</p>
                     )}
                   </div>
                 ))}
@@ -325,8 +340,8 @@ export default function Resultado() {
                     </thead>
                     <tbody>
                       {[
-                        { label: 'Consumo kWh/mes', key: 'consumoKwh' },
                         { label: 'kWp', key: 'kwp' },
+                        { label: 'Consumo kWh/mes (calc.)', key: 'consumoKwh' },
                         { label: 'N° Paneles', key: 'npaneles' },
                         { label: 'Inversión + IVA', key: 'costoProyectoMasIva', fmt: true },
                         { label: 'Ahorro mensual', key: 'ahorroMensual', fmt: true },
