@@ -825,8 +825,8 @@
 }
 
 .cotizador--light .cotHeader {
-  background: #1a1a2e;
-  border-color: rgba(255, 255, 255, 0.15);
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .cotizador--light .cotCard {

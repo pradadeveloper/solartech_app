@@ -205,7 +205,7 @@ function calcularProyecto({
 
   // Equipos
   const npaneles = Math.ceil(wPromedioDia / (potenciaPanel * radiacionSolarCobertura));
-  const ninversores = Math.ceil((potenciaPanel * npaneles) / capacidadInversor);
+  const ninversores = 1;
 
   const riel47 = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
   const midCland = Math.ceil((npaneles * 2) - 2);
@@ -313,7 +313,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   const COLOR_ACCENT  = rgb(0.690, 0.227, 0.133);
   const COLOR_TEXT    = rgb(0, 0, 0);
-  const COLOR_MUTED   = rgb(0.12, 0.12, 0.12);
+  const COLOR_MUTED   = rgb(0, 0, 0);
   const COLOR_WHITE   = rgb(1, 1, 1);
   const COLOR_BORDER  = rgb(0.6, 0.6, 0.6);
   const COLOR_LIGHT   = rgb(0.92, 0.92, 0.92);
@@ -334,17 +334,51 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // Logos de marcas aliadas
   const frontendLogos = path.join(__dirname, '..', 'frontend', 'public', 'logos');
   const brandLogos = {};
-  for (const [key, file] of [['longi', 'logo_longi.png'], ['growatt', 'growatt.png']]) {
+  for (const [key, file, type] of [
+    ['longi',   'logo_longi.png',    'png'],
+    ['growatt', 'growatt.png',       'png'],
+    ['huawei',  'huawei.jpeg',       'jpg'],
+    ['goodwe',  'goodwe.jpeg',       'jpg'],
+    ['jasolar', 'logo_ja_solar.jpg', 'jpg'],
+  ]) {
     const lp = path.join(frontendLogos, file);
     if (fs.existsSync(lp)) {
-      try { brandLogos[key] = await pdfDoc.embedPng(fs.readFileSync(lp)); } catch (_) {}
+      try {
+        brandLogos[key] = type === 'png'
+          ? await pdfDoc.embedPng(fs.readFileSync(lp))
+          : await pdfDoc.embedJpg(fs.readFileSync(lp));
+      } catch (_) {}
+    }
+  }
+
+  // Imagen casos de éxito
+  let casosExitoImg = null;
+  const casosPath = path.join(frontendLogos, 'casos_exito.jpg');
+  if (fs.existsSync(casosPath)) {
+    try { casosExitoImg = await pdfDoc.embedJpg(fs.readFileSync(casosPath)); } catch (_) {}
+  }
+
+  // Banners de proyecto
+  const assetsPath = path.join(__dirname, 'public', 'assets');
+  const bannerImgs = {};
+  for (const [key, file] of [
+    ['hogar',      'banner_panel_solar_hogar.jpg'],
+    ['industria',  'banner_panel_solar_industria.jpg'],
+    ['industria2', 'banner_panel_solar_industria_2.jpg'],
+    ['industria3', 'banner_panel_solar_industria_3.jpg'],
+  ]) {
+    const bp = path.join(assetsPath, file);
+    if (fs.existsSync(bp)) {
+      try { bannerImgs[key] = await pdfDoc.embedJpg(fs.readFileSync(bp)); } catch (_) {}
     }
   }
 
   let page;
   let y;
+  let pageCount = 0;
 
   function newPage() {
+    pageCount++;
     page = pdfDoc.addPage([W, H]);
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: COLOR_WHITE });
 
@@ -375,6 +409,16 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     });
 
     y = H - headerH - 18;
+
+    // Banner delgado en páginas 2 en adelante
+    if (pageCount >= 2) {
+      const thinImg = bannerImgs.industria2 || bannerImgs.industria || bannerImgs.hogar;
+      if (thinImg) {
+        const tH = 44;
+        page.drawImage(thinImg, { x: 0, y: H - headerH - tH, width: W, height: tH });
+        y = H - headerH - tH - 14;
+      }
+    }
   }
 
   function checkY(needed) {
@@ -519,7 +563,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 14;
   const componentes = [
     `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi / JA Solar)`,
-    `${resultados.ninversores} inversor(es) de ${(resultados.capacidadInversor / 1000).toFixed(1)} kW (Huawei / Growatt / GoodWe)`,
+    `1 inversor de ${resultados.kwp} kW (Huawei / Growatt / GoodWe)`,
     `${resultados.riel47} rieles de aluminio 4.7 m para estructura de montaje`,
     `${resultados.midCland} mid clamps y ${resultados.endCland} end clamps de fijacion`,
     `${resultados.lFoot} L-Foot de anclaje a cubierta`,
@@ -550,7 +594,17 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   gap(6);
 
-  // 8. IMPACTO AMBIENTAL
+  // Banner entre secciones
+  if (bannerImgs.hogar) {
+    checkY(130);
+    const bH = 115;
+    page.drawImage(bannerImgs.hogar, { x: 0, y: y - bH, width: W, height: bH });
+    y -= bH + 12;
+  }
+
+  // 8. IMPACTO AMBIENTAL — siempre inicia página nueva
+  newPage();
+  gap(4);
   sectionHeader('IMPACTO AMBIENTAL');
   infoRow2('Arboles equivalentes al ano', `${safe(resultados.arbolesEquivalentes)} arboles`, 'CO2 evitado anualmente', `${safe(resultados.co2EvitadoToneladas)} toneladas`);
   infoRow('Galones de gasolina ahorrados al ano', `${safe(resultados.galonesGasolinaEvitados)} galones`);
@@ -578,6 +632,14 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   gap(6);
 
+  // Banner industrial entre secciones
+  if (bannerImgs.industria) {
+    checkY(125);
+    const bH = 112;
+    page.drawImage(bannerImgs.industria, { x: 0, y: y - bH, width: W, height: bH });
+    y -= bH + 12;
+  }
+
   // 10. GARANTIAS
   sectionHeader('GARANTIAS');
   const garantias = [
@@ -597,6 +659,14 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   gap(6);
 
+  // Casos de éxito
+  if (casosExitoImg) {
+    checkY(155);
+    const bH = 140;
+    page.drawImage(casosExitoImg, { x: 0, y: y - bH, width: W, height: bH });
+    y -= bH + 12;
+  }
+
   // 11. MARCAS ALIADAS
   sectionHeader('MARCAS ALIADAS');
   checkY(20);
@@ -606,10 +676,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 18;
   const marcas = [
     { key: 'longi',   nombre: 'LONGi Solar',   desc: 'Paneles - N1 mundial'          },
-    { key: null,      nombre: 'JA Solar',       desc: 'Paneles - Top 3 mundial'       },
-    { key: null,      nombre: 'Huawei Solar',   desc: 'Inversores inteligentes'       },
+    { key: 'jasolar', nombre: 'JA Solar',       desc: 'Paneles - Top 3 mundial'       },
+    { key: 'huawei',  nombre: 'Huawei Solar',   desc: 'Inversores inteligentes'       },
     { key: 'growatt', nombre: 'Growatt',        desc: 'Inversores residencial/com.'   },
-    { key: null,      nombre: 'GoodWe',         desc: 'Soluciones hibridas'           },
+    { key: 'goodwe',  nombre: 'GoodWe',         desc: 'Soluciones hibridas'           },
   ];
   const mCols = 3;
   const mGap = 10;
@@ -637,6 +707,15 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   y -= mRows2 * (mBH + mGap) + 4;
   gap(6);
+
+  // Banner final de proyecto
+  if (bannerImgs.industria3 || bannerImgs.industria2) {
+    const img = bannerImgs.industria3 || bannerImgs.industria2;
+    checkY(120);
+    const bH = 108;
+    page.drawImage(img, { x: 0, y: y - bH, width: W, height: bH });
+    y -= bH + 12;
+  }
 
   // 12. CONDICIONES COMERCIALES
   sectionHeader('CONDICIONES COMERCIALES');

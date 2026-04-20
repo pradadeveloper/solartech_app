@@ -22,7 +22,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const consumo = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
 
   const npaneles = Math.ceil((kwp * 1000) / potenciaPanel);
-  const ninversores = Math.ceil((potenciaPanel * npaneles) / capacidadInversor);
+  const ninversores = 1;
   const riel47 = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
   const midCland = Math.ceil((npaneles * 2) - 2);
   const endCland = Math.ceil(npaneles / 2);
@@ -537,7 +537,7 @@ export default function Resultado() {
                 <li>Repuestos/reparaciones solo por el tiempo restante de garantía vigente.</li>
                 <li>Puede haber costos adicionales tras visita técnica.</li>
                 <li>El sistema no opera durante interrupciones de la red (si aplica al tipo de sistema).</li>
-                <li>Capacidad de techo: loza 50kg/m² y teja 15kg/m².</li>
+                <li>Capacidad de techo: losa 50kg/m² y teja 15kg/m².</li>
                 <li>
                   Garantías:
                   <ul>
