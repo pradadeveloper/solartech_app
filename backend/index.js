@@ -734,20 +734,21 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       return res.status(400).json({ error: "Faltan datos requeridos", missing });
     }
 
-    // ====== Validar lead duplicado ======
-    const todosLeads = await getAllLeads();
-    const leadExistente = todosLeads.find((l) =>
-      l.correo === data.correo ||
-      l.telefono === data.telefono ||
-      (data.identificacion && l.identificacion === data.identificacion)
-    ) || null;
-    if (leadExistente) {
-      return res.status(409).json({
-        error: 'lead_duplicado',
-        mensaje: `El cliente ya existe y lo está atendiendo el vendedor ${leadExistente.vendedor}.`,
-        vendedor: leadExistente.vendedor,
-        cotizacion: leadExistente.numeroCotizacion,
-      });
+    // ====== Validar lead duplicado (solo por cédula/NIT) ======
+    if (data.identificacion) {
+      const todosLeads = await getAllLeads();
+      const leadExistente = todosLeads.find(l =>
+        l.identificacion && String(l.identificacion).trim() === String(data.identificacion).trim()
+      ) || null;
+      if (leadExistente) {
+        return res.status(409).json({
+          error: 'lead_duplicado',
+          mensaje: `La Cédula/NIT ${data.identificacion} ya está registrada y la está atendiendo el asesor ${leadExistente.vendedor}.`,
+          vendedor: leadExistente.vendedor,
+          cotizacion: leadExistente.numeroCotizacion,
+          campoClave: 'Cédula/NIT',
+        });
+      }
     }
 
     const numeroCotizacion = await getNextContador();
@@ -775,22 +776,33 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       vendedor,
       estado: 'Nuevo',
       fecha: new Date().toISOString(),
+      // Cliente
       nombre: data.nombre,
+      identificacion: data.identificacion || null,
       correo: data.correo,
       telefono: data.telefono,
-      identificacion: data.identificacion || null,
       ubicacion: data.ubicacion,
-      preferenciaContacto: data.preferenciaContacto || null,
+      ciudadSolar: data.ciudadSolar || null,
+      // Proyecto
       tipoSolicitud: data.tipoSolicitud,
       tipoTecho: data.tipoTecho || null,
-      recibeFactura: data.recibeFactura || null,
       sistemaInteres: data.sistemaInteres || null,
+      preferenciaContacto: data.preferenciaContacto || null,
+      conociste: data.conociste || null,
+      // Técnico
       consumoKwh: resultados.consumoKwh,
       costoKwh: resultados.costoKwh,
       valorMensual: resultados.valorMensual,
       areaDisponible: resultados.areaDisponible,
+      radiacionSolar: resultados.radiacionSolar,
       kwp: resultados.kwp,
+      npaneles: resultados.npaneles,
+      ninversores: resultados.ninversores,
+      // Financiero
       costoProyectoMasIva: resultados.costoProyectoMasIva,
+      ahorroMensual: resultados.ahorroMensual,
+      ahorroAnual: resultados.ahorroAnual,
+      tiempoRetorno: resultados.tiempoRetorno,
       pdfUrl,
       opciones: [],
     });
@@ -844,16 +856,14 @@ app.get('/api/leads', async (_req, res) => {
 
 // ====== GET /api/leads/buscar ======
 app.get('/api/leads/buscar', async (req, res) => {
-  const { correo, telefono, identificacion } = req.query;
-  if (!correo && !telefono && !identificacion) return res.json({ encontrado: false });
+  const { identificacion } = req.query;
+  if (!identificacion) return res.json({ encontrado: false });
   try {
     const leads = await getAllLeads();
-    const lead = leads.find((l) =>
-      (correo && l.correo === correo) ||
-      (telefono && l.telefono === telefono) ||
-      (identificacion && l.identificacion && l.identificacion === identificacion)
+    const lead = leads.find(l =>
+      l.identificacion && String(l.identificacion).trim() === String(identificacion).trim()
     );
-    if (lead) return res.json({ encontrado: true, vendedor: lead.vendedor, numeroCotizacion: lead.numeroCotizacion, nombre: lead.nombre });
+    if (lead) return res.json({ encontrado: true, vendedor: lead.vendedor, numeroCotizacion: lead.numeroCotizacion, nombre: lead.nombre, campoClave: 'Cédula/NIT' });
     res.json({ encontrado: false });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

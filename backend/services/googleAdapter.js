@@ -14,22 +14,41 @@ const NUM_KEYS = [
 
 // Mapeo: columna del Sheets → propiedad interna del lead
 const SHEET_TO_LEAD = {
-  nombre:        'nombre',
-  email:         'correo',
-  telefono:      'telefono',
-  consumo_kwh:   'consumoKwh',
-  potencia_kw:   'kwp',
-  inversion_cop: 'costoProyectoMasIva',
-  roi_meses:     'tiempoRetorno',   // guardado en meses
-  fecha:         'fecha',
-  asesor:        'vendedor',
-  estado:        'estado',
-  ciudad:        'ubicacion',
-  tipo:          'tipoSolicitud',
-  canal:         'preferenciaContacto',
-  contacto:      'numeroCotizacion', // número de cotización
-  kwh:           'id',               // UUID para identificación interna
-  pdf_url:       'pdfUrl',
+  // ── Identificación ──
+  contacto:        'numeroCotizacion',
+  fecha:           'fecha',
+  asesor:          'vendedor',
+  estado:          'estado',
+  // ── Cliente ──
+  nombre:          'nombre',
+  cedula:          'identificacion',
+  email:           'correo',
+  telefono:        'telefono',
+  ciudad:          'ubicacion',
+  ciudad_solar:    'ciudadSolar',
+  // ── Proyecto ──
+  tipo:            'tipoSolicitud',
+  tipo_techo:      'tipoTecho',
+  sistema:         'sistemaInteres',
+  contacto_pref:   'preferenciaContacto',
+  canal_conociste: 'conociste',
+  // ── Técnico ──
+  consumo_kwh:     'consumoKwh',
+  costo_kwh:       'costoKwh',
+  factura_mensual: 'valorMensual',
+  area_m2:         'areaDisponible',
+  radiacion:       'radiacionSolar',
+  potencia_kw:     'kwp',
+  paneles:         'npaneles',
+  inversores:      'ninversores',
+  // ── Financiero ──
+  inversion_cop:   'costoProyectoMasIva',
+  ahorro_mensual:  'ahorroMensual',
+  ahorro_anual:    'ahorroAnual',
+  roi_meses:       'tiempoRetorno',
+  // ── Misc ──
+  pdf_url:         'pdfUrl',
+  kwh:             'id',
 };
 
 // Columnas del Sheets en el orden exacto de la hoja
@@ -97,7 +116,7 @@ async function getAllLeads() {
     const sheets = google.sheets({ version: 'v4', auth });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.SHEET_ID,
-      range: 'leads!A1:P',
+      range: 'leads!A1:AH',
     });
     const [headers, ...rows] = res.data.values || [[]];
     if (!headers || !headers.length) return [];
@@ -130,26 +149,26 @@ async function saveLead(lead) {
   const auth = await getAuth().getClient();
   const sheets = google.sheets({ version: 'v4', auth });
 
-  // Leer encabezados actuales (el usuario puede haber configurado el Sheets manualmente)
   const headerRes = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'leads!A1:P1',
+    range: 'leads!A1:1',
   });
-  const actualHeaders = headerRes.data.values?.[0];
+  let actualHeaders = headerRes.data.values?.[0] || [];
 
-  if (!actualHeaders || !actualHeaders.length) {
-    // Primera vez: escribir encabezados canónicos
+  // Agregar columnas canónicas faltantes al encabezado
+  const missingCols = SHEETS_COLS.filter(c => !actualHeaders.includes(c));
+  if (actualHeaders.length === 0 || missingCols.length > 0) {
+    const newHeaders = [...actualHeaders, ...missingCols];
     await sheets.spreadsheets.values.update({
       spreadsheetId: process.env.SHEET_ID,
       range: 'leads!A1',
       valueInputOption: 'RAW',
-      requestBody: { values: [SHEETS_COLS] },
+      requestBody: { values: [newHeaders] },
     });
+    actualHeaders = newHeaders;
   }
 
-  // Construir fila respetando el orden real del Sheets
-  const headers = actualHeaders && actualHeaders.length ? actualHeaders : SHEETS_COLS;
-  const row = headers.map(col => {
+  const row = actualHeaders.map(col => {
     const prop = SHEET_TO_LEAD[col];
     if (!prop) return '';
     const val = lead[prop];
@@ -170,7 +189,7 @@ async function updateLead(numeroCotizacion, fields) {
   const sheets = google.sheets({ version: 'v4', auth });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'leads!A1:P',
+    range: 'leads!A1:AH',
   });
   const [headers, ...rows] = res.data.values || [[]];
 
@@ -195,7 +214,7 @@ async function updateLead(numeroCotizacion, fields) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.SHEET_ID,
-    range: `leads!A${sheetRow}:P${sheetRow}`,
+    range: `leads!A${sheetRow}:AH${sheetRow}`,
     valueInputOption: 'RAW',
     requestBody: { values: [updatedRow] },
   });

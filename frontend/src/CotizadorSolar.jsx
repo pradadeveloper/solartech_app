@@ -133,7 +133,7 @@ export default function CotizadorSolar() {
 
       if (response.status === 409) {
         const err = await response.json();
-        alert(`⚠️ ${err.mensaje}`);
+        setClienteExistente({ vendedor: err.vendedor, numeroCotizacion: err.cotizacion, nombre: data.nombre, campoClave: err.campoClave, mensaje: err.mensaje });
         setLoading(false);
         return;
       }
@@ -301,7 +301,7 @@ export default function CotizadorSolar() {
                         <option>Madera</option>
                         <option>Zinc</option>
                         <option>Suelo</option>
-                        <option>Loza</option>
+                        <option>Losa</option>
                       </select>
                     </Field>
 
@@ -391,6 +391,23 @@ export default function CotizadorSolar() {
               <SummaryRow label="Canal" value={formData.conociste || "—"} />
               <SummaryRow label="Contacto" value={formData.preferenciaContacto || "—"} />
               <SummaryRow label="Tipo" value={formData.tipoSolicitud || "—"} />
+
+              {clienteExistente && (
+                <div style={{
+                  marginTop: '14px',
+                  background: 'rgba(243,156,18,0.18)',
+                  border: '1.5px solid #f39c12',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  color: '#fff',
+                  fontSize: '0.82rem',
+                  lineHeight: 1.6,
+                }}>
+                  🔒 <b>Cédula/NIT ya registrada</b><br />
+                  El documento <b>{formData.identificacion}</b> ya tiene una cotización activa.<br />
+                  Asesor: <b>{clienteExistente.vendedor}</b> — Cot. N-{clienteExistente.numeroCotizacion}
+                </div>
+              )}
             </Card>
 
             <Card title="Tips rápidos">
@@ -415,21 +432,6 @@ export default function CotizadorSolar() {
                 </div>
               )}
 
-              {clienteExistente && (
-                <div style={{
-                  marginTop: '12px',
-                  background: 'rgba(243, 156, 18, 0.18)',
-                  border: '1px solid #f39c12',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  color: '#fff',
-                  fontSize: '0.82rem',
-                  lineHeight: 1.6,
-                }}>
-                  🔒 <b>Cliente ya registrado.</b><br />
-                  <b>{clienteExistente.nombre}</b> ya está siendo atendido por el asesor <b>{clienteExistente.vendedor}</b> (Cot. N-{clienteExistente.numeroCotizacion}).
-                </div>
-              )}
             </Card>
           </aside>
         </form>
