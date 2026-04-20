@@ -133,7 +133,7 @@ export default function CotizadorSolar() {
 
       if (response.status === 409) {
         const err = await response.json();
-        setClienteExistente({ vendedor: err.vendedor, numeroCotizacion: err.cotizacion, nombre: data.nombre, campoClave: err.campoClave, mensaje: err.mensaje });
+        setClienteExistente({ vendedor: err.vendedor, numeroCotizacion: err.cotizacion, nombre: formData.nombre, campoClave: err.campoClave, mensaje: err.mensaje });
         setLoading(false);
         return;
       }
