@@ -10,12 +10,12 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const costokWp = Number(costokWpInput) > 0 ? Number(costokWpInput) : 3500000;
   if (!kwp || !costoUnidad) return null;
 
-  const potenciaPanel = 585;
-  const radiacionSolar = 3.8;
-  const margenCobertura = 0.8;
-  const capacidadInversor = 3000;
-  const longitudRiel = 4.7;
-  const cableSolar = 10;
+  const potenciaPanel = Number(base.potenciaPanel) || 585;
+  const radiacionSolar = Number(base.radiacionSolar) || 3.8;
+  const margenCobertura = Number(base.margenCobertura) || 0.8;
+  const capacidadInversor = kwp; // 1 inversor dimensionado al sistema
+  const longitudRiel = Number(base.longitudRiel) || 4.7;
+  const cableSolar = Number(base.cableSolar) || 10;
 
   const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
   const wPromedioDia = Number((kwp * radiacionSolarCobertura * 1000).toFixed(1));
@@ -428,13 +428,12 @@ export default function Resultado() {
                   </thead>
                   <tbody>
                     <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Inversor {resultadoActivo.capacidadInversor}W</td><td className="num">{resultadoActivo.ninversores}</td></tr>
+                    <tr><td>Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1 kit</td></tr>
+                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1 kit</td></tr>
                     <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
                     <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
-                    <tr><td>Pólizas</td><td className="num">1</td></tr>
-                    <tr><td>Servicio de instalación</td><td className="num">1</td></tr>
-                    <tr><td>Beneficios tributarios</td><td className="num">1</td></tr>
-                    <tr><td>Extras</td><td className="num">1</td></tr>
+                    <tr><td>Servicio de instalación y puesta en marcha</td><td className="num">1</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -520,10 +519,11 @@ export default function Resultado() {
             {/* MARCAS */}
             <Card title="Marcas aliadas">
               <div className="marcasAliadas" style={{ marginTop: 10 }}>
-                <img src="/logos/huawei.jpeg" alt="Huawei" style={{ width: 120, height: "auto" }} />
-                <img src="/logos/logo_longi.png" alt="Longi" style={{ width: 120, height: "auto" }} />
-                <img src="/logos/growatt.png" alt="Growatt" style={{ width: 120, height: "auto" }} />
-                <img src="/logos/goodwe.jpeg" alt="Goodwe" style={{ width: 120, height: "auto" }} />
+                <img src="/logos/logo_longi.png" alt="Longi" style={{ width: 110, height: "auto" }} />
+                <img src="/logos/logo_ja_solar.jpg" alt="JA Solar" style={{ width: 110, height: "auto" }} />
+                <img src="/logos/huawei.jpeg" alt="Huawei" style={{ width: 110, height: "auto" }} />
+                <img src="/logos/growatt.png" alt="Growatt" style={{ width: 110, height: "auto" }} />
+                <img src="/logos/goodwe.jpeg" alt="Goodwe" style={{ width: 110, height: "auto" }} />
               </div>
             </Card>
 
@@ -620,7 +620,7 @@ export default function Resultado() {
                   </thead>
                   <tbody>
                     <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Inversores {resultadoActivo.capacidadInversor}W</td><td className="num">{resultadoActivo.ninversores}</td></tr>
+                    <tr><td>Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
                     <tr><td>Riel 47</td><td className="num">{resultadoActivo.riel47}</td></tr>
                     <tr><td>Mid Clamp</td><td className="num">{resultadoActivo.midCland}</td></tr>
                     <tr><td>End Clamp</td><td className="num">{resultadoActivo.endCland}</td></tr>

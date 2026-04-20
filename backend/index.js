@@ -17,15 +17,28 @@ if (USE_GOOGLE) console.log('[storage] Google Sheets + Drive activado');
 const contadorPath = path.join(__dirname, 'contador.json');
 const leadsPath = path.join(__dirname, 'leads.json');
 const configPath = path.join(__dirname, 'config.json');
+const usuariosPath = path.join(__dirname, 'usuarios.json');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
 
-// Usuarios del sistema — agregar o quitar vendedores aquí
-const usuarios = [
-  { id: 1, nombre: 'Administrador', apellido: '',      cargo: 'Administrador',    usuario: 'admin',     password: 'solartech2026' },
-  { id: 2, nombre: 'Vendedor',      apellido: 'Uno',   cargo: 'Asesor Comercial', usuario: 'vendedor1', password: 'vendedor123'   },
-  { id: 3, nombre: 'Vendedor',      apellido: 'Dos',   cargo: 'Asesor Comercial', usuario: 'vendedor2', password: 'vendedor456'   },
+const USUARIOS_DEFAULT = [
+  { id: 1, nombre: 'Administrador', apellido: '',      cargo: 'Administrador',    usuario: 'admin',     password: 'solartech2026', rol: 'Admin'  },
+  { id: 2, nombre: 'Vendedor',      apellido: 'Uno',   cargo: 'Asesor Comercial', usuario: 'vendedor1', password: 'vendedor123',   rol: 'Asesor' },
+  { id: 3, nombre: 'Vendedor',      apellido: 'Dos',   cargo: 'Asesor Comercial', usuario: 'vendedor2', password: 'vendedor456',   rol: 'Asesor' },
 ];
+
+function cargarUsuarios() {
+  try {
+    if (fs.existsSync(usuariosPath)) return JSON.parse(fs.readFileSync(usuariosPath, 'utf-8'));
+  } catch (_) {}
+  return [...USUARIOS_DEFAULT];
+}
+
+function guardarUsuarios(lista) {
+  fs.writeFileSync(usuariosPath, JSON.stringify(lista, null, 2));
+}
+
+let usuarios = cargarUsuarios();
 
 const app = express();
 const PORT = 4000;
@@ -564,12 +577,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   const componentes = [
     `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi / JA Solar)`,
     `1 inversor de ${resultados.kwp} kW (Huawei / Growatt / GoodWe)`,
-    `${resultados.riel47} rieles de aluminio 4.7 m para estructura de montaje`,
-    `${resultados.midCland} mid clamps y ${resultados.endCland} end clamps de fijacion`,
-    `${resultados.lFoot} L-Foot de anclaje a cubierta`,
-    `${resultados.cableSolar} m de cable solar 10 mm2`,
-    `${resultados.groundingLoop} m grounding loop puesta a tierra`,
-    'Cableado de AC/DC, protecciones electricas y fusibles',
+    'Estructura de montaje (rieles, clamps, L-Foot y puesta a tierra)',
+    'Cableado solar AC/DC, protecciones electricas y fusibles',
     'Instalacion, puesta en marcha y configuracion de monitoreo remoto',
     'Capacitacion al usuario y entrega de manual de operacion',
   ];
@@ -971,13 +980,71 @@ app.get('/api/leads/buscar', async (req, res) => {
 // ====== GET /api/asesores ======
 app.get('/api/asesores', (_req, res) => {
   res.json(usuarios.map(u => ({
-    id: u.id,
-    nombre: u.nombre,
-    apellido: u.apellido,
-    cargo: u.cargo,
-    usuario: u.usuario,
-    rol: u.usuario === 'admin' ? 'Admin' : 'Asesor',
+    id: u.id, nombre: u.nombre, apellido: u.apellido,
+    cargo: u.cargo, usuario: u.usuario, rol: u.rol || (u.usuario === 'admin' ? 'Admin' : 'Asesor'),
   })));
+});
+
+// ====== POST /api/asesores (solo admin) ======
+app.post('/api/asesores', express.json(), (req, res) => {
+  const auth = req.headers['authorization'];
+  if (!auth) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (decoded.usuario !== 'admin' && (decoded.rol || '').toLowerCase() !== 'admin')
+      return res.status(403).json({ error: 'Solo administradores pueden agregar asesores' });
+  } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
+
+  const { nombre, apellido, cargo, usuario, password, rol } = req.body;
+  if (!nombre || !usuario || !password) return res.status(400).json({ error: 'nombre, usuario y password son requeridos' });
+  if (usuarios.find(u => u.usuario === usuario)) return res.status(409).json({ error: 'El usuario ya existe' });
+
+  const newUser = { id: Date.now(), nombre, apellido: apellido || '', cargo: cargo || 'Asesor Comercial', usuario, password, rol: rol || 'Asesor' };
+  usuarios.push(newUser);
+  guardarUsuarios(usuarios);
+  res.status(201).json({ ok: true, id: newUser.id });
+});
+
+// ====== PUT /api/asesores/:id (solo admin) ======
+app.put('/api/asesores/:id', express.json(), (req, res) => {
+  const auth = req.headers['authorization'];
+  if (!auth) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (decoded.usuario !== 'admin' && (decoded.rol || '').toLowerCase() !== 'admin')
+      return res.status(403).json({ error: 'Solo administradores' });
+  } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
+
+  const id = Number(req.params.id);
+  const idx = usuarios.findIndex(u => u.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Asesor no encontrado' });
+
+  const { nombre, apellido, cargo, usuario, password, rol } = req.body;
+  if (usuario && usuario !== usuarios[idx].usuario && usuarios.find(u => u.usuario === usuario))
+    return res.status(409).json({ error: 'El usuario ya existe' });
+
+  usuarios[idx] = { ...usuarios[idx], ...(nombre && { nombre }), ...(apellido !== undefined && { apellido }), ...(cargo && { cargo }), ...(usuario && { usuario }), ...(password && { password }), ...(rol && { rol }) };
+  guardarUsuarios(usuarios);
+  res.json({ ok: true });
+});
+
+// ====== DELETE /api/asesores/:id (solo admin) ======
+app.delete('/api/asesores/:id', (req, res) => {
+  const auth = req.headers['authorization'];
+  if (!auth) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (decoded.usuario !== 'admin' && (decoded.rol || '').toLowerCase() !== 'admin')
+      return res.status(403).json({ error: 'Solo administradores' });
+  } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
+
+  const id = Number(req.params.id);
+  if (id === 1) return res.status(403).json({ error: 'No se puede eliminar el administrador principal' });
+  const antes = usuarios.length;
+  usuarios = usuarios.filter(u => u.id !== id);
+  if (usuarios.length === antes) return res.status(404).json({ error: 'Asesor no encontrado' });
+  guardarUsuarios(usuarios);
+  res.json({ ok: true });
 });
 
 // ====== PATCH /api/leads/:numeroCotizacion/estado ======
