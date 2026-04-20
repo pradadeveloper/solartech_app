@@ -101,7 +101,13 @@ const CONFIG_DEFAULT = {
     nit: '900.123.456-7', ciudad: 'Medellin, Colombia' },
 };
 
-function leerConfig() {
+async function leerConfig() {
+  if (USE_GOOGLE) {
+    try {
+      const remote = await gAdapter.getConfig();
+      return { ...CONFIG_DEFAULT, ...remote };
+    } catch (_) {}
+  }
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');
     return { ...CONFIG_DEFAULT, ...JSON.parse(raw) };
@@ -110,8 +116,15 @@ function leerConfig() {
   }
 }
 
-function guardarConfig(cfg) {
+async function guardarConfig(cfg) {
   fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
+  if (USE_GOOGLE) {
+    try {
+      await gAdapter.saveConfig(cfg);
+    } catch (err) {
+      console.error('[config] Error sincronizando con Sheets:', err.message);
+    }
+  }
 }
 
 // ====== Helpers ======
@@ -749,7 +762,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       } catch (_) {}
     }
 
-    const cfg = leerConfig();
+    const cfg = await leerConfig();
     const resultados = calcularProyecto(data, cfg);
     const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion }, asesorPDF, cfg);
 
@@ -788,12 +801,12 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
 });
 
 // ====== GET /api/config ======
-app.get('/api/config', (req, res) => {
-  res.json(leerConfig());
+app.get('/api/config', async (req, res) => {
+  res.json(await leerConfig());
 });
 
 // ====== PUT /api/config ======
-app.put('/api/config', express.json(), (req, res) => {
+app.put('/api/config', express.json(), async (req, res) => {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No autorizado' });
@@ -803,10 +816,10 @@ app.put('/api/config', express.json(), (req, res) => {
   } catch (_) {
     return res.status(401).json({ error: 'Token inválido' });
   }
-  const actual = leerConfig();
+  const actual = await leerConfig();
   const nueva = { ...actual, ...req.body };
   if (req.body.empresa) nueva.empresa = { ...actual.empresa, ...req.body.empresa };
-  guardarConfig(nueva);
+  await guardarConfig(nueva);
   res.json({ ok: true, config: nueva });
 });
 
@@ -883,7 +896,7 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
         asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario };
       } catch (_) {}
     }
-    const cfg = leerConfig();
+    const cfg = await leerConfig();
     const resultados = calcularProyecto(data, cfg);
     const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '-' }, asesorPDF, cfg);
     res.json({ pdfUrl });
