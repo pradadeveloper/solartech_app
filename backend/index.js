@@ -594,23 +594,41 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   gap(6);
 
-  // Banner entre secciones
-  if (bannerImgs.hogar) {
-    checkY(130);
-    const bH = 115;
-    page.drawImage(bannerImgs.hogar, { x: 0, y: y - bH, width: W, height: bH });
-    y -= bH + 12;
-  }
-
   // 8. IMPACTO AMBIENTAL — siempre inicia página nueva
   newPage();
   gap(4);
   sectionHeader('IMPACTO AMBIENTAL');
-  infoRow2('Arboles equivalentes al ano', `${safe(resultados.arbolesEquivalentes)} arboles`, 'CO2 evitado anualmente', `${safe(resultados.co2EvitadoToneladas)} toneladas`);
-  infoRow('Galones de gasolina ahorrados al ano', `${safe(resultados.galonesGasolinaEvitados)} galones`);
+
+  // Tarjetas visuales para los 3 indicadores ambientales
+  const statCards = [
+    { icon: '🌳', label: 'Arboles equivalentes', value: `${safe(resultados.arbolesEquivalentes)}`, unit: 'arboles/ano' },
+    { icon: '💨', label: 'CO2 evitado',           value: `${safe(resultados.co2EvitadoToneladas)}`, unit: 'ton/ano'   },
+    { icon: '⛽', label: 'Gasolina evitada',       value: `${safe(resultados.galonesGasolinaEvitados)}`, unit: 'galones/ano' },
+  ];
+  const cardW = (cW - 12) / 3;
+  const cardH = 56;
+  checkY(cardH + 8);
+  statCards.forEach((card, i) => {
+    const cx2 = margin + i * (cardW + 6);
+    page.drawRectangle({ x: cx2, y: y - cardH, width: cardW, height: cardH, color: COLOR_ACLIGHT, borderColor: COLOR_ACCENT, borderWidth: 0.75 });
+    page.drawRectangle({ x: cx2, y: y - cardH, width: cardW, height: 4, color: COLOR_ACCENT });
+    page.drawText(card.label, { x: cx2 + 8, y: y - 14, size: 8, font, color: COLOR_MUTED });
+    page.drawText(card.value, { x: cx2 + 8, y: y - 30, size: 18, font, color: COLOR_ACCENT });
+    page.drawText(card.unit,  { x: cx2 + 8, y: y - 44, size: 7.5, font, color: COLOR_MUTED });
+  });
+  y -= cardH + 8;
+
   gap(4);
   para('Al elegir energia solar contribuye activamente a la reduccion de emisiones de CO2 y a la independencia energetica de Colombia. Su sistema generara energia limpia por mas de 25 anos.', 10, 8.5, COLOR_MUTED);
-  gap(6);
+  gap(8);
+
+  // Banner hogar después de impacto ambiental
+  if (bannerImgs.hogar) {
+    checkY(118);
+    const bH = 105;
+    page.drawImage(bannerImgs.hogar, { x: 0, y: y - bH, width: W, height: bH });
+    y -= bH + 12;
+  }
 
   // 9. ETAPAS DEL PROYECTO
   sectionHeader('ETAPAS DEL PROYECTO');
@@ -661,9 +679,12 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   // Casos de éxito
   if (casosExitoImg) {
-    checkY(155);
-    const bH = 140;
-    page.drawImage(casosExitoImg, { x: 0, y: y - bH, width: W, height: bH });
+    const aspectRatio = casosExitoImg.height / casosExitoImg.width;
+    const bH = Math.min(160, Math.round(aspectRatio * cW));
+    checkY(bH + 20);
+    page.drawText('CASOS DE EXITO', { x: margin + 10, y, size: 9.5, font, color: COLOR_ACCENT });
+    y -= 12;
+    page.drawImage(casosExitoImg, { x: margin, y: y - bH, width: cW, height: bH });
     y -= bH + 12;
   }
 
