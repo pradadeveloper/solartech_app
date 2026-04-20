@@ -312,12 +312,12 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   const footerH = 30;
 
   const COLOR_ACCENT  = rgb(0.690, 0.227, 0.133);
-  const COLOR_TEXT    = rgb(0.102, 0.102, 0.102);
-  const COLOR_MUTED   = rgb(0.353, 0.353, 0.353);
+  const COLOR_TEXT    = rgb(0, 0, 0);
+  const COLOR_MUTED   = rgb(0.12, 0.12, 0.12);
   const COLOR_WHITE   = rgb(1, 1, 1);
-  const COLOR_BORDER  = rgb(0.871, 0.871, 0.871);
-  const COLOR_LIGHT   = rgb(0.965, 0.965, 0.965);
-  const COLOR_ACLIGHT = rgb(0.980, 0.940, 0.930);
+  const COLOR_BORDER  = rgb(0.6, 0.6, 0.6);
+  const COLOR_LIGHT   = rgb(0.92, 0.92, 0.92);
+  const COLOR_ACLIGHT = rgb(0.97, 0.90, 0.87);
 
   let logoImg = null;
   const logoPath = path.join(__dirname, 'public', 'assets', 'logo_solartech.png');
@@ -399,7 +399,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     if (highlight) {
       page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_ACLIGHT, borderColor: COLOR_ACCENT, borderWidth: 0.5 });
     } else {
-      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: rgb(0.99, 0.99, 0.99), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER, borderWidth: 0.3 });
     }
     page.drawText(String(label), { x: margin + 10, y: y - 14, size: 9, font, color: highlight ? COLOR_ACCENT : COLOR_MUTED });
     page.drawText(String(value ?? '-'), { x: margin + cW / 2, y: y - 14, size: 10, font, color: highlight ? COLOR_ACCENT : COLOR_TEXT });
@@ -410,11 +410,11 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     const rH = 22;
     const half = (cW - 6) / 2;
     checkY(rH);
-    page.drawRectangle({ x: margin, y: y - rH, width: half, height: rH, color: rgb(0.99, 0.99, 0.99), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+    page.drawRectangle({ x: margin, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER, borderWidth: 0.3 });
     page.drawText(String(l1), { x: margin + 8, y: y - 14, size: 8.5, font, color: COLOR_MUTED });
     page.drawText(String(v1 ?? '-'), { x: margin + 8 + half / 2, y: y - 14, size: 9.5, font, color: COLOR_TEXT });
     const rx = margin + half + 6;
-    page.drawRectangle({ x: rx, y: y - rH, width: half, height: rH, color: rgb(0.99, 0.99, 0.99), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+    page.drawRectangle({ x: rx, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER, borderWidth: 0.3 });
     page.drawText(String(l2), { x: rx + 8, y: y - 14, size: 8.5, font, color: COLOR_MUTED });
     page.drawText(String(v2 ?? '-'), { x: rx + 8 + half / 2, y: y - 14, size: 9.5, font, color: COLOR_TEXT });
     y -= rH;
