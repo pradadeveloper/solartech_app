@@ -202,7 +202,7 @@ function calcularProyecto({
   const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
 
   // Área mínima estimada
-  const areaMinima = Math.round(npaneles * 1.13 * 2);
+  const areaMinima = Math.round(kwp * 5.8);
 
   // Cobertura por área (si aplica)
   let porcentajeCoberturaProyecto = 0;

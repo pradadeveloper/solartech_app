@@ -29,7 +29,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const lFoot = Math.ceil(riel47 * 3);
   const groundingLoop = Math.round(riel47 / 2) * 2;
   const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
-  const areaMinima = Math.round(npaneles * 1.13 * 2);
+  const areaMinima = Math.round(kwp * 5.8);
 
   // Cobertura por área (conserva el área del resultado original)
   const areaDisp = Number(base.areaDisponible ?? 0);
@@ -373,7 +373,6 @@ export default function Resultado() {
                 <SummaryRow label="Preferencia de contacto" value={resultado.preferenciaContacto} />
                 <SummaryRow label="Tipo de solicitud" value={resultado.tipoSolicitud} />
                 <SummaryRow label="Tipo de techo" value={resultado.tipoTecho} />
-                <SummaryRow label="Recibe factura" value={resultado.recibeFactura} />
                 <SummaryRow label="Sistema de interés" value={resultado.sistemaInteres} />
               </div>
             </Card>

@@ -16,7 +16,6 @@ export default function CotizadorSolar() {
     preferenciaContacto: "WhatsApp",
     tipoSolicitud: "Hogar",
     tipoTecho: "Teja de barro",
-    recibeFactura: "Sí",
     sistemaInteres: "Interconectado",
     valorMensual: "1000000",
     consumoKwh: "1000",
@@ -42,10 +41,9 @@ export default function CotizadorSolar() {
     const consumo = Number(formData.consumoKwh);
     if (!consumo || consumo <= 0) return null;
     const wPromedioDia = ((consumo * 1000) * 12) / 365;
-    const radiacionSolarCobertura = 3.8 * 0.8; // 3.04
-    const potenciaPanel = 585;
-    const npaneles = Math.ceil(wPromedioDia / (potenciaPanel * radiacionSolarCobertura));
-    return Math.round(npaneles * 1.13 * 2);
+    const radiacionSolarCobertura = 3.8 * 0.8;
+    const kwp = (wPromedioDia / radiacionSolarCobertura) / 1000;
+    return Math.round(kwp * 5.8);
   }, [formData.consumoKwh]);
 
   const areaInsuficiente = useMemo(() => {
@@ -73,13 +71,11 @@ export default function CotizadorSolar() {
   const [clienteExistente, setClienteExistente] = useState(null); // { vendedor, numeroCotizacion, nombre }
 
   useEffect(() => {
-    const { correo, telefono, identificacion } = formData;
-    if (!correo && !telefono && !identificacion) { setClienteExistente(null); return; }
+    const { identificacion } = formData;
+    if (!identificacion) { setClienteExistente(null); return; }
 
     const params = new URLSearchParams();
-    if (correo)        params.set('correo', correo);
-    if (telefono)      params.set('telefono', telefono);
-    if (identificacion) params.set('identificacion', identificacion);
+    params.set('identificacion', identificacion);
 
     const timer = setTimeout(async () => {
       try {
@@ -87,11 +83,11 @@ export default function CotizadorSolar() {
         const data = await res.json();
         setClienteExistente(data.encontrado ? data : null);
       } catch (_) {}
-    }, 600); // debounce 600ms
+    }, 600);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.correo, formData.telefono, formData.identificacion]);
+  }, [formData.identificacion]);
 
   const handleNext = () => {
     if (step === 1 && canGoNext) setStep(2);
@@ -267,6 +263,8 @@ export default function CotizadorSolar() {
                         <option>Teja Eternit</option>
                         <option>Madera</option>
                         <option>Zinc</option>
+                        <option>Suelo</option>
+                        <option>Loza</option>
                       </select>
                     </Field>
 
@@ -287,35 +285,13 @@ export default function CotizadorSolar() {
                         <option>LinkedIn</option>
                         <option>Google</option>
                         <option>Referido</option>
+                        <option>Referido Mercadeo</option>
+                        <option>Bancolombia</option>
+                        <option>Banco de Bogotá</option>
+                        <option>Otro</option>
                       </select>
                     </Field>
 
-                    <div className="cotRadioBlock">
-                      <span className="cotLabel">¿Recibe factura de energía?</span>
-                      <div className="cotRadioRow">
-                        <label className="cotRadio">
-                          <input
-                            type="radio"
-                            name="recibeFactura"
-                            value="Sí"
-                            checked={formData.recibeFactura === "Sí"}
-                            onChange={handleChange}
-                          />
-                          <span>Sí</span>
-                        </label>
-
-                        <label className="cotRadio">
-                          <input
-                            type="radio"
-                            name="recibeFactura"
-                            value="No"
-                            checked={formData.recibeFactura === "No"}
-                            onChange={handleChange}
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
                   </div>
                 </Card>
 
