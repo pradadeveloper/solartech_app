@@ -6,7 +6,7 @@ const ROL_BADGE = {
   Asesor: { bg: "rgba(52,152,219,.15)", color: "#3498db" },
 };
 
-const EMPTY_FORM = { nombre: "", apellido: "", cargo: "", usuario: "", password: "", rol: "Asesor" };
+const EMPTY_FORM = { nombre: "", apellido: "", cargo: "", usuario: "", password: "", rol: "Asesor", celular: "", correo: "" };
 
 export default function Asesores() {
   const [asesores, setAsesores] = useState([]);
@@ -38,7 +38,7 @@ export default function Asesores() {
   };
 
   const abrirEditar = (a) => {
-    setForm({ nombre: a.nombre, apellido: a.apellido || "", cargo: a.cargo || "", usuario: a.usuario, password: "", rol: a.rol || "Asesor" });
+    setForm({ nombre: a.nombre, apellido: a.apellido || "", cargo: a.cargo || "", usuario: a.usuario, password: "", rol: a.rol || "Asesor", celular: a.celular || "", correo: a.correo || "" });
     setError("");
     setModal({ mode: "edit", id: a.id });
   };
@@ -136,6 +136,8 @@ export default function Asesores() {
                     </span>
                   </div>
                   <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--muted)" }}>{a.cargo}</p>
+                  {a.celular && <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "var(--muted2)" }}>📱 {a.celular}</p>}
+                  {a.correo  && <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "var(--muted2)" }}>✉ {a.correo}</p>}
                   <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "var(--muted2)" }}>@{a.usuario}</p>
                   {isAdmin && (
                     <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -162,6 +164,8 @@ export default function Asesores() {
               { label: "Nombre *", name: "nombre", type: "text" },
               { label: "Apellido", name: "apellido", type: "text" },
               { label: "Cargo", name: "cargo", type: "text", placeholder: "Ej: Asesor Comercial" },
+              { label: "Celular", name: "celular", type: "tel", placeholder: "Ej: +57 300 000 0000" },
+              { label: "Correo", name: "correo", type: "email", placeholder: "Ej: asesor@solartech.com.co" },
               { label: "Usuario *", name: "usuario", type: "text" },
               { label: modal.mode === "edit" ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña *", name: "password", type: "password" },
             ].map(({ label, name, type, placeholder }) => (

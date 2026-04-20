@@ -22,9 +22,9 @@ const usuariosPath = path.join(__dirname, 'usuarios.json');
 const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
 
 const USUARIOS_DEFAULT = [
-  { id: 1, nombre: 'Administrador', apellido: '',      cargo: 'Administrador',    usuario: 'admin',     password: 'solartech2026', rol: 'Admin'  },
-  { id: 2, nombre: 'Vendedor',      apellido: 'Uno',   cargo: 'Asesor Comercial', usuario: 'vendedor1', password: 'vendedor123',   rol: 'Asesor' },
-  { id: 3, nombre: 'Vendedor',      apellido: 'Dos',   cargo: 'Asesor Comercial', usuario: 'vendedor2', password: 'vendedor456',   rol: 'Asesor' },
+  { id: 1, nombre: 'Administrador', apellido: '',      cargo: 'Administrador',    usuario: 'admin',     password: 'solartech2026', rol: 'Admin',  celular: '', correo: '' },
+  { id: 2, nombre: 'Vendedor',      apellido: 'Uno',   cargo: 'Asesor Comercial', usuario: 'vendedor1', password: 'vendedor123',   rol: 'Asesor', celular: '', correo: '' },
+  { id: 3, nombre: 'Vendedor',      apellido: 'Dos',   cargo: 'Asesor Comercial', usuario: 'vendedor2', password: 'vendedor456',   rol: 'Asesor', celular: '', correo: '' },
 ];
 
 function cargarUsuarios() {
@@ -769,12 +769,13 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // 13. DATOS DEL ASESOR COMERCIAL
   sectionHeader('DATOS DEL ASESOR COMERCIAL');
   infoRow2('Nombre del asesor', asesorNombre, 'Cargo', safe(asesor.cargo));
+  infoRow2('Celular', safe(asesor.celular || '-'), 'Correo', safe(asesor.correo || '-'));
   infoRow2('Usuario sistema', safe(asesor.usuario), 'Empresa', 'Solartech Energy Systems');
   gap(8);
 
   // 14. CIERRE
   sectionHeader('GRACIAS POR CONFIAR EN SOLARTECH ENERGY SYSTEMS');
-  checkY(100);
+  checkY(110);
   page.drawText('Estamos comprometidos a brindarle la mejor solucion de energia solar adaptada a sus necesidades.', {
     x: margin + 10, y, size: 10, font, color: COLOR_TEXT,
   });
@@ -785,11 +786,14 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 26;
 
   const sigX = margin + 10;
-  page.drawRectangle({ x: sigX, y: y - 66, width: 220, height: 66, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 0.5 });
-  page.drawRectangle({ x: sigX, y: y - 66, width: 5, height: 66, color: COLOR_ACCENT });
+  const sigH = asesor.celular || asesor.correo ? 82 : 66;
+  page.drawRectangle({ x: sigX, y: y - sigH, width: 260, height: sigH, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 0.5 });
+  page.drawRectangle({ x: sigX, y: y - sigH, width: 5, height: sigH, color: COLOR_ACCENT });
   page.drawText(asesorNombre, { x: sigX + 14, y: y - 18, size: 11, font, color: COLOR_TEXT });
   page.drawText(safe(asesor.cargo || 'Asesor Comercial'), { x: sigX + 14, y: y - 33, size: 9.5, font, color: COLOR_MUTED });
-  page.drawText('Solartech Energy Systems', { x: sigX + 14, y: y - 48, size: 9.5, font, color: COLOR_ACCENT });
+  if (asesor.celular) page.drawText(`Tel: ${asesor.celular}`, { x: sigX + 14, y: y - 48, size: 9, font, color: COLOR_MUTED });
+  if (asesor.correo)  page.drawText(asesor.correo, { x: sigX + 14, y: y - (asesor.celular ? 62 : 48), size: 9, font, color: COLOR_MUTED });
+  page.drawText('Solartech Energy Systems', { x: sigX + 14, y: y - (sigH - 14), size: 9.5, font, color: COLOR_ACCENT });
 
   const pdfBytes = await pdfDoc.save();
   const fileName = `propuesta-${uuidv4()}.pdf`;
@@ -811,12 +815,12 @@ app.post('/api/login', (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, usuario: user.usuario },
+    { id: user.id, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, usuario: user.usuario, celular: user.celular || '', correo: user.correo || '', rol: user.rol || 'Asesor' },
     JWT_SECRET,
     { expiresIn: '8h' }
   );
 
-  res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo });
+  res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, celular: user.celular || '', correo: user.correo || '' });
 });
 
 // ====== Endpoint ======
@@ -870,7 +874,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       try {
         const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
         vendedor = decoded.nombre || decoded.usuario;
-        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario };
+        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario, celular: decoded.celular || '', correo: decoded.correo || '' };
       } catch (_) {}
     }
 
@@ -980,8 +984,9 @@ app.get('/api/leads/buscar', async (req, res) => {
 // ====== GET /api/asesores ======
 app.get('/api/asesores', (_req, res) => {
   res.json(usuarios.map(u => ({
-    id: u.id, nombre: u.nombre, apellido: u.apellido,
-    cargo: u.cargo, usuario: u.usuario, rol: u.rol || (u.usuario === 'admin' ? 'Admin' : 'Asesor'),
+    id: u.id, nombre: u.nombre, apellido: u.apellido, cargo: u.cargo,
+    usuario: u.usuario, rol: u.rol || (u.usuario === 'admin' ? 'Admin' : 'Asesor'),
+    celular: u.celular || '', correo: u.correo || '',
   })));
 });
 
@@ -995,11 +1000,11 @@ app.post('/api/asesores', express.json(), (req, res) => {
       return res.status(403).json({ error: 'Solo administradores pueden agregar asesores' });
   } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
 
-  const { nombre, apellido, cargo, usuario, password, rol } = req.body;
+  const { nombre, apellido, cargo, usuario, password, rol, celular, correo } = req.body;
   if (!nombre || !usuario || !password) return res.status(400).json({ error: 'nombre, usuario y password son requeridos' });
   if (usuarios.find(u => u.usuario === usuario)) return res.status(409).json({ error: 'El usuario ya existe' });
 
-  const newUser = { id: Date.now(), nombre, apellido: apellido || '', cargo: cargo || 'Asesor Comercial', usuario, password, rol: rol || 'Asesor' };
+  const newUser = { id: Date.now(), nombre, apellido: apellido || '', cargo: cargo || 'Asesor Comercial', usuario, password, rol: rol || 'Asesor', celular: celular || '', correo: correo || '' };
   usuarios.push(newUser);
   guardarUsuarios(usuarios);
   res.status(201).json({ ok: true, id: newUser.id });
@@ -1019,11 +1024,11 @@ app.put('/api/asesores/:id', express.json(), (req, res) => {
   const idx = usuarios.findIndex(u => u.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Asesor no encontrado' });
 
-  const { nombre, apellido, cargo, usuario, password, rol } = req.body;
+  const { nombre, apellido, cargo, usuario, password, rol, celular, correo } = req.body;
   if (usuario && usuario !== usuarios[idx].usuario && usuarios.find(u => u.usuario === usuario))
     return res.status(409).json({ error: 'El usuario ya existe' });
 
-  usuarios[idx] = { ...usuarios[idx], ...(nombre && { nombre }), ...(apellido !== undefined && { apellido }), ...(cargo && { cargo }), ...(usuario && { usuario }), ...(password && { password }), ...(rol && { rol }) };
+  usuarios[idx] = { ...usuarios[idx], ...(nombre && { nombre }), ...(apellido !== undefined && { apellido }), ...(cargo && { cargo }), ...(usuario && { usuario }), ...(password && { password }), ...(rol && { rol }), ...(celular !== undefined && { celular }), ...(correo !== undefined && { correo }) };
   guardarUsuarios(usuarios);
   res.json({ ok: true });
 });
@@ -1083,7 +1088,7 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
     if (authPDF && authPDF.startsWith('Bearer ')) {
       try {
         const decoded = jwt.verify(authPDF.slice(7), JWT_SECRET);
-        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario };
+        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario, celular: decoded.celular || '', correo: decoded.correo || '' };
       } catch (_) {}
     }
     const cfg = await leerConfig();
