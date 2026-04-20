@@ -21,6 +21,8 @@ export default function CotizadorSolar() {
     consumoKwh: "1000",
     costoKwh: "800",
     conociste: "Instagram",
+    ciudadSolar: "",
+    radiacionSolar: "",
     facturaAdjunta: null,
     notasAdicionales: "Solo pruebas técnicas",
     areaDisponible: "100",
@@ -28,6 +30,14 @@ export default function CotizadorSolar() {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [ciudades, setCiudades] = useState([]);
+
+  useEffect(() => {
+    fetch(`${process.env.REACT_APP_API_URL}/api/ciudades`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setCiudades(data); })
+      .catch(() => {});
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, files, type } = e.target;
@@ -40,11 +50,11 @@ export default function CotizadorSolar() {
   const areaMinima = useMemo(() => {
     const consumo = Number(formData.consumoKwh);
     if (!consumo || consumo <= 0) return null;
+    const rad = Number(formData.radiacionSolar) > 0 ? Number(formData.radiacionSolar) : 3.8;
     const wPromedioDia = ((consumo * 1000) * 12) / 365;
-    const radiacionSolarCobertura = 3.8 * 0.8;
-    const kwp = (wPromedioDia / radiacionSolarCobertura) / 1000;
+    const kwp = (wPromedioDia / (rad * 0.8)) / 1000;
     return Math.round(kwp * 5.8);
-  }, [formData.consumoKwh]);
+  }, [formData.consumoKwh, formData.radiacionSolar]);
 
   const areaInsuficiente = useMemo(() => {
     const areaDisp = Number(formData.areaDisponible);
@@ -185,6 +195,33 @@ export default function CotizadorSolar() {
 
                     <Field label="Ubicación del proyecto">
                       <input name="ubicacion" value={formData.ubicacion} onChange={handleChange} required />
+                    </Field>
+
+                    <Field label="Ciudad / Municipio">
+                      <select
+                        name="ciudadSolar"
+                        value={formData.ciudadSolar}
+                        onChange={(e) => {
+                          const ciudad = ciudades.find(c => c.ciudad === e.target.value);
+                          setFormData(prev => ({
+                            ...prev,
+                            ciudadSolar: e.target.value,
+                            radiacionSolar: ciudad ? String(ciudad.radiacionDia) : "",
+                          }));
+                        }}
+                      >
+                        <option value="">Selecciona ciudad</option>
+                        {ciudades.map((c, i) => (
+                          <option key={i} value={c.ciudad}>
+                            {c.ciudad} ({c.departamento}) — {c.radiacionDia} kWh/m²/día
+                          </option>
+                        ))}
+                      </select>
+                      {formData.radiacionSolar && (
+                        <span style={{ fontSize: '0.75rem', color: '#b03a22', marginTop: 4, display: 'block' }}>
+                          Radiación: {formData.radiacionSolar} kWh/m²/día
+                        </span>
+                      )}
                     </Field>
 
                     <Field label="Preferencia de contacto">

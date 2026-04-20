@@ -153,6 +153,8 @@ function calcularProyecto({
   valorMensual,
   consumoKwh,
   costoKwh,
+  radiacionSolar: radiacionData,
+  ciudadSolar,
 }, cfg = {}) {
   const consumo = toNumber(consumoKwh);       // kWh/mes
   const costoUnidad = toNumber(costoKwh);     // COP/kWh
@@ -165,7 +167,7 @@ function calcularProyecto({
 
   // Parámetros desde config (con fallback a defaults)
   const potenciaPanel    = cfg.potenciaPanel    || 585;
-  const radiacionSolar   = cfg.radiacionSolar   || 3.8;
+  const radiacionSolar   = (Number(radiacionData) > 0) ? Number(radiacionData) : (cfg.radiacionSolar || 3.8);
   const margenCobertura  = cfg.margenCobertura  || 0.8;
   const capacidadInversor= cfg.capacidadInversor|| 3000;
   const costokWp         = cfg.costokWp         || 3500000;
@@ -797,6 +799,17 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || "Error interno" });
+  }
+});
+
+// ====== GET /api/ciudades ======
+app.get('/api/ciudades', async (req, res) => {
+  if (!USE_GOOGLE) return res.json([]);
+  try {
+    const ciudades = await gAdapter.getCiudades();
+    res.json(ciudades);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

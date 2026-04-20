@@ -221,4 +221,27 @@ async function incrementContador() {
   return total;
 }
 
-module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador };
+// ─── CIUDADES / RADIACIÓN ──────────────────────────────────────────────────────
+async function getCiudades() {
+  try {
+    const auth = await getAuth().getClient();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: 'config!D2:G',
+    });
+    const rows = res.data.values || [];
+    return rows
+      .filter(r => r[1] && r[3])
+      .map(([departamento, ciudad, , radiacionDia]) => ({
+        departamento: departamento || '',
+        ciudad: ciudad || '',
+        radiacionDia: Number(String(radiacionDia).replace(',', '.')) || 0,
+      }));
+  } catch (err) {
+    console.error('[googleAdapter] getCiudades error:', err.message);
+    return [];
+  }
+}
+
+module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador, getCiudades };
