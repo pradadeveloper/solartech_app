@@ -554,15 +554,34 @@ export default function Resultado() {
               </ol>
             </Card>
 
+            {/* ASESOR COMERCIAL */}
+            <Card title="Tu asesor comercial">
+              {(() => {
+                const nombre = [localStorage.getItem('nombreUsuario'), localStorage.getItem('apellidoUsuario')].filter(Boolean).join(' ');
+                const cargo = localStorage.getItem('cargoUsuario') || 'Asesor Comercial';
+                const celular = localStorage.getItem('celularUsuario') || '';
+                const correo = localStorage.getItem('correoUsuario') || '';
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#b03a22', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', flexShrink: 0 }}>
+                      {nombre ? nombre.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'A'}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem' }}>{nombre || 'Asesor Comercial'}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: '0.85rem', opacity: 0.7 }}>{cargo}</p>
+                      {celular && <p style={{ margin: '2px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>📱 {celular}</p>}
+                      {correo  && <p style={{ margin: '2px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>✉ {correo}</p>}
+                    </div>
+                  </div>
+                );
+              })()}
+            </Card>
+
             {/* CIERRE */}
             <Card title="Cierre">
               <p style={{ marginTop: 0, lineHeight: 1.6 }}>
                 ¡Muchas gracias! Estamos para atender tus dudas e inquietudes.
               </p>
-              <p style={{ margin: 0 }}>
-                <b>{[localStorage.getItem('nombreUsuario'), localStorage.getItem('apellidoUsuario')].filter(Boolean).join(' ')}</b>
-              </p>
-              <p style={{ margin: "6px 0 0", opacity: 0.9 }}>{localStorage.getItem('cargoUsuario') || 'Asesor Comercial'}</p>
 
               <div className="cotActions" style={{ marginTop: 14 }}>
                 <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>

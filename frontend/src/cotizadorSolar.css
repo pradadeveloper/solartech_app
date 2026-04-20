@@ -437,6 +437,8 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #fff;
   opacity: 0.6;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 .cotStep.isActive {
   opacity: 1;
@@ -447,6 +449,22 @@
   width: 28px;
   height: 2px;
   background: rgba(255, 255, 255, 0.15);
+}
+/* Light mode: steps visibles sobre fondo blanco */
+.cotizador--light .cotStep {
+  border-color: rgba(176, 58, 34, 0.35);
+  color: #b03a22;
+  opacity: 0.5;
+}
+.cotizador--light .cotStep.isActive {
+  opacity: 1;
+  background: #b03a22;
+  color: #fff;
+  border-color: #b03a22;
+  box-shadow: 0 0 0 2px rgba(176, 58, 34, 0.2);
+}
+.cotizador--light .cotStepLine {
+  background: rgba(176, 58, 34, 0.25);
 }
 
 /* Grid principal */
@@ -825,8 +843,17 @@
 }
 
 .cotizador--light .cotHeader {
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.10) !important;
+  backdrop-filter: none !important;
+}
+
+.cotizador--light .cotTitle {
+  color: #1a1a1a !important;
+}
+
+.cotizador--light .cotSubtitle {
+  color: #555 !important;
 }
 
 .cotizador--light .cotCard {

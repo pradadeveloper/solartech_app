@@ -7,25 +7,24 @@ export default function CotizadorSolar() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    nombre: "Juan Pérez",
+    nombre: "",
     contribucion: false,
     identificacion: "",
-    correo: "juan@example.com",
-    telefono: "3001234567",
-    ubicacion: "Medellín",
-    preferenciaContacto: "WhatsApp",
-    tipoSolicitud: "Hogar",
-    tipoTecho: "Teja de barro",
+    correo: "",
+    telefono: "",
+    ubicacion: "",
+    preferenciaContacto: "",
+    tipoSolicitud: "",
+    tipoTecho: "",
     sistemaInteres: "Interconectado",
-    valorMensual: "1000000",
-    consumoKwh: "1000",
-    costoKwh: "800",
-    conociste: "Instagram",
+    consumoKwh: "",
+    costoKwh: "",
+    conociste: "",
     ciudadSolar: "",
     radiacionSolar: "",
     facturaAdjunta: null,
-    notasAdicionales: "Solo pruebas técnicas",
-    areaDisponible: "100",
+    notasAdicionales: "",
+    areaDisponible: "",
   });
 
   const [step, setStep] = useState(1);
@@ -61,19 +60,17 @@ export default function CotizadorSolar() {
     return areaMinima !== null && areaDisp > 0 && areaDisp < areaMinima;
   }, [formData.areaDisponible, areaMinima]);
 
+  const valorMensual = useMemo(() => {
+    const c = Number(formData.consumoKwh);
+    const k = Number(formData.costoKwh);
+    return c > 0 && k > 0 ? String(Math.round(c * k)) : "";
+  }, [formData.consumoKwh, formData.costoKwh]);
+
   const canGoNext = useMemo(() => {
-    // ✅ Validación simple (sin tocar backend)
     const requiredStep1 = [
-      "nombre",
-      "correo",
-      "telefono",
-      "ubicacion",
-      "consumoKwh",
-      "costoKwh",
-      "valorMensual",
-      "areaDisponible",
-      "preferenciaContacto",
-      "tipoSolicitud",
+      "nombre", "correo", "telefono", "ciudadSolar",
+      "consumoKwh", "costoKwh", "areaDisponible",
+      "preferenciaContacto", "tipoSolicitud",
     ];
     return requiredStep1.every((k) => String(formData[k] ?? "").trim().length > 0);
   }, [formData]);
@@ -119,7 +116,8 @@ export default function CotizadorSolar() {
 
     try {
       const formToSend = new FormData();
-      Object.entries(formData).forEach(([key, value]) => formToSend.append(key, value));
+      const payload = { ...formData, valorMensual, ubicacion: formData.ciudadSolar || formData.ubicacion };
+      Object.entries(payload).forEach(([key, value]) => formToSend.append(key, value ?? ""));
 
       const apiUrl = `${process.env.REACT_APP_API_URL}/api/calcular-proyecto`;
       console.log('🔗 Fetching:', apiUrl);
@@ -193,10 +191,6 @@ export default function CotizadorSolar() {
                       <input name="telefono" type="tel" value={formData.telefono} onChange={handleChange} required />
                     </Field>
 
-                    <Field label="Ubicación del proyecto">
-                      <input name="ubicacion" value={formData.ubicacion} onChange={handleChange} required />
-                    </Field>
-
                     <Field label="Ciudad / Municipio">
                       <select
                         name="ciudadSolar"
@@ -206,6 +200,7 @@ export default function CotizadorSolar() {
                           setFormData(prev => ({
                             ...prev,
                             ciudadSolar: e.target.value,
+                            ubicacion: e.target.value,
                             radiacionSolar: ciudad ? String(ciudad.radiacionDia) : "",
                           }));
                         }}
@@ -266,10 +261,6 @@ export default function CotizadorSolar() {
                       </span>
                     }>
                       <FormattedInput name="costoKwh" value={formData.costoKwh} onChange={handleChange} prefix="$" required />
-                    </Field>
-
-                    <Field label="Valor mensual factura (COP)">
-                      <FormattedInput name="valorMensual" value={formData.valorMensual} onChange={handleChange} prefix="$" required />
                     </Field>
 
                     <Field label="Área disponible (m²)">

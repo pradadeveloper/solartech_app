@@ -33,6 +33,8 @@ export default function Login() {
       localStorage.setItem('nombreUsuario', data.nombre);
       localStorage.setItem('apellidoUsuario', data.apellido || '');
       localStorage.setItem('cargoUsuario', data.cargo || '');
+      localStorage.setItem('celularUsuario', data.celular || '');
+      localStorage.setItem('correoUsuario', data.correo || '');
       navigate('/');
     } catch (err) {
       setError('No se pudo conectar con el servidor. Verifica que el backend esté activo.');
