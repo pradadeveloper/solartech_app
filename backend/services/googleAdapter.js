@@ -263,4 +263,104 @@ async function getCiudades() {
   }
 }
 
-module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador, getCiudades };
+// ─── ASESORES ─────────────────────────────────────────────────────────────────
+const ASESOR_COLS = ['id', 'nombre', 'apellido', 'cargo', 'usuario', 'password', 'rol', 'celular', 'correo'];
+
+async function getAsesores() {
+  try {
+    const auth = await getAuth().getClient();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: 'asesores!A1:I',
+    });
+    const [headers, ...rows] = res.data.values || [[]];
+    if (!headers || !headers.length) return [];
+    return rows.map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
+      return { ...obj, id: Number(obj.id) || 0 };
+    });
+  } catch (err) {
+    console.error('[googleAdapter] getAsesores error:', err.message);
+    return [];
+  }
+}
+
+async function _ensureAsesorHeaders(sheets) {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1:I1',
+  });
+  const headers = res.data.values?.[0] || [];
+  if (headers.length === 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1',
+      valueInputOption: 'RAW', requestBody: { values: [ASESOR_COLS] },
+    });
+  }
+}
+
+async function saveAsesor(asesor) {
+  const auth = await getAuth().getClient();
+  const sheets = google.sheets({ version: 'v4', auth });
+  await _ensureAsesorHeaders(sheets);
+  const row = ASESOR_COLS.map(c => String(asesor[c] ?? ''));
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1',
+    valueInputOption: 'RAW', requestBody: { values: [row] },
+  });
+}
+
+async function updateAsesor(id, fields) {
+  const auth = await getAuth().getClient();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1:I',
+  });
+  const [headers, ...rows] = res.data.values || [[]];
+  const idIdx = headers.indexOf('id');
+  const rowIdx = rows.findIndex(r => Number(r[idIdx]) === Number(id));
+  if (rowIdx === -1) throw new Error('Asesor no encontrado en Sheets');
+  const updatedRow = [...rows[rowIdx]];
+  while (updatedRow.length < headers.length) updatedRow.push('');
+  Object.entries(fields).forEach(([k, v]) => {
+    const ci = headers.indexOf(k);
+    if (ci !== -1) updatedRow[ci] = String(v ?? '');
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.SHEET_ID,
+    range: `asesores!A${rowIdx + 2}:I${rowIdx + 2}`,
+    valueInputOption: 'RAW', requestBody: { values: [updatedRow] },
+  });
+}
+
+async function deleteAsesor(id) {
+  const auth = await getAuth().getClient();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1:I',
+  });
+  const [headers, ...rows] = res.data.values || [[]];
+  const idIdx = headers.indexOf('id');
+  const rowIdx = rows.findIndex(r => Number(r[idIdx]) === Number(id));
+  if (rowIdx === -1) return;
+  // Borra la fila limpiando su contenido y luego reescribe sin ella
+  const remaining = rows.filter((_, i) => i !== rowIdx);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A2',
+    valueInputOption: 'RAW',
+    requestBody: { values: remaining.length ? remaining : [['']] },
+  });
+}
+
+async function saveAllAsesores(lista) {
+  const auth = await getAuth().getClient();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const rows = [ASESOR_COLS, ...lista.map(a => ASESOR_COLS.map(c => String(a[c] ?? '')))];
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1',
+    valueInputOption: 'RAW', requestBody: { values: rows },
+  });
+}
+
+module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador, getCiudades, getAsesores, saveAsesor, updateAsesor, deleteAsesor, saveAllAsesores };

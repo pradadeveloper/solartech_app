@@ -36,9 +36,32 @@ function cargarUsuarios() {
 
 function guardarUsuarios(lista) {
   fs.writeFileSync(usuariosPath, JSON.stringify(lista, null, 2));
+  if (USE_GOOGLE) {
+    gAdapter.saveAllAsesores(lista).catch(err =>
+      console.error('[asesores] Error sincronizando con Sheets:', err.message)
+    );
+  }
+}
+
+async function inicializarUsuarios() {
+  if (USE_GOOGLE) {
+    try {
+      const remoto = await gAdapter.getAsesores();
+      if (remoto.length > 0) {
+        usuarios = remoto;
+        fs.writeFileSync(usuariosPath, JSON.stringify(usuarios, null, 2));
+        console.log(`[asesores] ${usuarios.length} asesores cargados desde Google Sheets`);
+        return;
+      }
+    } catch (err) {
+      console.error('[asesores] Error cargando desde Sheets:', err.message);
+    }
+  }
+  usuarios = cargarUsuarios();
 }
 
 let usuarios = cargarUsuarios();
+inicializarUsuarios();
 
 const app = express();
 const PORT = 4000;
