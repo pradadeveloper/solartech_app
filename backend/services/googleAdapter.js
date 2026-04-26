@@ -1,5 +1,7 @@
 'use strict';
 const { google } = require('googleapis');
+const fs = require('fs');
+const path = require('path');
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -59,8 +61,20 @@ const LEAD_TO_SHEET = Object.fromEntries(
   Object.entries(SHEET_TO_LEAD).map(([col, prop]) => [prop, col])
 );
 
+function loadCredentials() {
+  // 1. Env var como JSON en una línea (producción / Vercel)
+  try {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
+    if (raw && raw.trim().startsWith('{')) return JSON.parse(raw);
+  } catch (_) {}
+  // 2. Archivo local service-account.json (desarrollo local)
+  const filePath = path.join(__dirname, '..', 'service-account.json');
+  if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  throw new Error('No se encontraron credenciales de Google. Configura GOOGLE_SERVICE_ACCOUNT o crea service-account.json');
+}
+
 function getAuth() {
-  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+  const credentials = loadCredentials();
   return new google.auth.GoogleAuth({ credentials, scopes: SCOPES });
 }
 
