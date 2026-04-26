@@ -18,7 +18,10 @@ export default function Asesores() {
 
   const token = localStorage.getItem("token");
   const isAdmin = (() => {
-    try { return JSON.parse(atob(token.split(".")[1])).usuario === "admin"; } catch { return false; }
+    try {
+      const d = JSON.parse(atob(token.split(".")[1]));
+      return d.usuario === "admin" || (d.rol || "").toLowerCase() === "admin";
+    } catch { return false; }
   })();
 
   const cargar = () => {
