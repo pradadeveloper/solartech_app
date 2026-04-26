@@ -280,14 +280,41 @@ async function getCiudades() {
 // ─── ASESORES ─────────────────────────────────────────────────────────────────
 const ASESOR_COLS = ['id', 'nombre', 'apellido', 'cargo', 'usuario', 'password', 'rol', 'celular', 'correo'];
 
+async function _crearHojaAsesores(sheets) {
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: process.env.SHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: 'asesores' } } }] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: process.env.SHEET_ID,
+      range: 'asesores!A1',
+      valueInputOption: 'RAW',
+      requestBody: { values: [ASESOR_COLS] },
+    });
+    console.log('[googleAdapter] Hoja "asesores" creada en Sheets');
+  } catch (e) {
+    console.error('[googleAdapter] Error creando hoja asesores:', e.message);
+  }
+}
+
 async function getAsesores() {
   try {
     const auth = await getAuth().getClient();
     const sheets = google.sheets({ version: 'v4', auth });
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.SHEET_ID,
-      range: 'asesores!A1:I',
-    });
+    let res;
+    try {
+      res = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'asesores!A1:I',
+      });
+    } catch (e) {
+      if (e.message && e.message.includes('not found')) {
+        await _crearHojaAsesores(sheets);
+        return [];
+      }
+      throw e;
+    }
     const [headers, ...rows] = res.data.values || [[]];
     if (!headers || !headers.length) return [];
     return rows.map(row => {
