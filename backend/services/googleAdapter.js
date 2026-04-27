@@ -146,7 +146,7 @@ async function getAllLeads() {
         let val = sheetObj[col] ?? '';
         if (prop === 'numeroCotizacion') val = Number(val) || 0;
         if (['consumoKwh', 'kwp', 'costoProyectoMasIva'].includes(prop)) val = Number(val) || 0;
-        if (prop === 'tiempoRetorno' && val !== '') val = Number(val) / 12; // meses → años
+        if (prop === 'tiempoRetorno' && val !== '') val = Number(val); // ya en meses
         lead[prop] = val;
       });
 
@@ -186,7 +186,7 @@ async function saveLead(lead) {
     const prop = SHEET_TO_LEAD[col];
     if (!prop) return '';
     const val = lead[prop];
-    if (col === 'roi_meses') return val != null ? Math.round(Number(val) * 12) : '';
+    if (col === 'roi_meses') return val != null ? Math.round(Number(val)) : ''; // ya en meses
     return val ?? '';
   });
 
@@ -280,41 +280,16 @@ async function getCiudades() {
 // ─── ASESORES ─────────────────────────────────────────────────────────────────
 const ASESOR_COLS = ['id', 'nombre', 'apellido', 'cargo', 'usuario', 'password', 'rol', 'celular', 'correo'];
 
-async function _crearHojaAsesores(sheets) {
-  try {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: process.env.SHEET_ID,
-      requestBody: { requests: [{ addSheet: { properties: { title: 'asesores' } } }] },
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: process.env.SHEET_ID,
-      range: 'asesores!A1',
-      valueInputOption: 'RAW',
-      requestBody: { values: [ASESOR_COLS] },
-    });
-    console.log('[googleAdapter] Hoja "asesores" creada en Sheets');
-  } catch (e) {
-    console.error('[googleAdapter] Error creando hoja asesores:', e.message);
-  }
-}
 
 async function getAsesores() {
   try {
     const auth = await getAuth().getClient();
     const sheets = google.sheets({ version: 'v4', auth });
-    let res;
-    try {
-      res = await sheets.spreadsheets.values.get({
-        spreadsheetId: process.env.SHEET_ID,
-        range: 'asesores!A1:I',
-      });
-    } catch (e) {
-      if (e.message && e.message.includes('not found')) {
-        await _crearHojaAsesores(sheets);
-        return [];
-      }
-      throw e;
-    }
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: 'ASESORES!A:I',
+    });
     const [headers, ...rows] = res.data.values || [[]];
     if (!headers || !headers.length) return [];
     return rows.map(row => {
@@ -330,12 +305,12 @@ async function getAsesores() {
 
 async function _ensureAsesorHeaders(sheets) {
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1:I1',
+    spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A1:I1',
   });
   const headers = res.data.values?.[0] || [];
   if (headers.length === 0) {
     await sheets.spreadsheets.values.update({
-      spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1',
+      spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A1',
       valueInputOption: 'RAW', requestBody: { values: [ASESOR_COLS] },
     });
   }
@@ -347,7 +322,7 @@ async function saveAsesor(asesor) {
   await _ensureAsesorHeaders(sheets);
   const row = ASESOR_COLS.map(c => String(asesor[c] ?? ''));
   await sheets.spreadsheets.values.append({
-    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1',
+    spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A1',
     valueInputOption: 'RAW', requestBody: { values: [row] },
   });
 }
@@ -356,7 +331,7 @@ async function updateAsesor(id, fields) {
   const auth = await getAuth().getClient();
   const sheets = google.sheets({ version: 'v4', auth });
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1:I',
+    spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A1:I',
   });
   const [headers, ...rows] = res.data.values || [[]];
   const idIdx = headers.indexOf('id');
@@ -370,7 +345,7 @@ async function updateAsesor(id, fields) {
   });
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.SHEET_ID,
-    range: `asesores!A${rowIdx + 2}:I${rowIdx + 2}`,
+    range: `ASESORES!A${rowIdx + 2}:I${rowIdx + 2}`,
     valueInputOption: 'RAW', requestBody: { values: [updatedRow] },
   });
 }
@@ -379,7 +354,7 @@ async function deleteAsesor(id) {
   const auth = await getAuth().getClient();
   const sheets = google.sheets({ version: 'v4', auth });
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1:I',
+    spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A1:I',
   });
   const [headers, ...rows] = res.data.values || [[]];
   const idIdx = headers.indexOf('id');
@@ -388,7 +363,7 @@ async function deleteAsesor(id) {
   // Borra la fila limpiando su contenido y luego reescribe sin ella
   const remaining = rows.filter((_, i) => i !== rowIdx);
   await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A2',
+    spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A2',
     valueInputOption: 'RAW',
     requestBody: { values: remaining.length ? remaining : [['']] },
   });
@@ -399,7 +374,7 @@ async function saveAllAsesores(lista) {
   const sheets = google.sheets({ version: 'v4', auth });
   const rows = [ASESOR_COLS, ...lista.map(a => ASESOR_COLS.map(c => String(a[c] ?? '')))];
   await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.SHEET_ID, range: 'asesores!A1',
+    spreadsheetId: process.env.SHEET_ID, range: 'ASESORES!A1',
     valueInputOption: 'RAW', requestBody: { values: rows },
   });
 }

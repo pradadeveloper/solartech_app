@@ -39,16 +39,19 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
     porcentajeCoberturaProyecto = p >= 100 ? 100 : Number(p.toFixed(1));
   }
 
-  const costoProyecto = Math.round(kwp * costokWp);
-  const ivaProyecto = Math.round(costoProyecto * 0.05);
+  const costoProyecto       = Math.round(kwp * costokWp);
+  const ivaProyecto         = Math.round(costoProyecto * 0.05);
   const costoProyectoMasIva = Math.round(costoProyecto + ivaProyecto);
-  const costokwpproyecto = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
+  const costokwpproyecto    = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
   const descuentoDeclaracion = Math.round(costoProyecto / 2);
-  const ahorroMensual = Math.round(consumo * costoUnidad);
-  const ahorroAnual = ahorroMensual * 12;
-  const consumoKwh = consumo;
-  const ahorro10Anos = Math.round(ahorroAnual * 10);
-  const tiempoRetorno = ahorroAnual > 0 ? Number((costoProyecto / ahorroAnual).toFixed(1)) : null;
+  // facturaPromedio = consumo × tarifa (lo que el cliente paga al mes)
+  const facturaPromedio = Math.round(consumo * costoUnidad);
+  const ahorroMensual   = facturaPromedio;
+  const ahorroAnual     = facturaPromedio * 12;
+  const consumoKwh      = consumo;
+  const ahorro10Anos    = Math.round(ahorroAnual * 10);
+  // Tiempo de retorno = Costo total (con IVA) / Factura mensual → MESES
+  const tiempoRetorno = facturaPromedio > 0 ? Math.round(costoProyectoMasIva / facturaPromedio) : null;
 
   // Ambiental
   const co2EvitadoToneladas = Number((kwp * 1.2 * 0.7 * 0.43).toFixed(2));
@@ -315,7 +318,7 @@ export default function Resultado() {
                         <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                         <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
                         <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
-                        <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} años`} />
+                        <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} meses`} />
                       </div>
                     ) : (
                       <p style={{ margin: '12px 0 0', opacity: 0.4, fontSize: '0.8rem' }}>Ingresa el kWp para calcular</p>
@@ -346,7 +349,7 @@ export default function Resultado() {
                         { label: 'Inversión + IVA', key: 'costoProyectoMasIva', fmt: true },
                         { label: 'Ahorro mensual', key: 'ahorroMensual', fmt: true },
                         { label: 'Ahorro anual', key: 'ahorroAnual', fmt: true },
-                        { label: 'Retorno (años)', key: 'tiempoRetorno' },
+                        { label: 'Retorno (meses)', key: 'tiempoRetorno' },
                       ].map(({ label, key, fmt }) => (
                         <tr key={key}>
                           <td>{label}</td>
@@ -397,7 +400,7 @@ export default function Resultado() {
                 <Metric label="Inversión estimada (con IVA)" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
                 <Metric label="Ahorro anual estimado" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
                 <Metric label="Ahorro mensual estimado" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
-                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} meses`} />
                 <Metric label="Vida útil estimada" value={`25 años`} />
                 <Metric label="Descuento declaración de renta" value={`$ ${money(resultadoActivo?.descuentoDeclaracion)}`} />
                 <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultadoActivo?.ahorro10Anos)}`} />
@@ -606,7 +609,7 @@ export default function Resultado() {
               <SummaryRow label="Cobertura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
               <div className="cotDivider" />
               <SummaryRow label="Total inversión" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
-              <SummaryRow label="Retorno" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+              <SummaryRow label="Retorno" value={`${resultadoActivo?.tiempoRetorno ?? "—"} meses`} />
               <SummaryRow label="Ahorro anual" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
             </Card>
 

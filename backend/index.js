@@ -67,8 +67,8 @@ inicializarUsuarios();
 const app = express();
 const PORT = 4000;
 
-const montserratPath = path.join(__dirname, "fonts", "Montserrat-Regular.ttf");
-// const montserratBoldPath = path.join(__dirname, "fonts", "Montserrat-Bold.ttf");
+const montserratPath     = path.join(__dirname, "fonts", "Montserrat-Regular.ttf");
+const montserratBoldPath = path.join(__dirname, "fonts", "Montserrat-Bold.ttf");
 
 // ====== Middlewares ======
 app.use(cors());
@@ -195,11 +195,10 @@ function calcularProyecto({
 }, cfg = {}) {
   const consumo = toNumber(consumoKwh);       // kWh/mes
   const costoUnidad = toNumber(costoKwh);     // COP/kWh
-  const gastoMensual = toNumber(valorMensual);
   const areaDisp = toNumber(areaDisponible);
 
-  if ([consumo, costoUnidad, gastoMensual].some((n) => Number.isNaN(n))) {
-    throw new Error("Valores numéricos inválidos: consumoKwh, costoKwh o valorMensual");
+  if ([consumo, costoUnidad].some((n) => Number.isNaN(n))) {
+    throw new Error("Valores numéricos inválidos: consumoKwh o costoKwh");
   }
 
   // Parámetros desde config (con fallback a defaults)
@@ -227,17 +226,20 @@ function calcularProyecto({
   const kwp = Number(kwpNum.toFixed(1));
 
   // Costos
-  const ahorroAnual = Math.round(consumo * 12 * costoUnidad);
-  const ahorroMensual = Math.round(consumo * costoUnidad);
-  const ahorro10Anos = Math.round(ahorroAnual * 10);
+  // facturaPromedio = lo que el cliente paga mensualmente (consumo × tarifa)
+  const facturaPromedio = Math.round(consumo * costoUnidad);
+  const ahorroMensual   = facturaPromedio; // alias semántico para el PDF/UI
+  const ahorroAnual     = Math.round(facturaPromedio * 12);
+  const ahorro10Anos    = Math.round(ahorroAnual * 10);
 
-  const costoProyecto = Math.round(kwp * costokWp);
-  const ivaProyecto = Math.round(costoProyecto * (ivaPct / 100));
+  const costoProyecto       = Math.round(kwp * costokWp);
+  const ivaProyecto         = Math.round(costoProyecto * (ivaPct / 100));
   const costoProyectoMasIva = Math.round(costoProyecto + ivaProyecto);
 
-  const costokwpproyecto = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
+  const costokwpproyecto     = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
   const descuentoDeclaracion = Math.round(costoProyecto * (descuentoRentaPct / 100));
-  const tiempoRetorno = ahorroAnual > 0 ? Number((costoProyecto / ahorroAnual).toFixed(1)) : null;
+  // Tiempo de retorno = Costo total (con IVA) / Factura promedio mensual → resultado en MESES
+  const tiempoRetorno = facturaPromedio > 0 ? Math.round(costoProyectoMasIva / facturaPromedio) : null;
   const valorKwp = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
 
   // Equipos
@@ -339,8 +341,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
-  const fontBytes = fs.readFileSync(montserratPath);
-  const font = await pdfDoc.embedFont(fontBytes);
+  const fontBytes     = fs.readFileSync(montserratPath);
+  const fontBoldBytes = fs.readFileSync(montserratBoldPath);
+  const font     = await pdfDoc.embedFont(fontBytes);
+  const fontBold = await pdfDoc.embedFont(fontBoldBytes);
 
   const W = 595, H = 842;
   const margin = 42;
@@ -348,13 +352,16 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   const headerH = 80;
   const footerH = 30;
 
-  const COLOR_ACCENT  = rgb(0.690, 0.227, 0.133);
-  const COLOR_TEXT    = rgb(0, 0, 0);
-  const COLOR_MUTED   = rgb(0, 0, 0);
-  const COLOR_WHITE   = rgb(1, 1, 1);
-  const COLOR_BORDER  = rgb(0.6, 0.6, 0.6);
-  const COLOR_LIGHT   = rgb(0.92, 0.92, 0.92);
-  const COLOR_ACLIGHT = rgb(0.97, 0.90, 0.87);
+  const COLOR_ACCENT       = rgb(0.690, 0.227, 0.133);
+  const COLOR_TITLE        = rgb(0.102, 0.102, 0.102); // #1a1a1a
+  const COLOR_TEXT         = rgb(0.067, 0.067, 0.067); // #111111
+  const COLOR_MUTED        = rgb(0.176, 0.176, 0.176); // #2d2d2d
+  const COLOR_NUM          = rgb(0, 0, 0);              // #000000
+  const COLOR_WHITE        = rgb(1, 1, 1);
+  const COLOR_BORDER       = rgb(0.753, 0.753, 0.753); // #c0c0c0 (outer)
+  const COLOR_BORDER_INNER = rgb(0.835, 0.835, 0.835); // #d5d5d5 (inner)
+  const COLOR_LIGHT        = rgb(0.92, 0.92, 0.92);
+  const COLOR_ACLIGHT      = rgb(0.97, 0.90, 0.87);
 
   let logoImg = null;
   const logoPath = path.join(__dirname, 'public', 'assets', 'logo_solartech.png');
@@ -371,20 +378,23 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // Logos de marcas aliadas
   const frontendLogos = path.join(__dirname, '..', 'frontend', 'public', 'logos');
   const brandLogos = {};
-  for (const [key, file, type] of [
+  for (const [key, file, type, altDir] of [
     ['longi',   'logo_longi.png',    'png'],
     ['growatt', 'growatt.png',       'png'],
     ['huawei',  'huawei.jpeg',       'jpg'],
     ['goodwe',  'goodwe.jpeg',       'jpg'],
-    ['jasolar', 'logo_ja_solar.jpg', 'jpg'],
+    // ja_solar: usar el PNG de assets (colormap, sin canal alpha) — el de frontend es RGBA y falla en pdf-lib
+    ['jasolar', 'ja_solar.png',      'png', assetsPath],
   ]) {
-    const lp = path.join(frontendLogos, file);
+    const lp = path.join(altDir || frontendLogos, file);
     if (fs.existsSync(lp)) {
       try {
         brandLogos[key] = type === 'png'
           ? await pdfDoc.embedPng(fs.readFileSync(lp))
           : await pdfDoc.embedJpg(fs.readFileSync(lp));
-      } catch (_) {}
+      } catch (e) {
+        console.error(`[PDF] Error embebiendo logo ${key}:`, e.message);
+      }
     }
   }
 
@@ -414,7 +424,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   let y;
   let pageCount = 0;
 
-  function newPage() {
+  function newPage(withBanner = true) {
     pageCount++;
     page = pdfDoc.addPage([W, H]);
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: COLOR_WHITE });
@@ -431,7 +441,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     }
 
     const cx = W - margin - 190;
-    page.drawText(`${empTel}  |  ${empEmail}`, { x: cx, y: H - headerH + 52, size: 7.5, font, color: COLOR_WHITE });
+    const hdrLine1 = [asesor.celular, asesor.correo].filter(Boolean).join('  |  ') || `${empTel}  |  ${empEmail}`;
+    page.drawText(hdrLine1, { x: cx, y: H - headerH + 52, size: 7.5, font, color: COLOR_WHITE });
     page.drawText(empWeb, { x: cx, y: H - headerH + 38, size: 7.5, font, color: rgb(1, 0.85, 0.80) });
     page.drawText(`NIT: ${empNit}  |  ${empCiudad}`, { x: cx, y: H - headerH + 24, size: 7, font, color: rgb(1, 0.85, 0.80) });
 
@@ -447,13 +458,16 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
     y = H - headerH - 18;
 
-    // Banner delgado en páginas 2 en adelante
-    if (pageCount >= 2) {
-      const thinImg = bannerImgs.industria2 || bannerImgs.industria || bannerImgs.hogar;
-      if (thinImg) {
-        const tH = 44;
-        page.drawImage(thinImg, { x: 0, y: H - headerH - tH, width: W, height: tH });
-        y = H - headerH - tH - 14;
+    // Banner full-size solo si withBanner=true (páginas que lo solicitan explícitamente)
+    if (pageCount >= 2 && withBanner) {
+      const pageBanner =
+        pageCount === 2 ? (bannerImgs.hogar    || bannerImgs.industria2) :
+        pageCount === 3 ? (bannerImgs.industria || bannerImgs.industria2) :
+                          (bannerImgs.industria2 || bannerImgs.industria3 || bannerImgs.industria);
+      if (pageBanner) {
+        const bH = 155;
+        page.drawImage(pageBanner, { x: 0, y: H - headerH - bH, width: W, height: bH });
+        y = H - headerH - bH - 14;
       }
     }
   }
@@ -468,9 +482,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   function sectionHeader(title) {
     checkY(46);
     y -= 8;
-    page.drawRectangle({ x: margin, y: y - 28, width: cW, height: 28, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 0.5 });
+    page.drawRectangle({ x: margin, y: y - 28, width: cW, height: 28, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 1.5 });
     page.drawRectangle({ x: margin, y: y - 28, width: 5, height: 28, color: COLOR_ACCENT });
-    page.drawText(title, { x: margin + 14, y: y - 18, size: 11, font, color: COLOR_ACCENT });
+    page.drawText(title.toUpperCase(), { x: margin + 14, y: y - 18, size: 11, font: fontBold, color: COLOR_TITLE });
     y -= 36;
   }
 
@@ -478,26 +492,35 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     const rH = 22;
     checkY(rH);
     if (highlight) {
-      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_ACLIGHT, borderColor: COLOR_ACCENT, borderWidth: 0.5 });
+      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_ACLIGHT, borderColor: COLOR_ACCENT, borderWidth: 1.5 });
     } else {
-      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER, borderWidth: 0.3 });
+      page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER_INNER, borderWidth: 1 });
     }
-    page.drawText(String(label), { x: margin + 10, y: y - 14, size: 9, font, color: highlight ? COLOR_ACCENT : COLOR_MUTED });
-    page.drawText(String(value ?? '-'), { x: margin + cW / 2, y: y - 14, size: 10, font, color: highlight ? COLOR_ACCENT : COLOR_TEXT });
+    page.drawText(String(label), { x: margin + 10, y: y - 14, size: 9, font: fontBold, color: highlight ? COLOR_ACCENT : COLOR_MUTED });
+    page.drawText(String(value ?? '-'), { x: margin + cW / 2, y: y - 14, size: 9.5, font, color: highlight ? COLOR_ACCENT : COLOR_TEXT });
     y -= rH;
   }
 
   function infoRow2(l1, v1, l2, v2) {
-    const rH = 22;
+    const rH = 24;
     const half = (cW - 6) / 2;
+    const labelW = 100; // ancho fijo para la etiqueta
+    const valX1 = margin + 8 + labelW;
+    const valMaxW = half - labelW - 16; // espacio real disponible para el valor
+    const valX2 = margin + half + 6 + 8 + labelW;
+    const fitSize = (text, maxW) => {
+      let sz = 9.5;
+      while (sz >= 6.5 && font.widthOfTextAtSize(String(text ?? '-'), sz) > maxW) sz -= 0.5;
+      return sz;
+    };
     checkY(rH);
-    page.drawRectangle({ x: margin, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER, borderWidth: 0.3 });
-    page.drawText(String(l1), { x: margin + 8, y: y - 14, size: 8.5, font, color: COLOR_MUTED });
-    page.drawText(String(v1 ?? '-'), { x: margin + 8 + half / 2, y: y - 14, size: 9.5, font, color: COLOR_TEXT });
+    page.drawRectangle({ x: margin, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER_INNER, borderWidth: 1 });
+    page.drawText(String(l1), { x: margin + 8, y: y - 15, size: 8.5, font: fontBold, color: COLOR_MUTED });
+    page.drawText(String(v1 ?? '-'), { x: valX1, y: y - 15, size: fitSize(v1, valMaxW), font, color: COLOR_TEXT });
     const rx = margin + half + 6;
-    page.drawRectangle({ x: rx, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER, borderWidth: 0.3 });
-    page.drawText(String(l2), { x: rx + 8, y: y - 14, size: 8.5, font, color: COLOR_MUTED });
-    page.drawText(String(v2 ?? '-'), { x: rx + 8 + half / 2, y: y - 14, size: 9.5, font, color: COLOR_TEXT });
+    page.drawRectangle({ x: rx, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER_INNER, borderWidth: 1 });
+    page.drawText(String(l2), { x: rx + 8, y: y - 15, size: 8.5, font: fontBold, color: COLOR_MUTED });
+    page.drawText(String(v2 ?? '-'), { x: valX2, y: y - 15, size: fitSize(v2, valMaxW), font, color: COLOR_TEXT });
     y -= rH;
   }
 
@@ -548,7 +571,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     y -= 10;
   }
 
-  page.drawText('PROPUESTA TECNICA Y COMERCIAL', { x: margin, y, size: 15, font, color: COLOR_ACCENT });
+  page.drawText('PROPUESTA TECNICA Y COMERCIAL', { x: margin, y, size: 15, font: fontBold, color: COLOR_ACCENT });
   y -= 16;
   const fecha = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
   page.drawText(`Cotizacion N-${resultados?.numeroCotizacion ?? '-'}   |   Fecha: ${fecha}`, { x: margin, y, size: 9, font, color: COLOR_MUTED });
@@ -581,7 +604,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   infoRow('Ahorro mensual estimado', cop(resultados.ahorroMensual));
   infoRow('Ahorro anual estimado', cop(resultados.ahorroAnual));
   infoRow('Ahorro proyectado a 10 anos', cop(resultados.ahorro10Anos));
-  infoRow('Tiempo de retorno de la inversion', `${safe(resultados.tiempoRetorno)} anos`);
+  infoRow('Tiempo de retorno de la inversion', `${safe(resultados.tiempoRetorno)} meses`);
   gap(6);
 
   // 5. PROPUESTA ECONOMICA
@@ -596,7 +619,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // 6. RESUMEN INVERSION
   sectionHeader('RESUMEN DE LA INVERSION');
   checkY(20);
-  page.drawText('Componentes e items incluidos en el proyecto:', { x: margin + 10, y, size: 9, font, color: COLOR_TEXT });
+  page.drawText('Componentes e items incluidos en el proyecto:', { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_TITLE });
   y -= 14;
   const componentes = [
     `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi / JA Solar)`,
@@ -620,7 +643,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   ];
   formasPago.forEach(({ t, d }) => {
     checkY(42);
-    page.drawText(t, { x: margin + 10, y, size: 9, font, color: COLOR_ACCENT });
+    page.drawText(t, { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_ACCENT });
     y -= 13;
     para(d, 14, 8.5, COLOR_MUTED);
     gap(3);
@@ -645,8 +668,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     const cx2 = margin + i * (cardW + 6);
     page.drawRectangle({ x: cx2, y: y - cardH, width: cardW, height: cardH, color: COLOR_ACLIGHT, borderColor: COLOR_ACCENT, borderWidth: 0.75 });
     page.drawRectangle({ x: cx2, y: y - cardH, width: cardW, height: 4, color: COLOR_ACCENT });
-    page.drawText(card.label, { x: cx2 + 8, y: y - 14, size: 8, font, color: COLOR_MUTED });
-    page.drawText(card.value, { x: cx2 + 8, y: y - 30, size: 18, font, color: COLOR_ACCENT });
+    page.drawText(card.label, { x: cx2 + 8, y: y - 14, size: 8, font: fontBold, color: COLOR_MUTED });
+    page.drawText(card.value, { x: cx2 + 8, y: y - 30, size: 18, font: fontBold, color: COLOR_ACCENT });
     page.drawText(card.unit,  { x: cx2 + 8, y: y - 44, size: 7.5, font, color: COLOR_MUTED });
   });
   y -= cardH + 8;
@@ -655,13 +678,13 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   para('Al elegir energia solar contribuye activamente a la reduccion de emisiones de CO2 y a la independencia energetica de Colombia. Su sistema generara energia limpia por mas de 25 anos.', 10, 8.5, COLOR_MUTED);
   gap(8);
 
-  // Banner hogar después de impacto ambiental
-  if (bannerImgs.hogar) {
-    checkY(118);
-    const bH = 105;
-    page.drawImage(bannerImgs.hogar, { x: 0, y: y - bH, width: W, height: bH });
-    y -= bH + 12;
-  }
+  // // Banner hogar después de impacto ambiental
+  // if (bannerImgs.hogar) {
+  //   checkY(118);
+  //   const bH = 105;
+  //   page.drawImage(bannerImgs.hogar, { x: 0, y: y - bH, width: W, height: bH });
+  //   y -= bH + 12;
+  // }
 
   // 9. ETAPAS DEL PROYECTO
   sectionHeader('ETAPAS DEL PROYECTO');
@@ -676,39 +699,89 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   etapas.forEach(({ n, t, d }) => {
     checkY(34);
     page.drawRectangle({ x: margin + 10, y: y - 24, width: 24, height: 24, color: COLOR_ACCENT });
-    page.drawText(n, { x: margin + 14, y: y - 16, size: 8.5, font, color: COLOR_WHITE });
-    page.drawText(t, { x: margin + 42, y: y - 9, size: 9, font, color: COLOR_TEXT });
+    page.drawText(n, { x: margin + 14, y: y - 16, size: 8.5, font: fontBold, color: COLOR_WHITE });
+    page.drawText(t, { x: margin + 42, y: y - 9, size: 9, font: fontBold, color: COLOR_TEXT });
     page.drawText(d, { x: margin + 42, y: y - 21, size: 7.5, font, color: COLOR_MUTED });
     y -= 32;
   });
   gap(6);
 
-  // Banner industrial entre secciones
-  if (bannerImgs.industria) {
-    checkY(125);
-    const bH = 112;
-    page.drawImage(bannerImgs.industria, { x: 0, y: y - bH, width: W, height: bH });
-    y -= bH + 12;
-  }
 
-  // 10. GARANTIAS
+  // 10. GARANTIAS — página 3, 2 columnas
+  newPage();
+  gap(4);
   sectionHeader('GARANTIAS');
-  const garantias = [
-    ['Paneles solares - rendimiento', 'Garantia de producto 12 anos. Rendimiento mayor al 80% por 25 anos.'],
-    ['Inversor', 'Garantia de fabrica 5 anos (extensible a 10 segun fabricante).'],
-    ['Estructura de montaje', 'Garantia estructural 10 anos contra corrosion y deformacion.'],
-    ['Instalacion electrica', 'Garantia de mano de obra 2 anos segun norma RETIE.'],
-    ['Soporte post-instalacion', '12 meses de soporte tecnico y monitoreo remoto incluidos.'],
-  ];
-  garantias.forEach(([label, desc]) => {
-    checkY(26);
-    page.drawRectangle({ x: margin + 10, y: y - 5, width: 6, height: 6, color: COLOR_ACCENT });
-    page.drawText(`${label}:`, { x: margin + 22, y: y - 5, size: 8.5, font, color: COLOR_ACCENT });
-    y -= 14;
-    page.drawText(desc, { x: margin + 22, y, size: 8.5, font, color: COLOR_TEXT });
-    y -= 15;
-  });
-  gap(6);
+  {
+    const col1Items = [
+      ['Paneles solares - rendimiento', 'Garantia de producto 12 anos. Rendimiento mayor al 80% por 25 anos.'],
+      ['Inversor', 'Garantia de fabrica 5 anos (extensible a 10 segun fabricante).'],
+      ['Estructura de montaje', 'Garantia estructural 10 anos contra corrosion y deformacion.'],
+    ];
+    const col2Items = [
+      ['Instalacion electrica', 'Garantia de mano de obra 2 anos segun norma RETIE.'],
+      ['Soporte post-instalacion', '12 meses de soporte tecnico y monitoreo remoto incluidos.'],
+    ];
+
+    const colW = (cW - 12) / 2;
+    const colX1 = margin;
+    const colX2 = margin + colW + 12;
+    const itemLineH = 14;
+    const descLineH = 13;
+    const itemGap   = 10;
+    const dotOff    = 8;
+    const textOff   = 20;
+    const descMaxW  = colW - textOff - 4;
+    const fontSize  = 8.5;
+
+    // word-wrap: split desc into lines that fit descMaxW
+    const wrapText = (text, maxW, sz) => {
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+      for (const w of words) {
+        const candidate = line ? `${line} ${w}` : w;
+        if (font.widthOfTextAtSize(candidate, sz) > maxW) {
+          if (line) lines.push(line);
+          line = w;
+        } else {
+          line = candidate;
+        }
+      }
+      if (line) lines.push(line);
+      return lines;
+    };
+
+    // measure total height of one column
+    const colHeight = (items) => items.reduce((h, [, desc]) => {
+      const lines = wrapText(desc, descMaxW, fontSize);
+      return h + itemLineH + lines.length * descLineH + itemGap;
+    }, 0);
+
+    const totalH = Math.max(colHeight(col1Items), colHeight(col2Items));
+    checkY(totalH + 8);
+    const startY = y;
+
+    // draw one column
+    const drawCol = (items, cx) => {
+      let cy = startY;
+      items.forEach(([label, desc]) => {
+        page.drawRectangle({ x: cx + dotOff, y: cy - 6, width: 6, height: 6, color: COLOR_ACCENT });
+        page.drawText(`${label}:`, { x: cx + textOff, y: cy - 5, size: fontSize, font: fontBold, color: COLOR_ACCENT });
+        cy -= itemLineH;
+        const lines = wrapText(desc, descMaxW, fontSize);
+        lines.forEach(ln => {
+          page.drawText(ln, { x: cx + textOff, y: cy, size: fontSize, font, color: COLOR_TEXT });
+          cy -= descLineH;
+        });
+        cy -= itemGap;
+      });
+    };
+
+    drawCol(col1Items, colX1);
+    drawCol(col2Items, colX2);
+    y -= totalH;
+    gap(6);
+  }
 
   // Casos de éxito
   if (casosExitoImg) {
@@ -721,7 +794,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     y -= bH + 12;
   }
 
-  // 11. MARCAS ALIADAS
+  // 11. MARCAS ALIADAS — página propia, sin banner (sección visual limpia)
+  newPage(false);
+  gap(4);
   sectionHeader('MARCAS ALIADAS');
   checkY(20);
   page.drawText('Trabajamos con marcas lideres del mercado solar mundial con presencia certificada en Colombia:', {
@@ -762,16 +837,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= mRows2 * (mBH + mGap) + 4;
   gap(6);
 
-  // Banner final de proyecto
-  if (bannerImgs.industria3 || bannerImgs.industria2) {
-    const img = bannerImgs.industria3 || bannerImgs.industria2;
-    checkY(120);
-    const bH = 108;
-    page.drawImage(img, { x: 0, y: y - bH, width: W, height: bH });
-    y -= bH + 12;
-  }
 
-  // 12. CONDICIONES COMERCIALES
+  // 12. CONDICIONES COMERCIALES — siempre inicia página nueva
+  newPage();
+  gap(4);
   sectionHeader('CONDICIONES COMERCIALES');
   const condiciones = [
     'Esta cotizacion tiene validez de 30 dias calendario desde la fecha de emision.',
@@ -810,14 +879,17 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 26;
 
   const sigX = margin + 10;
-  const sigH = asesor.celular || asesor.correo ? 82 : 66;
-  page.drawRectangle({ x: sigX, y: y - sigH, width: 260, height: sigH, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 0.5 });
+  const sigLines = [asesor.cargo, asesor.celular, asesor.correo].filter(Boolean).length;
+  const sigH = 38 + sigLines * 16 + 18; // nombre(18) + líneas(16c/u) + empresa(18) + padding
+  page.drawRectangle({ x: sigX, y: y - sigH, width: 280, height: sigH, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 1.5 });
   page.drawRectangle({ x: sigX, y: y - sigH, width: 5, height: sigH, color: COLOR_ACCENT });
-  page.drawText(asesorNombre, { x: sigX + 14, y: y - 18, size: 11, font, color: COLOR_TEXT });
-  page.drawText(safe(asesor.cargo || 'Asesor Comercial'), { x: sigX + 14, y: y - 33, size: 9.5, font, color: COLOR_MUTED });
-  if (asesor.celular) page.drawText(`Tel: ${asesor.celular}`, { x: sigX + 14, y: y - 48, size: 9, font, color: COLOR_MUTED });
-  if (asesor.correo)  page.drawText(asesor.correo, { x: sigX + 14, y: y - (asesor.celular ? 62 : 48), size: 9, font, color: COLOR_MUTED });
-  page.drawText('Solartech Energy Systems', { x: sigX + 14, y: y - (sigH - 14), size: 9.5, font, color: COLOR_ACCENT });
+  let sy = y - 16;
+  page.drawText(asesorNombre, { x: sigX + 14, y: sy, size: 11, font: fontBold, color: COLOR_TITLE });
+  sy -= 16;
+  if (asesor.cargo) { page.drawText(safe(asesor.cargo), { x: sigX + 14, y: sy, size: 9, font, color: COLOR_MUTED }); sy -= 15; }
+  if (asesor.celular) { page.drawText(`Tel: ${asesor.celular}`, { x: sigX + 14, y: sy, size: 9, font, color: COLOR_MUTED }); sy -= 15; }
+  if (asesor.correo)  { page.drawText(asesor.correo, { x: sigX + 14, y: sy, size: 9, font, color: COLOR_MUTED }); sy -= 15; }
+  page.drawText('Solartech Energy Systems', { x: sigX + 14, y: y - sigH + 10, size: 9, font, color: COLOR_ACCENT });
 
   const pdfBytes = await pdfDoc.save();
   const fileName = `propuesta-${uuidv4()}.pdf`;
@@ -898,7 +970,16 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       try {
         const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
         vendedor = decoded.nombre || decoded.usuario;
-        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario, celular: decoded.celular || '', correo: decoded.correo || '' };
+        // Buscar asesor actualizado en memoria para tener celular/correo frescos
+        const asesorVivo = usuarios.find(u => u.usuario === decoded.usuario) || {};
+        asesorPDF = {
+          nombre:   asesorVivo.nombre   || decoded.nombre,
+          apellido: asesorVivo.apellido || decoded.apellido,
+          cargo:    asesorVivo.cargo    || decoded.cargo,
+          usuario:  decoded.usuario,
+          celular:  asesorVivo.celular  || decoded.celular || '',
+          correo:   asesorVivo.correo   || decoded.correo  || '',
+        };
       } catch (_) {}
     }
 
@@ -1112,7 +1193,15 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
     if (authPDF && authPDF.startsWith('Bearer ')) {
       try {
         const decoded = jwt.verify(authPDF.slice(7), JWT_SECRET);
-        asesorPDF = { nombre: decoded.nombre, apellido: decoded.apellido, cargo: decoded.cargo, usuario: decoded.usuario, celular: decoded.celular || '', correo: decoded.correo || '' };
+        const asesorVivo = usuarios.find(u => u.usuario === decoded.usuario) || {};
+        asesorPDF = {
+          nombre:   asesorVivo.nombre   || decoded.nombre,
+          apellido: asesorVivo.apellido || decoded.apellido,
+          cargo:    asesorVivo.cargo    || decoded.cargo,
+          usuario:  decoded.usuario,
+          celular:  asesorVivo.celular  || decoded.celular || '',
+          correo:   asesorVivo.correo   || decoded.correo  || '',
+        };
       } catch (_) {}
     }
     const cfg = await leerConfig();
