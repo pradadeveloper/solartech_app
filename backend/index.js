@@ -377,6 +377,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   // Logos de marcas aliadas
   const frontendLogos = path.join(__dirname, '..', 'frontend', 'public', 'logos');
+  const assetsPath = path.join(__dirname, 'public', 'assets');
   const brandLogos = {};
   for (const [key, file, type, altDir] of [
     ['longi',   'logo_longi.png',    'png'],
@@ -406,7 +407,6 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   }
 
   // Banners de proyecto
-  const assetsPath = path.join(__dirname, 'public', 'assets');
   const bannerImgs = {};
   for (const [key, file] of [
     ['hogar',      'banner_panel_solar_hogar.jpg'],
