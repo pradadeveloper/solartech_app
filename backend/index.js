@@ -838,8 +838,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(6);
 
 
-  // 12. CONDICIONES COMERCIALES — siempre inicia página nueva
-  newPage();
+  // 12. CONDICIONES COMERCIALES — misma página que Marcas Aliadas
   gap(4);
   sectionHeader('CONDICIONES COMERCIALES');
   const condiciones = [
@@ -859,7 +858,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   gap(8);
 
-  // 13. DATOS DEL ASESOR COMERCIAL
+  // 13. DATOS DEL ASESOR COMERCIAL — última página
+  newPage();
+  gap(4);
   sectionHeader('DATOS DEL ASESOR COMERCIAL');
   infoRow2('Nombre del asesor', asesorNombre, 'Cargo', safe(asesor.cargo));
   infoRow2('Celular', safe(asesor.celular || '-'), 'Correo', safe(asesor.correo || '-'));
