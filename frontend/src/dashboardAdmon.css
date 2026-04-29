@@ -264,6 +264,60 @@ grid-template-columns: repeat(2, minmax(0, 1fr));
   .table th, .table td { padding: 8px 8px; font-size: 12px; }
 }
 
+/* ── Leads: tabla ↔ tarjetas según viewport ── */
+.leads-table-wrap  { display: block; }
+.leads-cards-wrap  { display: none;  }
+
+@media (max-width: 768px) {
+  .leads-table-wrap  { display: none;  }
+  .leads-cards-wrap  { display: flex; flex-direction: column; gap: 10px; }
+}
+
+/* Tarjeta de lead en mobile */
+.lead-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lead-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.lead-card__nombre {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  flex: 1;
+}
+.lead-card__fecha {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lead-card__valor {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.lead-card__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lead-card__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .card{
 border: 1px solid var(--border);
 background: var(--panel);

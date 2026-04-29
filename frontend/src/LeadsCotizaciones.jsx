@@ -161,7 +161,70 @@ export default function LeadsCotizaciones() {
       {loading ? (
         <p style={{ color: "var(--muted)", textAlign: "center", marginTop: 60 }}>Cargando leads…</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <>
+        {/* ── Vista tarjetas (mobile) ── */}
+        <div className="leads-cards-wrap">
+          {filtrados.length === 0 ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>No hay registros con esos filtros.</p>
+          ) : filtrados.map((lead) => {
+            const pdf = pdfPrincipal(lead);
+            const badge = BADGE[lead.estado] ?? BADGE["Nuevo"];
+            return (
+              <div key={lead.id} className="lead-card">
+                <div className="lead-card__top">
+                  <div className="lead-card__nombre">{lead.nombre}</div>
+                  <span className="lead-card__fecha">{safeDate(lead.fecha)}</span>
+                </div>
+                <div className="lead-card__valor">{money(lead.costoProyectoMasIva)}</div>
+                <div className="lead-card__bottom">
+                  <select
+                    value={lead.estado ?? "Nuevo"}
+                    onChange={(e) => actualizarEstado(lead, e.target.value)}
+                    style={{
+                      background: badge.bg, color: badge.color,
+                      border: `1px solid ${badge.color}`,
+                      borderRadius: 20, padding: "4px 12px", fontSize: "0.8rem",
+                      fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    {ESTADOS.filter(Boolean).map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <div className="lead-card__actions">
+                    <button
+                      onClick={() => verLead(lead)}
+                      style={{
+                        background: "var(--bg)", color: "var(--text)",
+                        border: "1px solid var(--border)",
+                        padding: "5px 14px", borderRadius: 8,
+                        fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      Ver
+                    </button>
+                    {pdf ? (
+                      <a
+                        href={pdf?.startsWith('http') ? pdf : `${process.env.REACT_APP_API_URL}${pdf}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          background: "var(--accent)", color: "#fff",
+                          padding: "5px 14px", borderRadius: 8,
+                          fontSize: "0.8rem", fontWeight: 700,
+                          textDecoration: "none",
+                        }}
+                      >
+                        ↓ PDF
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Vista tabla (desktop) ── */}
+        <div className="leads-table-wrap" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.83rem" }}>
             <thead>
               {/* Fila de encabezados */}
@@ -362,6 +425,7 @@ export default function LeadsCotizaciones() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
