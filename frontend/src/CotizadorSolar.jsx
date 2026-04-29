@@ -452,7 +452,11 @@ function FormattedInput({ name, value, onChange, required, prefix, suffix }) {
     <input
       name={name}
       value={focused ? value : display}
-      onChange={onChange}
+      onChange={(e) => {
+        // Siempre pasar solo dígitos al estado padre — evita que el sufijo/prefijo quede en formData
+        const raw = e.target.value.replace(/[^\d]/g, "");
+        onChange({ target: { name, value: raw } });
+      }}
       onFocus={(e) => { setFocused(true); setTimeout(() => e.target.select(), 0); }}
       onBlur={() => setFocused(false)}
       required={required}
