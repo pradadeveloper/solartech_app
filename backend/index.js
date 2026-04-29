@@ -784,19 +784,18 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     gap(6);
   }
 
-  // Casos de éxito
+  // 11. CASOS DE EXITO + MARCAS ALIADAS + CONDICIONES — página sin banner
+  newPage(false);
+  gap(4);
+
   if (casosExitoImg) {
     const aspectRatio = casosExitoImg.height / casosExitoImg.width;
     const bH = Math.min(280, Math.round(aspectRatio * cW));
-    checkY(bH + 50);
     sectionHeader('CASOS DE EXITO');
     page.drawImage(casosExitoImg, { x: margin, y: y - bH, width: cW, height: bH });
-    y -= bH + 12;
+    y -= bH + 16;
   }
 
-  // 11. MARCAS ALIADAS — página propia, sin banner (sección visual limpia)
-  newPage(false);
-  gap(4);
   sectionHeader('MARCAS ALIADAS');
   checkY(20);
   page.drawText('Trabajamos con marcas lideres del mercado solar mundial con presencia certificada en Colombia:', {
