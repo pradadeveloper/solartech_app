@@ -476,46 +476,6 @@ export default function Resultado() {
               )}
             </Card>
 
-            {/* VERSIONES GUARDADAS */}
-            {versiones.length > 0 && (
-              <Card title="Versiones guardadas">
-                <p style={{ margin: '0 0 12px', opacity: 0.7, fontSize: '0.85rem' }}>
-                  Cada versión tiene su propio link y PDF para compartir con el cliente.
-                </p>
-                {versiones.map((ver, vidx) => (
-                  <div key={vidx} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '12px 0', borderBottom: vidx < versiones.length - 1 ? '1px solid #eee' : 'none',
-                    flexWrap: 'wrap', gap: 8,
-                  }}>
-                    <div>
-                      <b style={{ color: '#b03a22' }}>N-{ver.numeroCotizacion}</b>
-                      {ver.label && <span style={{ fontSize: '0.8rem', opacity: 0.6, marginLeft: 8 }}>{ver.label}</span>}
-                      <div style={{ fontSize: '0.8rem', opacity: 0.75, marginTop: 2 }}>
-                        {ver.kwp} kWp · {ver.npaneles} paneles · ${Number(ver.costoProyectoMasIva).toLocaleString('es-CO')} · {ver.tiempoRetorno} meses
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        className="cotBtn cotBtnGhost"
-                        style={{ padding: '4px 12px', fontSize: '0.78rem' }}
-                        onClick={() => copiarLinkVersion(ver.numeroCotizacion)}
-                      >
-                        {linkVersionCopiado === ver.numeroCotizacion ? '¡Copiado! ✓' : 'Copiar link'}
-                      </button>
-                      <button
-                        className="cotBtn cotBtnPrimary"
-                        style={{ padding: '4px 12px', fontSize: '0.78rem' }}
-                        onClick={() => descargarPdfVersion(ver, vidx)}
-                        disabled={generandoPdfVersion === vidx}
-                      >
-                        {generandoPdfVersion === vidx ? 'Generando...' : 'PDF'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </Card>
-            )}
 
             {/* INFO INICIAL */}
             <Card title="Información inicial">
@@ -763,6 +723,44 @@ export default function Resultado() {
               <SummaryRow label="Retorno" value={`${resultadoActivo?.tiempoRetorno ?? "—"} meses`} />
               <SummaryRow label="Ahorro anual" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
             </Card>
+
+            {versiones.length > 0 && (
+              <Card title="Versiones guardadas">
+                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                  {versiones.map((ver, vidx) => (
+                    <div key={vidx} style={{
+                      padding: '10px 0',
+                      borderBottom: vidx < versiones.length - 1 ? '1px solid #eee' : 'none',
+                    }}>
+                      <div style={{ marginBottom: 6 }}>
+                        <b style={{ color: '#b03a22', fontSize: '0.9rem' }}>N-{ver.numeroCotizacion}</b>
+                        {ver.label && <span style={{ fontSize: '0.75rem', opacity: 0.6, marginLeft: 6 }}>{ver.label}</span>}
+                        <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: 2 }}>
+                          {ver.kwp} kWp · ${Number(ver.costoProyectoMasIva).toLocaleString('es-CO')}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          className="cotBtn cotBtnGhost"
+                          style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem' }}
+                          onClick={() => copiarLinkVersion(ver.numeroCotizacion)}
+                        >
+                          {linkVersionCopiado === ver.numeroCotizacion ? '¡Copiado! ✓' : 'Copiar link'}
+                        </button>
+                        <button
+                          className="cotBtn cotBtnPrimary"
+                          style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem' }}
+                          onClick={() => descargarPdfVersion(ver, vidx)}
+                          disabled={generandoPdfVersion === vidx}
+                        >
+                          {generandoPdfVersion === vidx ? '...' : 'PDF'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             <Card title="Acciones">
               <div className="cotActions" style={{ marginTop: 0 }}>
