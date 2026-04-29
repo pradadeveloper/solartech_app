@@ -285,7 +285,7 @@ function calcularProyecto({
 
     consumoKwh: consumo,
     costoKwh: costoUnidad,
-    valorMensual: gastoMensual,
+    valorMensual: facturaPromedio,
     areaDisponible: Number.isNaN(areaDisp) ? null : areaDisp,
 
     wPromedioDia,
