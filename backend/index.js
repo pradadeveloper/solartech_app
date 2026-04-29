@@ -893,7 +893,11 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   page.drawText('Solartech Energy Systems', { x: sigX + 14, y: y - sigH + 10, size: 9, font, color: COLOR_ACCENT });
 
   const pdfBytes = await pdfDoc.save();
-  const fileName = `propuesta-${uuidv4()}.pdf`;
+  const slug = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+  const cotNum   = resultados.numeroCotizacion || uuidv4().slice(0, 8);
+  const cliente  = slug(data.nombre) || 'Cliente';
+  const empresa  = slug(cfg?.empresa?.nombre || 'Solartech');
+  const fileName = `Propuesta_N-${cotNum}_${cliente}_${empresa}.pdf`;
   return savePDFStorage(fileName, pdfBytes);
 }
 
