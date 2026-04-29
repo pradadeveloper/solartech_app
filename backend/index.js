@@ -599,6 +599,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(6);
 
   // 4. ANALISIS FINANCIERO
+  newPage();
+  gap(4);
   sectionHeader('ANALISIS FINANCIERO');
   infoRow('Ahorro mensual estimado', cop(resultados.ahorroMensual));
   infoRow('Ahorro anual estimado', cop(resultados.ahorroAnual));
@@ -632,6 +634,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(6);
 
   // 7. FORMAS DE PAGO
+  newPage();
+  gap(4);
   sectionHeader('FORMAS DE PAGO');
   const formasPago = [
     { t: '1. Pago de contado', d: 'Pago total antes de iniciar la instalacion. Garantiza disponibilidad inmediata de equipos y posible descuento por pronto pago.' },
@@ -649,9 +653,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   });
   gap(6);
 
-  // 8. IMPACTO AMBIENTAL — siempre inicia página nueva
-  newPage();
-  gap(4);
+  // 8. IMPACTO AMBIENTAL
+  gap(6);
   sectionHeader('IMPACTO AMBIENTAL');
 
   // Tarjetas visuales para los 3 indicadores ambientales
@@ -706,9 +709,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(6);
 
 
-  // 10. GARANTIAS — página 3, 2 columnas
-  newPage();
-  gap(4);
+  // 10. GARANTIAS
+  gap(6);
   sectionHeader('GARANTIAS');
   {
     const col1Items = [
