@@ -170,10 +170,10 @@ export default function LeadsCotizaciones() {
                   { label: "Cot.",             hide: true  },
                   { label: "Fecha",            hide: false },
                   { label: "Cliente",          hide: false },
-                  { label: "Ciudad",           hide: false },
+                  { label: "Ciudad",           hide: true  },
                   { label: "kWh",              hide: true  },
                   { label: "kWp",              hide: true  },
-                  { label: "Sistema",          hide: false },
+                  { label: "Sistema",          hide: true  },
                   { label: "Valor",            hide: false },
                   { label: "Opción principal", hide: true  },
                   { label: "Estado",           hide: false },
@@ -205,7 +205,7 @@ export default function LeadsCotizaciones() {
                 </td>
 
                 {/* Ciudad */}
-                <td style={{ padding: "6px 8px" }}>
+                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
                   <select style={selectStyle} value={f.ciudad} onChange={set("ciudad")}>
                     {ciudades.map((c) => <option key={c} value={c}>{c || "Todas"}</option>)}
                   </select>
@@ -225,7 +225,7 @@ export default function LeadsCotizaciones() {
                 </td>
 
                 {/* Sistema */}
-                <td style={{ padding: "6px 8px" }}>
+                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
                   <select style={selectStyle} value={f.sistema} onChange={set("sistema")}>
                     {sistemas.map((s) => <option key={s} value={s}>{s || "Todos"}</option>)}
                   </select>
@@ -284,10 +284,10 @@ export default function LeadsCotizaciones() {
                         {safeDate(lead.fecha)}
                       </td>
                       <td style={{ padding: "10px 12px", fontWeight: 600 }}>{lead.nombre}</td>
-                      <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.ubicacion}</td>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.ubicacion}</td>
                       <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right" }}>{lead.consumoKwh ?? "—"}</td>
                       <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right", color: "var(--accent)" }}>{lead.kwp ?? "—"}</td>
-                      <td style={{ padding: "10px 12px" }}>{lead.tipoSolicitud}</td>
+                      <td className="col-hide-mobile" style={{ padding: "10px 12px" }}>{lead.tipoSolicitud}</td>
                       <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
                         {money(lead.costoProyectoMasIva)}
                       </td>
