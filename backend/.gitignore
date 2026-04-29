@@ -6,3 +6,5 @@ uploads/
 propuesta-*.pdf
 public/propuesta-*.pdf
 public/cotizaciones/*.pdf
+usuarios.json
+leads.json

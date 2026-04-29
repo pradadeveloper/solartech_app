@@ -1,22 +1,27 @@
 {
-  "costokWp": 3500000,
-  "potenciaPanel": 585,
+  "costokWp": 4200000,
+  "potenciaPanel": 710,
   "capacidadInversor": 3000,
-  "radiacionSolar": 3.8,
-  "margenCobertura": 0.8,
-  "longitudRiel": 4.7,
+  "radiacionSolar": 0,
+  "margenCobertura": 0.008,
+  "longitudRiel": 0,
   "cableSolar": 10,
   "ivaPct": 5,
   "descuentoRentaPct": 50,
-  "factorCO2": 0.3612,
-  "factorArboles": 0.02,
-  "factorGalones": 117.6,
+  "factorCO2": 0.58,
+  "factorArboles": 0.021,
+  "factorGalones": 113,
   "empresa": {
-    "nombre": "Solartech Energy Systems",
-    "telefono": "+57 300 000 0000",
-    "email": "info@solartech.com.co",
-    "web": "www.solartechenergysystems.com",
-    "nit": "900.123.456-7",
-    "ciudad": "Medellin, Colombia"
-  }
+    "nombre": "Solartech Energy",
+    "telefono": "311 2878182",
+    "web": "https://solartechenergy.co/",
+    "email": "muribec@ferragro.com",
+    "nit": "800060880-3",
+    "ciudad": "Medellin Colombia"
+  },
+  "tarifa_kwh": "850",
+  "precio_panel": "1200000",
+  "capacidad_panel": "640",
+  "rendimiento": "0.8",
+  "horas_sol": "4.5"
 }
