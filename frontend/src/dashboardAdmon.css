@@ -254,6 +254,7 @@ grid-template-columns: repeat(2, minmax(0, 1fr));
 
   .kpiGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chartsGrid{ grid-template-columns: 1fr; }
+  .card--hero{ grid-column: 1 / -1; }
 }
 
 /* ── Columnas ocultas en mobile (tabla leads) ── */
@@ -295,6 +296,15 @@ background: var(--accent-light);
 }
 .card--highlight .card__title{ color: var(--accent); font-weight: 600; }
 .card--highlight .card__value{ color: var(--accent); font-size: clamp(16px, 1.6vw, 24px); }
+
+/* Tarjeta héroe — primera y prominente */
+.card--hero{
+  border-width: 2px;
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(176,58,34,0.10) 0%, rgba(176,58,34,0.04) 100%);
+}
+.card--hero .card__title{ font-size: 13px; font-weight: 700; }
+.card--hero .card__value{ font-size: clamp(20px, 2.2vw, 30px); letter-spacing: -0.5px; }
 
 
 .panel{

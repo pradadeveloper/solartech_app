@@ -136,18 +136,19 @@ export default function DashboardResumen() {
   return (
     <>
       <div className="grid kpiGrid">
+        <KpiCard
+          title="Valor cotizado mes"
+          value={loading ? "—" : formatCOP(kpis.valorCotizadoMes)}
+          hint="Suma proyectos del mes"
+          highlight
+          hero
+        />
         <KpiCard title="Leads hoy" value={loading ? "—" : kpis.leadsHoy} hint="Últimas 24h" />
         <KpiCard title="Leads del mes" value={loading ? "—" : kpis.leadsMes} hint="Mes actual" />
         <KpiCard title="Cotizaciones" value={loading ? "—" : kpis.cotizacionesMes} hint="Mes actual" />
         <KpiCard title="Tasa de cierre" value={loading ? "—" : `${kpis.tasaCierre}%`} hint="Sobre total leads" />
         <KpiCard title="Ticket promedio" value={loading ? "—" : formatCOP(kpis.ticketPromedio)} hint="COP" />
         <KpiCard title="kWp proyectados" value={loading ? "—" : Number(kpis.kwpProyectadosMes.toFixed(1))} hint="Mes actual" />
-        <KpiCard
-          title="Valor cotizado mes"
-          value={loading ? "—" : formatCOP(kpis.valorCotizadoMes)}
-          hint="Suma proyectos del mes"
-          highlight
-        />
       </div>
 
       <div className="grid chartsGrid">
