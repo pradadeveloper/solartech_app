@@ -11,7 +11,7 @@ const SECTIONS = [
     fields: [
       { key: "costokWp",        label: "Costo por kWp instalado",         unit: "COP/kWp", type: "number", hint: "Precio de mercado por kilovatio-pico instalado." },
       { key: "potenciaPanel",   label: "Potencia por panel",              unit: "W",       type: "number", hint: "Wattios de cada panel solar (ej: 585 W)." },
-      { key: "margenCobertura", label: "Margen de cobertura del sistema", unit: "%",       type: "number", step: "0.01", factor: 100, hint: "Eficiencia real del sistema (ej: 0.8 = 80%)." },
+      { key: "margenCobertura", label: "Margen de cobertura del sistema", unit: "%",       type: "number", step: "0.01", hint: "Eficiencia real del sistema (ej: 0.8 = 80%)." },
     ],
   },
   {
@@ -134,8 +134,14 @@ export default function Configuracion() {
       });
       if (!res.ok) throw new Error("Error guardando");
       setMsg({ type: "ok", text: "Configuracion guardada correctamente. Los nuevos calculos usaran estos valores." });
-    } catch (_) {
-      setMsg({ type: "error", text: "Error al guardar. Verifica tu sesion." });
+    } catch (err) {
+      const noConexion = err instanceof TypeError && err.message.includes("fetch");
+      setMsg({
+        type: "error",
+        text: noConexion
+          ? "No se puede conectar con el servidor. Verifica que el backend esté corriendo."
+          : "Error al guardar. Verifica tu sesión (vuelve a iniciar sesión si expiró).",
+      });
     } finally {
       setGuardando(false);
     }
