@@ -82,6 +82,10 @@ export default function Resultado() {
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [cfg, setCfg] = useState({});
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [versiones, setVersiones] = useState([]);
+  const [guardandoVersion, setGuardandoVersion] = useState(null);
+  const [linkVersionCopiado, setLinkVersionCopiado] = useState(null);
+  const [generandoPdfVersion, setGenerandoPdfVersion] = useState(null);
 
   const compartirLink = () => {
     const url = `${window.location.origin}/propuesta/${resultado.numeroCotizacion}`;
@@ -111,6 +115,76 @@ export default function Resultado() {
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!resultado?.numeroCotizacion) return;
+    const token = localStorage.getItem('token');
+    fetch(`${process.env.REACT_APP_API_URL}/api/leads/${resultado.numeroCotizacion}/versiones`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setVersiones(data); })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultado?.numeroCotizacion]);
+
+  const guardarVersion = async (idx) => {
+    const calc = calculos[idx];
+    if (!calc || !resultado?.numeroCotizacion) return;
+    setGuardandoVersion(idx);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${resultado.numeroCotizacion}/version`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ...resultado, ...calc, costokWp: Number(opciones[idx].costokWp), label: opciones[idx].label }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setVersiones(prev => [...prev, {
+          ...resultado, ...calc,
+          numeroCotizacion: data.versionId,
+          label: opciones[idx].label,
+          pdfUrl: '',
+        }]);
+      }
+    } catch (e) {
+      alert('Error guardando versión');
+    } finally {
+      setGuardandoVersion(null);
+    }
+  };
+
+  const copiarLinkVersion = (vid) => {
+    navigator.clipboard.writeText(`${window.location.origin}/propuesta/${vid}`).then(() => {
+      setLinkVersionCopiado(vid);
+      setTimeout(() => setLinkVersionCopiado(null), 2500);
+    });
+  };
+
+  const descargarPdfVersion = async (ver, vidx) => {
+    if (ver.pdfUrl) {
+      window.open(ver.pdfUrl.startsWith('http') ? ver.pdfUrl : `${process.env.REACT_APP_API_URL}${ver.pdfUrl}`, '_blank');
+      return;
+    }
+    setGenerandoPdfVersion(vidx);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ...ver }),
+      });
+      const data = await res.json();
+      setVersiones(prev => prev.map((v, i) => i === vidx ? { ...v, pdfUrl: data.pdfUrl } : v));
+      const u = data.pdfUrl;
+      window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
+    } catch (e) {
+      alert('Error generando PDF');
+    } finally {
+      setGenerandoPdfVersion(null);
+    }
+  };
 
   const calculos = opciones.map((op) =>
     op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, { ...resultado, ...cfg }) : null
@@ -347,6 +421,14 @@ export default function Resultado() {
                         <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
                         <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
                         <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} meses`} />
+                        <button
+                          className="cotBtn cotBtnGhost"
+                          style={{ marginTop: 6, fontSize: '0.78rem', padding: '5px 0', width: '100%' }}
+                          onClick={(e) => { e.stopPropagation(); guardarVersion(idx); }}
+                          disabled={guardandoVersion === idx}
+                        >
+                          {guardandoVersion === idx ? 'Guardando...' : `+ Guardar ${op.label} como versión`}
+                        </button>
                       </div>
                     ) : (
                       <p style={{ margin: '12px 0 0', opacity: 0.4, fontSize: '0.8rem' }}>Ingresa el kWp para calcular</p>
@@ -393,6 +475,47 @@ export default function Resultado() {
                 </div>
               )}
             </Card>
+
+            {/* VERSIONES GUARDADAS */}
+            {versiones.length > 0 && (
+              <Card title="Versiones guardadas">
+                <p style={{ margin: '0 0 12px', opacity: 0.7, fontSize: '0.85rem' }}>
+                  Cada versión tiene su propio link y PDF para compartir con el cliente.
+                </p>
+                {versiones.map((ver, vidx) => (
+                  <div key={vidx} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '12px 0', borderBottom: vidx < versiones.length - 1 ? '1px solid #eee' : 'none',
+                    flexWrap: 'wrap', gap: 8,
+                  }}>
+                    <div>
+                      <b style={{ color: '#b03a22' }}>N-{ver.numeroCotizacion}</b>
+                      {ver.label && <span style={{ fontSize: '0.8rem', opacity: 0.6, marginLeft: 8 }}>{ver.label}</span>}
+                      <div style={{ fontSize: '0.8rem', opacity: 0.75, marginTop: 2 }}>
+                        {ver.kwp} kWp · {ver.npaneles} paneles · ${Number(ver.costoProyectoMasIva).toLocaleString('es-CO')} · {ver.tiempoRetorno} meses
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="cotBtn cotBtnGhost"
+                        style={{ padding: '4px 12px', fontSize: '0.78rem' }}
+                        onClick={() => copiarLinkVersion(ver.numeroCotizacion)}
+                      >
+                        {linkVersionCopiado === ver.numeroCotizacion ? '¡Copiado! ✓' : 'Copiar link'}
+                      </button>
+                      <button
+                        className="cotBtn cotBtnPrimary"
+                        style={{ padding: '4px 12px', fontSize: '0.78rem' }}
+                        onClick={() => descargarPdfVersion(ver, vidx)}
+                        disabled={generandoPdfVersion === vidx}
+                      >
+                        {generandoPdfVersion === vidx ? 'Generando...' : 'PDF'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            )}
 
             {/* INFO INICIAL */}
             <Card title="Información inicial">

@@ -167,7 +167,7 @@ async function getAllLeads() {
       const lead = { opciones: [], identificacion: null };
       Object.entries(SHEET_TO_LEAD).forEach(([col, prop]) => {
         let val = sheetObj[col] ?? '';
-        if (prop === 'numeroCotizacion') val = Number(val) || 0;
+        if (prop === 'numeroCotizacion') val = String(val).includes('_') ? String(val) : (Number(val) || 0);
         if (['consumoKwh', 'kwp', 'costoProyectoMasIva'].includes(prop)) val = Number(val) || 0;
         if (prop === 'tiempoRetorno' && val !== '') val = Number(val); // ya en meses
         lead[prop] = val;
@@ -236,7 +236,7 @@ async function updateLead(numeroCotizacion, fields) {
   const contIdx = headers.indexOf('contacto');
   if (contIdx === -1) throw new Error('Columna contacto no encontrada en Sheets');
 
-  const rowIdx = rows.findIndex(r => Number(r[contIdx]) === Number(numeroCotizacion));
+  const rowIdx = rows.findIndex(r => String(r[contIdx]) === String(numeroCotizacion));
   if (rowIdx === -1) throw new Error('Lead no encontrado');
 
   const sheetRow = rowIdx + 2;

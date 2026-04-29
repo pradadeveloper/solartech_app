@@ -1075,10 +1075,53 @@ app.put('/api/config', express.json(), async (req, res) => {
 app.get('/api/propuesta/:num', async (req, res) => {
   try {
     const leads = await getAllLeads();
-    const lead = leads.find(l => Number(l.numeroCotizacion) === Number(req.params.num));
+    const lead = leads.find(l => String(l.numeroCotizacion) === String(req.params.num));
     if (!lead) return res.status(404).json({ error: 'Propuesta no encontrada' });
     const { id, estado, ...pub } = lead;
     res.json(pub);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== GET /api/leads/:num/versiones — lista versiones de una cotización ======
+app.get('/api/leads/:numeroCotizacion/versiones', async (req, res) => {
+  try {
+    const base = String(req.params.numeroCotizacion);
+    const leads = await getAllLeads();
+    const regex = new RegExp(`^${base}_\\d+$`);
+    const versiones = leads
+      .filter(l => regex.test(String(l.numeroCotizacion)))
+      .map(({ id, ...pub }) => pub);
+    res.json(versiones);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== POST /api/leads/:num/version — guarda una opción como nueva versión ======
+app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res) => {
+  try {
+    const base = String(req.params.numeroCotizacion);
+    const leads = await getAllLeads();
+    const baseLead = leads.find(l => String(l.numeroCotizacion) === base);
+    if (!baseLead) return res.status(404).json({ error: 'Propuesta base no encontrada' });
+
+    const regex = new RegExp(`^${base}_\\d+$`);
+    const nextNum = leads.filter(l => regex.test(String(l.numeroCotizacion))).length + 1;
+    const versionId = `${base}_${nextNum}`;
+
+    const newLead = {
+      ...baseLead,
+      ...req.body,
+      numeroCotizacion: versionId,
+      id: require('crypto').randomUUID(),
+      pdfUrl: '',
+      opciones: [],
+    };
+
+    await saveLeadStorage(newLead);
+    res.json({ ok: true, versionId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
