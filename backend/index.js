@@ -894,10 +894,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   const pdfBytes = await pdfDoc.save();
   const slug = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-  const cotNum   = resultados.numeroCotizacion || uuidv4().slice(0, 8);
-  const cliente  = slug(data.nombre) || 'Cliente';
-  const empresa  = slug(cfg?.empresa?.nombre || 'Solartech');
-  const fileName = `Propuesta_N-${cotNum}_${cliente}_${empresa}.pdf`;
+  const fnCot     = resultados.numeroCotizacion || uuidv4().slice(0, 8);
+  const fnCliente = slug(data.nombre) || 'Cliente';
+  const fnEmpresa = slug(cfg?.empresa?.nombre || 'Solartech');
+  const fileName  = `Propuesta_N-${fnCot}_${fnCliente}_${fnEmpresa}.pdf`;
   return savePDFStorage(fileName, pdfBytes);
 }
 
