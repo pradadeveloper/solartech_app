@@ -144,7 +144,10 @@ export default function CotizadorSolar() {
       const data = await response.json();
       navigate("/resultado", { state: { resultado: data } });
     } catch (err) {
-      alert(`Error al calcular: ${err.message}`);
+      const msg = (err instanceof TypeError && err.message.includes("fetch"))
+        ? "No se pudo conectar con el servidor. Verifica que el backend esté corriendo e intenta de nuevo."
+        : `Error al calcular: ${err.message}`;
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -157,7 +160,7 @@ export default function CotizadorSolar() {
         <header className="cotHeader">
           <img src={logo} alt="Logo Solartech" className="cotLogo" />
           <div className="cotHeaderText">
-            <h1 className="cotTitle">Nuevo Lead — Cotizador Solar</h1>
+            <h1 className="cotTitle">Nuevo Cliente — Cotizador Solar</h1>
             <p className="cotSubtitle">Completa los datos y genera la cotización en segundos.</p>
           </div>
 
@@ -371,12 +374,12 @@ export default function CotizadorSolar() {
 
           {/* Right: Summary */}
           <aside className="cotSide">
-            <Card title="Resumen del lead">
+            <Card title="Resumen del Cliente">
               <SummaryRow label="Cliente" value={formData.nombre} />
               <SummaryRow label="Ciudad" value={formData.ubicacion} />
               <SummaryRow label="kWh/mes" value={formData.consumoKwh ? `${Number(formData.consumoKwh).toLocaleString("es-CO")} kWh/mes` : "—"} />
               <SummaryRow label="Costo kWh" value={formData.costoKwh ? `$${Number(formData.costoKwh).toLocaleString("es-CO")}` : "—"} />
-              <SummaryRow label="Factura mensual" value={valorMensual ? `$${Number(valorMensual).toLocaleString("es-CO")}` : "—"} />
+              <SummaryRow label="Factura Mensual Promedio" value={valorMensual ? `$${Number(valorMensual).toLocaleString("es-CO")}` : "—"} />
               <SummaryRow label="Área (m²)" value={formData.areaDisponible ? `${Number(formData.areaDisponible).toLocaleString("es-CO")} m²` : "—"} />
               <div className="cotDivider" />
               <SummaryRow label="Canal" value={formData.conociste || "—"} />

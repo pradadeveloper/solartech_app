@@ -93,8 +93,12 @@ async function getConfig() {
       if (!key) return;
       if (key.startsWith('empresa.')) {
         cfg.empresa[key.slice(8)] = value ?? '';
+      } else if (NUM_KEYS.includes(key)) {
+        // Solo setear si el valor es un número válido — celda vacía → no sobreescribe el default
+        const n = Number(value);
+        if (value !== undefined && value !== '' && !isNaN(n)) cfg[key] = n;
       } else {
-        cfg[key] = NUM_KEYS.includes(key) ? Number(value) : value;
+        cfg[key] = value;
       }
     });
     return cfg;
