@@ -376,7 +376,7 @@ export default function CotizadorSolar() {
               <SummaryRow label="Ciudad" value={formData.ubicacion} />
               <SummaryRow label="kWh/mes" value={formData.consumoKwh ? `${Number(formData.consumoKwh).toLocaleString("es-CO")} kWh/mes` : "—"} />
               <SummaryRow label="Costo kWh" value={formData.costoKwh ? `$${Number(formData.costoKwh).toLocaleString("es-CO")}` : "—"} />
-              <SummaryRow label="Factura mensual" value={formData.valorMensual ? `$${Number(formData.valorMensual).toLocaleString("es-CO")}` : "—"} />
+              <SummaryRow label="Factura mensual" value={valorMensual ? `$${Number(valorMensual).toLocaleString("es-CO")}` : "—"} />
               <SummaryRow label="Área (m²)" value={formData.areaDisponible ? `${Number(formData.areaDisponible).toLocaleString("es-CO")} m²` : "—"} />
               <div className="cotDivider" />
               <SummaryRow label="Canal" value={formData.conociste || "—"} />
