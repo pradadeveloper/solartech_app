@@ -787,10 +787,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // Casos de éxito
   if (casosExitoImg) {
     const aspectRatio = casosExitoImg.height / casosExitoImg.width;
-    const bH = Math.min(160, Math.round(aspectRatio * cW));
-    checkY(bH + 20);
-    page.drawText('CASOS DE EXITO', { x: margin + 10, y, size: 9.5, font, color: COLOR_ACCENT });
-    y -= 12;
+    const bH = Math.min(280, Math.round(aspectRatio * cW));
+    checkY(bH + 50);
+    sectionHeader('CASOS DE EXITO');
     page.drawImage(casosExitoImg, { x: margin, y: y - bH, width: cW, height: bH });
     y -= bH + 12;
   }
