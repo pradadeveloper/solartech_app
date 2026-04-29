@@ -6,9 +6,15 @@ import "./cotizadorSolar.css";
 const API = process.env.REACT_APP_API_URL;
 
 function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
-  const kwp = Number(kwpInput);
+  let kwp = Number(kwpInput);
   const costoUnidad = Number(costoKwh);
   const costokWp = Number(costokWpInput) > 0 ? Number(costokWpInput) : 3500000;
+
+  if (!kwp && Number(base.npaneles) > 0) {
+    const potPanel = Number(base.potenciaPanel) || 585;
+    kwp = Number(((Number(base.npaneles) * potPanel) / 1000).toFixed(1));
+  }
+
   if (!kwp || !costoUnidad) return null;
 
   const potenciaPanel   = Number(base.potenciaPanel)   || 585;
@@ -41,7 +47,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
 
   return {
-    consumo, wPromedioDia, npaneles, produccionDeEnergia, areaMinima,
+    kwp, consumo, wPromedioDia, npaneles, produccionDeEnergia, areaMinima,
     porcentajeCoberturaProyecto, costoProyecto, ivaProyecto, costoProyectoMasIva,
     descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
     co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
@@ -74,7 +80,11 @@ export default function PropuestaPublica() {
     const storedCostokWp = lead.kwp > 0 && lead.costoProyectoMasIva > 0
       ? Math.round(lead.costoProyectoMasIva / (lead.kwp * 1.05))
       : (cfg.costokWp || 3500000);
-    return calcularLocal(lead.kwp, lead.costoKwh, storedCostokWp, { ...cfg, ...lead });
+    const costoKwh = lead.costoKwh ||
+      (lead.ahorroMensual > 0 && lead.consumoKwh > 0
+        ? Math.round(lead.ahorroMensual / lead.consumoKwh)
+        : 0);
+    return calcularLocal(lead.kwp, costoKwh, storedCostokWp, { ...cfg, ...lead });
   }, [lead, cfg]);
 
   const money = (v) => typeof v === 'number' ? v.toLocaleString('es-CO') : (v ?? '—');
@@ -82,6 +92,9 @@ export default function PropuestaPublica() {
   const ahorroMensual  = lead?.ahorroMensual  || calc?.ahorroMensual  || 0;
   const ahorroAnual    = lead?.ahorroAnual    || calc?.ahorroAnual    || 0;
   const tiempoRetorno  = lead?.tiempoRetorno  || calc?.tiempoRetorno  || null;
+  const ahorro10Anos   = calc?.ahorro10Anos   ?? (ahorroAnual > 0 ? ahorroAnual * 10 : null);
+  const descuentoDeclaracion = calc?.descuentoDeclaracion ??
+    (lead?.costoProyectoMasIva > 0 ? Math.round((lead.costoProyectoMasIva / 1.05) * 0.5) : null);
 
   const compartir = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -175,7 +188,7 @@ export default function PropuestaPublica() {
             {/* Sistema solar */}
             <Card title="Tu sistema solar">
               <div className="cotTwoCol">
-                <Metric label="Potencia del sistema" value={`${lead.kwp ?? '—'} kWp`} />
+                <Metric label="Potencia del sistema" value={`${lead.kwp || calc?.kwp || '—'} kWp`} />
                 <Metric label="N° de paneles" value={`${lead.npaneles ?? calc?.npaneles ?? '—'} paneles`} />
                 <Metric label="N° de inversores" value={`${lead.ninversores ?? 1} und`} />
                 <Metric label="Potencia por panel" value={`${calc?.potenciaPanel ?? cfg.potenciaPanel ?? '—'} W`} />
@@ -192,9 +205,9 @@ export default function PropuestaPublica() {
                 <Metric label="Inversión estimada (con IVA)" value={`$ ${money(lead.costoProyectoMasIva || calc?.costoProyectoMasIva)}`} />
                 <Metric label="Ahorro mensual estimado" value={`$ ${money(ahorroMensual)}`} />
                 <Metric label="Ahorro anual estimado" value={`$ ${money(ahorroAnual)}`} />
-                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(calc?.ahorro10Anos)}`} />
+                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(ahorro10Anos)}`} />
                 <Metric label="Retorno de inversión" value={`${tiempoRetorno ?? '—'} meses`} />
-                <Metric label="Descuento declaración de renta" value={`$ ${money(calc?.descuentoDeclaracion)}`} />
+                <Metric label="Descuento declaración de renta" value={`$ ${money(descuentoDeclaracion)}`} />
                 <Metric label="Vida útil estimada" value="25 años" />
               </div>
             </Card>
