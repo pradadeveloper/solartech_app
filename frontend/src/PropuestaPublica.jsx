@@ -337,7 +337,7 @@ export default function PropuestaPublica() {
               <SummaryRow label="Cliente" value={lead.nombre} />
               <SummaryRow label="Ciudad" value={lead.ubicacion} />
               <div className="cotDivider" />
-              <SummaryRow label="Potencia" value={`${lead.kwp ?? '—'} kWp`} />
+              <SummaryRow label="Potencia" value={`${lead.kwp || calc?.kwp || '—'} kWp`} />
               <SummaryRow label="Producción" value={`${calc?.produccionDeEnergia ?? '—'} kWh/mes`} />
               <SummaryRow label="Cobertura" value={`${calc?.porcentajeCoberturaProyecto ?? '—'}%`} />
               <div className="cotDivider" />
