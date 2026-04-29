@@ -1071,6 +1071,19 @@ app.put('/api/config', express.json(), async (req, res) => {
   res.json({ ok: true, config: nueva });
 });
 
+// ====== GET /api/propuesta/:num (público — sin auth, para compartir con cliente) ======
+app.get('/api/propuesta/:num', async (req, res) => {
+  try {
+    const leads = await getAllLeads();
+    const lead = leads.find(l => Number(l.numeroCotizacion) === Number(req.params.num));
+    if (!lead) return res.status(404).json({ error: 'Propuesta no encontrada' });
+    const { id, estado, ...pub } = lead;
+    res.json(pub);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ====== GET /api/leads ======
 app.get('/api/leads', async (_req, res) => {
   try { res.json(await getAllLeads()); }

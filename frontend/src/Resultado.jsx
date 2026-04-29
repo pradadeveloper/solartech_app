@@ -81,6 +81,15 @@ export default function Resultado() {
   const [pdfUrls, setPdfUrls] = useState(() => resultado ? [resultado.pdfUrl, null, null] : []);
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [cfg, setCfg] = useState({});
+  const [linkCopiado, setLinkCopiado] = useState(false);
+
+  const compartirLink = () => {
+    const url = `${window.location.origin}/propuesta/${resultado.numeroCotizacion}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2500);
+    });
+  };
 
   const [opciones, setOpciones] = useState(() => resultado ? [
     { label: "Opción A", kwp: String(resultado.kwp ?? ""), costokWp: "3500000" },
@@ -248,6 +257,9 @@ export default function Resultado() {
                 <div className="cotActions" style={{ marginTop: 14 }}>
                   <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
                     {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} en PDF`}
+                  </button>
+                  <button className="cotBtn cotBtnGhost" onClick={compartirLink}>
+                    {linkCopiado ? '¡Link copiado! ✓' : 'Compartir Link'}
                   </button>
                   <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
                     Volver al formulario
@@ -633,6 +645,9 @@ export default function Resultado() {
               <div className="cotActions" style={{ marginTop: 0 }}>
                 <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf} style={{ width: '100%' }}>
                   {generandoPdf ? 'Generando...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? ''} PDF`}
+                </button>
+                <button className="cotBtn cotBtnGhost" onClick={compartirLink} style={{ width: '100%' }}>
+                  {linkCopiado ? '¡Copiado! ✓' : 'Compartir Link'}
                 </button>
                 <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
                   Nueva cotización

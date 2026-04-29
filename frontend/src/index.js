@@ -8,6 +8,7 @@ import LeadsCotizaciones from './LeadsCotizaciones';
 import Asesores from './Asesores';
 import Configuracion from './Configuracion';
 import Login from './Login';
+import PropuestaPublica from './PropuestaPublica';
 
 function RutaProtegida({ children }) {
   const token = localStorage.getItem('token');
@@ -19,6 +20,8 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <Router>
     <Routes>
+      {/* Ruta pública — sin login */}
+      <Route path="/propuesta/:num" element={<PropuestaPublica />} />
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<RutaProtegida><DashboardLayout /></RutaProtegida>}>
         <Route index element={<DashboardResumen />} />
