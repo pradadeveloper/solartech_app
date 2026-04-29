@@ -502,25 +502,24 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   }
 
   function infoRow2(l1, v1, l2, v2) {
-    const rH = 24;
+    const rH = 34; // más alto para apilar label + valor
     const half = (cW - 6) / 2;
-    const labelW = 100; // ancho fijo para la etiqueta
-    const valX1 = margin + 8 + labelW;
-    const valMaxW = half - labelW - 16; // espacio real disponible para el valor
-    const valX2 = margin + half + 6 + 8 + labelW;
+    const maxValW = half - 16;
     const fitSize = (text, maxW) => {
       let sz = 9.5;
       while (sz >= 6.5 && font.widthOfTextAtSize(String(text ?? '-'), sz) > maxW) sz -= 0.5;
       return sz;
     };
     checkY(rH);
+    // Columna izquierda
     page.drawRectangle({ x: margin, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER_INNER, borderWidth: 1 });
-    page.drawText(String(l1), { x: margin + 8, y: y - 15, size: 8.5, font: fontBold, color: COLOR_MUTED });
-    page.drawText(String(v1 ?? '-'), { x: valX1, y: y - 15, size: fitSize(v1, valMaxW), font, color: COLOR_TEXT });
+    page.drawText(String(l1), { x: margin + 8, y: y - 12, size: 7.5, font: fontBold, color: COLOR_MUTED });
+    page.drawText(String(v1 ?? '-'), { x: margin + 8, y: y - 26, size: fitSize(v1, maxValW), font, color: COLOR_TEXT });
+    // Columna derecha
     const rx = margin + half + 6;
     page.drawRectangle({ x: rx, y: y - rH, width: half, height: rH, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_BORDER_INNER, borderWidth: 1 });
-    page.drawText(String(l2), { x: rx + 8, y: y - 15, size: 8.5, font: fontBold, color: COLOR_MUTED });
-    page.drawText(String(v2 ?? '-'), { x: valX2, y: y - 15, size: fitSize(v2, valMaxW), font, color: COLOR_TEXT });
+    page.drawText(String(l2), { x: rx + 8, y: y - 12, size: 7.5, font: fontBold, color: COLOR_MUTED });
+    page.drawText(String(v2 ?? '-'), { x: rx + 8, y: y - 26, size: fitSize(v2, maxValW), font, color: COLOR_TEXT });
     y -= rH;
   }
 
