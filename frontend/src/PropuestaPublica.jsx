@@ -62,6 +62,8 @@ export default function PropuestaPublica() {
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(null);
   const [copiado, setCopiado] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [pdfUrlLocal, setPdfUrlLocal] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -95,6 +97,33 @@ export default function PropuestaPublica() {
   const ahorro10Anos   = calc?.ahorro10Anos   ?? (ahorroAnual > 0 ? ahorroAnual * 10 : null);
   const descuentoDeclaracion = calc?.descuentoDeclaracion ??
     (lead?.costoProyectoMasIva > 0 ? Math.round((lead.costoProyectoMasIva / 1.05) * 0.5) : null);
+
+  const descargarPdf = async () => {
+    const url = pdfUrlLocal || lead?.pdfUrl;
+    if (url) {
+      window.open(url.startsWith('http') ? url : `${API}${url}`, '_blank');
+      return;
+    }
+    if (!calc && !lead) return;
+    setGenerandoPdf(true);
+    try {
+      const payload = { ...lead, ...calc };
+      const res = await fetch(`${API}/api/generar-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.pdfUrl) {
+        setPdfUrlLocal(data.pdfUrl);
+        window.open(data.pdfUrl.startsWith('http') ? data.pdfUrl : `${API}${data.pdfUrl}`, '_blank');
+      }
+    } catch (e) {
+      alert('No se pudo generar el PDF. Intenta de nuevo.');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   const compartir = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -155,16 +184,9 @@ export default function PropuestaPublica() {
                   <b>¡Ten en cuenta!</b> Si requieres más información, ponte en contacto con tu asesor.
                 </p>
                 <div className="cotActions" style={{ marginTop: 14 }}>
-                  {lead.pdfUrl && (
-                    <a
-                      href={lead.pdfUrl?.startsWith('http') ? lead.pdfUrl : `${API}${lead.pdfUrl}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="cotBtn cotBtnPrimary"
-                    >
-                      Descargar PDF
-                    </a>
-                  )}
+                  <button className="cotBtn cotBtnPrimary" onClick={descargarPdf} disabled={generandoPdf}>
+                    {generandoPdf ? 'Generando PDF...' : 'Descargar PDF'}
+                  </button>
                   <button className="cotBtn cotBtnGhost" onClick={compartir}>
                     {copiado ? '¡Link copiado! ✓' : 'Compartir Link'}
                   </button>
@@ -313,16 +335,9 @@ export default function PropuestaPublica() {
                 ¡Muchas gracias por confiar en Solartech Energy Systems! Estamos para atender tus dudas.
               </p>
               <div className="cotActions" style={{ marginTop: 14 }}>
-                {lead.pdfUrl && (
-                  <a
-                    href={lead.pdfUrl?.startsWith('http') ? lead.pdfUrl : `${API}${lead.pdfUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cotBtn cotBtnPrimary"
-                  >
-                    Descargar PDF
-                  </a>
-                )}
+                <button className="cotBtn cotBtnPrimary" onClick={descargarPdf} disabled={generandoPdf}>
+                  {generandoPdf ? 'Generando PDF...' : 'Descargar PDF'}
+                </button>
                 <button className="cotBtn cotBtnGhost" onClick={compartir}>
                   {copiado ? '¡Link copiado! ✓' : 'Compartir Link'}
                 </button>
@@ -348,17 +363,14 @@ export default function PropuestaPublica() {
 
             <Card title="Acciones">
               <div className="cotActions" style={{ marginTop: 0 }}>
-                {lead.pdfUrl && (
-                  <a
-                    href={lead.pdfUrl?.startsWith('http') ? lead.pdfUrl : `${API}${lead.pdfUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cotBtn cotBtnPrimary"
-                    style={{ width: '100%', textAlign: 'center', textDecoration: 'none' }}
-                  >
-                    Descargar PDF
-                  </a>
-                )}
+                <button
+                  className="cotBtn cotBtnPrimary"
+                  onClick={descargarPdf}
+                  disabled={generandoPdf}
+                  style={{ width: '100%' }}
+                >
+                  {generandoPdf ? 'Generando PDF...' : 'Descargar PDF'}
+                </button>
                 <button className="cotBtn cotBtnGhost" onClick={compartir} style={{ width: '100%' }}>
                   {copiado ? '¡Copiado! ✓' : 'Compartir Link'}
                 </button>
