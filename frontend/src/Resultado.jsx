@@ -170,15 +170,28 @@ export default function Resultado() {
     setGenerandoPdfVersion(vidx);
     try {
       const token = localStorage.getItem('token');
+      const costoKwhFinal = Number(ver.costoKwh) || resultado?.costoKwh ||
+        (ver.ahorroMensual > 0 && ver.consumoKwh > 0
+          ? Math.round(ver.ahorroMensual / ver.consumoKwh)
+          : 0);
+      const payload = {
+        ...ver,
+        consumoKwh: Number(ver.consumoKwh) || ver.consumoKwh,
+        costoKwh: costoKwhFinal,
+      };
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ...ver }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-      setVersiones(prev => prev.map((v, i) => i === vidx ? { ...v, pdfUrl: data.pdfUrl } : v));
-      const u = data.pdfUrl;
-      window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
+      if (data.pdfUrl) {
+        setVersiones(prev => prev.map((v, i) => i === vidx ? { ...v, pdfUrl: data.pdfUrl } : v));
+        const u = data.pdfUrl;
+        window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
+      } else if (data.error) {
+        alert(`No se pudo generar el PDF: ${data.error}`);
+      }
     } catch (e) {
       alert('Error generando PDF');
     } finally {

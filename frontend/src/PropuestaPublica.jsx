@@ -47,7 +47,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
 
   return {
-    kwp, consumo, wPromedioDia, npaneles, produccionDeEnergia, areaMinima,
+    kwp, consumoKwh: consumo, costoKwh: costoUnidad, consumo, wPromedioDia, npaneles, produccionDeEnergia, areaMinima,
     porcentajeCoberturaProyecto, costoProyecto, ivaProyecto, costoProyectoMasIva,
     descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
     co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
@@ -104,10 +104,19 @@ export default function PropuestaPublica() {
       window.open(url.startsWith('http') ? url : `${API}${url}`, '_blank');
       return;
     }
-    if (!calc && !lead) return;
+    if (!lead) return;
     setGenerandoPdf(true);
     try {
-      const payload = { ...lead, ...calc };
+      const costoKwhFinal = calc?.costoKwh || lead.costoKwh ||
+        (lead.ahorroMensual > 0 && lead.consumoKwh > 0
+          ? Math.round(lead.ahorroMensual / lead.consumoKwh)
+          : 0);
+      const payload = {
+        ...lead,
+        ...calc,
+        consumoKwh: calc?.consumoKwh || lead.consumoKwh,
+        costoKwh: costoKwhFinal,
+      };
       const res = await fetch(`${API}/api/generar-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,6 +126,8 @@ export default function PropuestaPublica() {
       if (data.pdfUrl) {
         setPdfUrlLocal(data.pdfUrl);
         window.open(data.pdfUrl.startsWith('http') ? data.pdfUrl : `${API}${data.pdfUrl}`, '_blank');
+      } else if (data.error) {
+        alert(`No se pudo generar el PDF: ${data.error}`);
       }
     } catch (e) {
       alert('No se pudo generar el PDF. Intenta de nuevo.');

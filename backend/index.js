@@ -1245,9 +1245,30 @@ app.patch('/api/leads/:numeroCotizacion/opciones', express.json(), async (req, r
 app.post('/api/generar-pdf', express.json(), async (req, res) => {
   try {
     const data = req.body || {};
-    if (!data.consumoKwh || !data.costoKwh) {
-      return res.status(400).json({ error: 'consumoKwh y costoKwh son requeridos' });
+    const cfg = await leerConfig();
+
+    let consumoKwh = Number(data.consumoKwh) || 0;
+    let costoKwh = Number(data.costoKwh) || 0;
+
+    // Derive consumoKwh from kwp when missing (versioned proposals store kwp explicitly)
+    if (!consumoKwh && Number(data.kwp) > 0) {
+      const kwp = Number(data.kwp);
+      const radiacion = Number(data.radiacionSolar) || cfg.radiacionSolar || 3.8;
+      const margen = cfg.margenCobertura || 0.8;
+      const radCobertura = radiacion * margen;
+      const wPromedioDia = kwp * radCobertura * 1000;
+      consumoKwh = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
     }
+
+    // Derive costoKwh from ahorroMensual / consumoKwh when missing
+    if (!costoKwh && Number(data.ahorroMensual) > 0 && consumoKwh > 0) {
+      costoKwh = Math.round(Number(data.ahorroMensual) / consumoKwh);
+    }
+
+    if (!consumoKwh || !costoKwh) {
+      return res.status(400).json({ error: 'No se pudieron determinar consumoKwh y costoKwh. Verifica los datos de la propuesta.' });
+    }
+
     let asesorPDF = {};
     const authPDF = req.headers['authorization'];
     if (authPDF && authPDF.startsWith('Bearer ')) {
@@ -1264,9 +1285,15 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
         };
       } catch (_) {}
     }
-    const cfg = await leerConfig();
-    const resultados = calcularProyecto(data, cfg);
-    const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '-' }, asesorPDF, cfg);
+
+    // For versioned proposals, respect the version's costokWp
+    const cfgForCalc = Number(data.costokWp) > 0
+      ? { ...cfg, costokWp: Number(data.costokWp) }
+      : cfg;
+
+    const dataWithFix = { ...data, consumoKwh, costoKwh };
+    const resultados = calcularProyecto(dataWithFix, cfgForCalc);
+    const pdfUrl = await generarPDF(dataWithFix, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '-' }, asesorPDF, cfgForCalc);
     res.json({ pdfUrl });
   } catch (err) {
     console.error(err);
