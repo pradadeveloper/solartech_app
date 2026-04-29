@@ -235,23 +235,24 @@ async function updateLead(numeroCotizacion, fields) {
 }
 
 // ─── CONTADOR ─────────────────────────────────────────────────────────────────
+// Deriva el próximo número de cotización del máximo en la columna 'contacto' de leads.
+// Ya no necesita la hoja 'contador'.
 async function incrementContador() {
   const auth = await getAuth().getClient();
   const sheets = google.sheets({ version: 'v4', auth });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'contador!A:B',
+    range: 'leads!A1:AH',
   });
-  const rows = (res.data.values || []).filter(r => r[0] !== 'fecha');
-  let total = rows.length > 0 ? parseInt(rows[rows.length - 1][1] || '0', 10) : 0;
-  total += 1;
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: process.env.SHEET_ID,
-    range: 'contador!A:B',
-    valueInputOption: 'RAW',
-    requestBody: { values: [[new Date().toISOString(), total]] },
-  });
-  return total;
+  const [headers, ...rows] = res.data.values || [[]];
+  if (!headers || !headers.length) return 1;
+  const contIdx = headers.indexOf('contacto');
+  if (contIdx === -1) return 1;
+  const max = rows.reduce((m, row) => {
+    const n = Number(row[contIdx] || 0);
+    return n > m ? n : m;
+  }, 0);
+  return max + 1;
 }
 
 // ─── CIUDADES / RADIACIÓN ──────────────────────────────────────────────────────
