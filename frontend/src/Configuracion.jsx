@@ -9,13 +9,9 @@ const SECTIONS = [
     title: "Parametros Tecnicos",
     hint: "Valores que determinan el dimensionamiento del sistema solar.",
     fields: [
-      { key: "costokWp",          label: "Costo por kWp instalado",        unit: "COP/kWp",  type: "number", hint: "Precio de mercado por kilovatio-pico instalado." },
-      { key: "potenciaPanel",     label: "Potencia por panel",             unit: "W",        type: "number", hint: "Wattios de cada panel solar (ej: 585 W)." },
-      { key: "capacidadInversor", label: "Capacidad del inversor",         unit: "W",        type: "number", hint: "Potencia nominal del inversor (ej: 3000 W = 3 kW)." },
-      { key: "radiacionSolar",    label: "Radiacion solar promedio",       unit: "kWh/m2/dia", type: "number", step: "0.1", hint: "Horas pico solar segun la region." },
-      { key: "margenCobertura",   label: "Margen de cobertura del sistema",unit: "%",        type: "number", step: "0.01", factor: 100, hint: "Eficiencia real del sistema (ej: 0.8 = 80%)." },
-      { key: "longitudRiel",      label: "Longitud del riel de montaje",   unit: "m",        type: "number", step: "0.1", hint: "Metros por riel de aluminio." },
-      { key: "cableSolar",        label: "Cable solar incluido",           unit: "m",        type: "number", hint: "Metros de cable solar por instalacion." },
+      { key: "costokWp",        label: "Costo por kWp instalado",         unit: "COP/kWp", type: "number", hint: "Precio de mercado por kilovatio-pico instalado." },
+      { key: "potenciaPanel",   label: "Potencia por panel",              unit: "W",       type: "number", hint: "Wattios de cada panel solar (ej: 585 W)." },
+      { key: "margenCobertura", label: "Margen de cobertura del sistema", unit: "%",       type: "number", step: "0.01", factor: 100, hint: "Eficiencia real del sistema (ej: 0.8 = 80%)." },
     ],
   },
   {
@@ -127,9 +123,8 @@ export default function Configuracion() {
       const token = localStorage.getItem("token");
       const payload = { ...config };
       // Convertir strings numericos a Number
-      const numKeys = ["costokWp","potenciaPanel","capacidadInversor","radiacionSolar",
-        "margenCobertura","longitudRiel","cableSolar","ivaPct","descuentoRentaPct",
-        "factorCO2","factorArboles","factorGalones"];
+      const numKeys = ["costokWp","potenciaPanel","margenCobertura",
+        "ivaPct","descuentoRentaPct","factorCO2","factorArboles","factorGalones"];
       numKeys.forEach((k) => { if (payload[k] !== undefined) payload[k] = Number(payload[k]); });
 
       const res = await fetch(`${API}/api/config`, {
@@ -200,13 +195,12 @@ export default function Configuracion() {
         <div className="panel__body">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
             {[
-              { label: "Costo/kWp",      value: `$${Number(config.costokWp || 0).toLocaleString("es-CO")}` },
-              { label: "IVA",            value: `${config.ivaPct}%` },
-              { label: "Panel",          value: `${config.potenciaPanel} W` },
-              { label: "Radiacion",      value: `${config.radiacionSolar} kWh/m2/dia` },
-              { label: "Cobertura",      value: `${Math.round((config.margenCobertura || 0) * 100)}%` },
-              { label: "Desc. renta",    value: `${config.descuentoRentaPct}%` },
-              { label: "Factor CO2",     value: `${config.factorCO2} ton/kWp` },
+              { label: "Costo/kWp",   value: `$${Number(config.costokWp || 0).toLocaleString("es-CO")}` },
+              { label: "Panel",        value: `${config.potenciaPanel} W` },
+              { label: "Cobertura",    value: `${Math.round((config.margenCobertura || 0) * 100)}%` },
+              { label: "IVA",          value: `${config.ivaPct}%` },
+              { label: "Desc. renta",  value: `${config.descuentoRentaPct}%` },
+              { label: "Factor CO2",   value: `${config.factorCO2} ton/kWp` },
             ].map(({ label, value }) => (
               <div key={label} style={{
                 background: "var(--bg)", borderRadius: 10, padding: "10px 14px",
