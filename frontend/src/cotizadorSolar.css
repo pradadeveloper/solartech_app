@@ -13,7 +13,7 @@
   background-image: url("./assets/banner_1.webp");
   background-size: cover;
   background-position: center;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Fondo translúcido (legacy) */
