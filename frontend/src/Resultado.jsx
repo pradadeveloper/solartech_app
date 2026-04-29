@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import logo from "./assets/logo_solartech.webp";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import "./cotizadorSolar.css"; // usa tu misma hoja
 
 // ── Replica las fórmulas del backend para calcular en el frontend ──
@@ -80,6 +80,7 @@ export default function Resultado() {
   const [resultadoActivo, setResultadoActivo] = useState(() => resultado ?? {});
   const [pdfUrls, setPdfUrls] = useState(() => resultado ? [resultado.pdfUrl, null, null] : []);
   const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [cfg, setCfg] = useState({});
 
   const [opciones, setOpciones] = useState(() => resultado ? [
     { label: "Opción A", kwp: String(resultado.kwp ?? ""), costokWp: "3500000" },
@@ -87,8 +88,23 @@ export default function Resultado() {
     { label: "Opción C", kwp: "", costokWp: "3500000" },
   ] : []);
 
+  useEffect(() => {
+    fetch(`${process.env.REACT_APP_API_URL}/api/config`)
+      .then((r) => r.json())
+      .then((data) => {
+        setCfg(data);
+        if (data.costokWp) {
+          setOpciones((prev) =>
+            prev.map((op) => ({ ...op, costokWp: String(data.costokWp) }))
+          );
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const calculos = opciones.map((op) =>
-    op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, resultado) : null
+    op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, { ...resultado, ...cfg }) : null
   );
 
   const actualizarOpcion = (idx, campo, valor) => {
