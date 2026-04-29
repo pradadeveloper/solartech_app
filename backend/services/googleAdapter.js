@@ -61,6 +61,24 @@ const LEAD_TO_SHEET = Object.fromEntries(
   Object.entries(SHEET_TO_LEAD).map(([col, prop]) => [prop, col])
 );
 
+// Alias para encabezados que el usuario pudo haber renombrado en Sheets
+const COL_ALIASES = {
+  'cotizacion': 'contacto',
+  'cotización': 'contacto',
+  'n': 'contacto',
+  'no': 'contacto',
+  'numero cotizacion': 'contacto',
+};
+
+// Normaliza un encabezado del Sheets al nombre canónico interno.
+// Maneja tildes, mayúsculas y alias conocidos.
+function resolveHeader(h) {
+  const norm = String(h || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  if (COL_ALIASES[norm]) return COL_ALIASES[norm];
+  const canonical = SHEETS_COLS.find(col => col.toLowerCase() === norm);
+  return canonical || h; // si no hay match, devuelve el original
+}
+
 function loadCredentials() {
   // 1. Env var como JSON en una línea (producción / Vercel)
   try {
@@ -136,8 +154,9 @@ async function getAllLeads() {
       spreadsheetId: process.env.SHEET_ID,
       range: 'leads!A1:AH',
     });
-    const [headers, ...rows] = res.data.values || [[]];
-    if (!headers || !headers.length) return [];
+    const [rawHeaders, ...rows] = res.data.values || [[]];
+    if (!rawHeaders || !rawHeaders.length) return [];
+    const headers = rawHeaders.map(resolveHeader);
 
     return rows.map(row => {
       // Construir objeto con columnas del Sheets
@@ -171,7 +190,8 @@ async function saveLead(lead) {
     spreadsheetId: process.env.SHEET_ID,
     range: 'leads!A1:1',
   });
-  let actualHeaders = headerRes.data.values?.[0] || [];
+  // Normalizar encabezados (maneja renombres del usuario: "Fecha"→"fecha", "Cotización"→"contacto")
+  let actualHeaders = (headerRes.data.values?.[0] || []).map(resolveHeader);
 
   // Agregar columnas canónicas faltantes al encabezado
   const missingCols = SHEETS_COLS.filter(c => !actualHeaders.includes(c));
@@ -209,7 +229,8 @@ async function updateLead(numeroCotizacion, fields) {
     spreadsheetId: process.env.SHEET_ID,
     range: 'leads!A1:AH',
   });
-  const [headers, ...rows] = res.data.values || [[]];
+  const [rawHeaders, ...rows] = res.data.values || [[]];
+  const headers = (rawHeaders || []).map(resolveHeader);
 
   // La columna 'contacto' almacena numeroCotizacion
   const contIdx = headers.indexOf('contacto');
@@ -248,8 +269,9 @@ async function incrementContador() {
     spreadsheetId: process.env.SHEET_ID,
     range: 'leads!A1:AH',
   });
-  const [headers, ...rows] = res.data.values || [[]];
-  if (!headers || !headers.length) return 1;
+  const [rawHdr, ...rows] = res.data.values || [[]];
+  if (!rawHdr || !rawHdr.length) return 1;
+  const headers = rawHdr.map(resolveHeader);
   const contIdx = headers.indexOf('contacto');
   if (contIdx === -1) return 1;
   const max = rows.reduce((m, row) => {
