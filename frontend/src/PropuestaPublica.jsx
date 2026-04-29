@@ -41,7 +41,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const ahorroMensual        = facturaPromedio;
   const ahorroAnual          = facturaPromedio * 12;
   const ahorro10Anos         = Math.round(ahorroAnual * 10);
-  const tiempoRetorno        = facturaPromedio > 0 ? Math.round(costoProyectoMasIva / facturaPromedio) : null;
+  const tiempoRetorno        = facturaPromedio > 0 ? Number((costoProyectoMasIva / facturaPromedio / 12).toFixed(1)) : null;
   const co2EvitadoToneladas  = Number((kwp * 1.2 * 0.7 * 0.43).toFixed(2));
   const arbolesEquivalentes  = Math.round(co2EvitadoToneladas / 0.02);
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
@@ -228,7 +228,7 @@ export default function PropuestaPublica() {
                 <Metric label="Ahorro mensual estimado" value={`$ ${money(ahorroMensual)}`} />
                 <Metric label="Ahorro anual estimado" value={`$ ${money(ahorroAnual)}`} />
                 <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(ahorro10Anos)}`} />
-                <Metric label="Retorno de inversión" value={`${tiempoRetorno ?? '—'} meses`} />
+                <Metric label="Retorno de inversión" value={`${tiempoRetorno ?? '—'} años`} />
                 <Metric label="Descuento declaración de renta" value={`$ ${money(descuentoDeclaracion)}`} />
                 <Metric label="Vida útil estimada" value="25 años" />
               </div>
@@ -357,7 +357,7 @@ export default function PropuestaPublica() {
               <SummaryRow label="Cobertura" value={`${calc?.porcentajeCoberturaProyecto ?? '—'}%`} />
               <div className="cotDivider" />
               <SummaryRow label="Total inversión" value={`$ ${money(lead.costoProyectoMasIva || calc?.costoProyectoMasIva)}`} />
-              <SummaryRow label="Retorno" value={`${tiempoRetorno ?? '—'} meses`} />
+              <SummaryRow label="Retorno" value={`${tiempoRetorno ?? '—'} años`} />
               <SummaryRow label="Ahorro anual" value={`$ ${money(ahorroAnual)}`} />
             </Card>
 

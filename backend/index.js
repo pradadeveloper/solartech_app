@@ -238,8 +238,8 @@ function calcularProyecto({
 
   const costokwpproyecto     = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
   const descuentoDeclaracion = Math.round(costoProyecto * (descuentoRentaPct / 100));
-  // Tiempo de retorno = Costo total (con IVA) / Factura promedio mensual → resultado en MESES
-  const tiempoRetorno = facturaPromedio > 0 ? Math.round(costoProyectoMasIva / facturaPromedio) : null;
+  // Tiempo de retorno = Costo total (con IVA) / Factura promedio mensual / 12 → resultado en AÑOS
+  const tiempoRetorno = facturaPromedio > 0 ? Number((costoProyectoMasIva / facturaPromedio / 12).toFixed(1)) : null;
   const valorKwp = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
 
   // Equipos
@@ -605,7 +605,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   infoRow('Ahorro mensual estimado', cop(resultados.ahorroMensual));
   infoRow('Ahorro anual estimado', cop(resultados.ahorroAnual));
   infoRow('Ahorro proyectado a 10 anos', cop(resultados.ahorro10Anos));
-  infoRow('Tiempo de retorno de la inversion', `${safe(resultados.tiempoRetorno)} meses`);
+  infoRow('Tiempo de retorno de la inversion', `${safe(resultados.tiempoRetorno)} años`);
   gap(6);
 
   // 5. PROPUESTA ECONOMICA

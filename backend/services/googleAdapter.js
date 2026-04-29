@@ -169,7 +169,7 @@ async function getAllLeads() {
         let val = sheetObj[col] ?? '';
         if (prop === 'numeroCotizacion') val = String(val).includes('_') ? String(val) : (Number(val) || 0);
         if (['consumoKwh', 'kwp', 'costoProyectoMasIva'].includes(prop)) val = Number(val) || 0;
-        if (prop === 'tiempoRetorno' && val !== '') val = Number(val); // ya en meses
+        if (prop === 'tiempoRetorno' && val !== '') val = Number(val); // en años (1 decimal)
         lead[prop] = val;
       });
 
@@ -210,7 +210,7 @@ async function saveLead(lead) {
     const prop = SHEET_TO_LEAD[col];
     if (!prop) return '';
     const val = lead[prop];
-    if (col === 'roi_meses') return val != null ? Math.round(Number(val)) : ''; // ya en meses
+    if (col === 'roi_meses') return val != null ? Number(val) : ''; // en años (1 decimal)
     return val ?? '';
   });
 
