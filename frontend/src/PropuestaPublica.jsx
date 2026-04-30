@@ -2,6 +2,10 @@ import { useParams } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import logo from "./assets/logo_solartech.webp";
 import "./cotizadorSolar.css";
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
+} from "recharts";
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -20,11 +24,19 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const potenciaPanel   = Number(base.potenciaPanel)   || 585;
   const radiacionSolar  = Number(base.radiacionSolar)  || 3.8;
   const margenCobertura = Number(base.margenCobertura) || 0.8;
+  const longitudRiel    = Number(base.longitudRiel)    || 4.7;
+  const cableSolar      = Number(base.cableSolar)      || 10;
 
   const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
   const wPromedioDia = Number((kwp * radiacionSolarCobertura * 1000).toFixed(1));
   const consumo = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
   const npaneles = Math.ceil((kwp * 1000) / potenciaPanel);
+  const ninversores = 1;
+  const riel47      = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
+  const midCland    = Math.ceil((npaneles * 2) - 2);
+  const endCland    = Math.ceil(npaneles / 2);
+  const lFoot       = Math.ceil(riel47 * 3);
+  const groundingLoop = Math.round(riel47 / 2) * 2;
   const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
   const areaMinima = Math.round(kwp * 5.8);
   const areaDisp = Number(base.areaDisponible ?? 0);
@@ -36,6 +48,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const costoProyecto        = Math.round(kwp * costokWp);
   const ivaProyecto          = Math.round(costoProyecto * 0.05);
   const costoProyectoMasIva  = Math.round(costoProyecto + ivaProyecto);
+  const costokwpproyecto     = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
   const descuentoDeclaracion = Math.round(costoProyecto / 2);
   const facturaPromedio      = Math.round(consumo * costoUnidad);
   const ahorroMensual        = facturaPromedio;
@@ -47,8 +60,10 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
 
   return {
-    kwp, consumoKwh: consumo, costoKwh: costoUnidad, consumo, wPromedioDia, npaneles, produccionDeEnergia, areaMinima,
-    porcentajeCoberturaProyecto, costoProyecto, ivaProyecto, costoProyectoMasIva,
+    kwp, consumoKwh: consumo, costoKwh: costoUnidad, consumo, wPromedioDia,
+    npaneles, ninversores, riel47, midCland, endCland, lFoot, groundingLoop, cableSolar,
+    produccionDeEnergia, areaMinima, porcentajeCoberturaProyecto,
+    costoProyecto, ivaProyecto, costoProyectoMasIva, costokwpproyecto,
     descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
     co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
     potenciaPanel, radiacionSolar,
@@ -57,13 +72,14 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
 
 export default function PropuestaPublica() {
   const { num } = useParams();
-  const [lead, setLead]     = useState(null);
-  const [cfg, setCfg]       = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(null);
-  const [copiado, setCopiado] = useState(false);
+  const [lead, setLead]         = useState(null);
+  const [cfg, setCfg]           = useState({});
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+  const [copiado, setCopiado]   = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
-  const [pdfUrlLocal, setPdfUrlLocal] = useState(null);
+  const [pdfUrlLocal, setPdfUrlLocal]   = useState(null);
+  const [mostrarModal, setMostrarModal] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -89,13 +105,16 @@ export default function PropuestaPublica() {
     return calcularLocal(lead.kwp, costoKwh, storedCostokWp, { ...cfg, ...lead });
   }, [lead, cfg]);
 
+  // Datos unificados: prioriza calc (fresco) sobre lead (almacenado)
+  const r = useMemo(() => ({ ...lead, ...calc }), [lead, calc]);
+
   const money = (v) => typeof v === 'number' ? v.toLocaleString('es-CO') : (v ?? '—');
 
-  const ahorroMensual  = lead?.ahorroMensual  || calc?.ahorroMensual  || 0;
-  const ahorroAnual    = lead?.ahorroAnual    || calc?.ahorroAnual    || 0;
-  const tiempoRetorno  = lead?.tiempoRetorno  || calc?.tiempoRetorno  || null;
-  const ahorro10Anos   = calc?.ahorro10Anos   ?? (ahorroAnual > 0 ? ahorroAnual * 10 : null);
-  const descuentoDeclaracion = calc?.descuentoDeclaracion ??
+  const ahorroMensual        = r?.ahorroMensual  || 0;
+  const ahorroAnual          = r?.ahorroAnual    || 0;
+  const tiempoRetorno        = r?.tiempoRetorno  || null;
+  const ahorro10Anos         = r?.ahorro10Anos   ?? (ahorroAnual > 0 ? ahorroAnual * 10 : null);
+  const descuentoDeclaracion = r?.descuentoDeclaracion ??
     (lead?.costoProyectoMasIva > 0 ? Math.round((lead.costoProyectoMasIva / 1.05) * 0.5) : null);
 
   const descargarPdf = async () => {
@@ -171,6 +190,7 @@ export default function PropuestaPublica() {
   return (
     <div className="cotizador cotizador--light">
       <div className="cotizadorShell">
+
         {/* Header */}
         <header className="cotHeader">
           <img src={logo} alt="Solartech" className="cotLogo" />
@@ -180,8 +200,32 @@ export default function PropuestaPublica() {
           </div>
         </header>
 
+        {/* Hero mobile */}
+        <div className="mobileHero">
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Potencia</span>
+            <span className="mobileHeroValue">{r?.kwp ?? '—'} kWp</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Inversión</span>
+            <span className="mobileHeroValue">${money(r?.costoProyectoMasIva)}</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Retorno</span>
+            <span className="mobileHeroValue">{tiempoRetorno ?? '—'} años</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Ahorro/mes</span>
+            <span className="mobileHeroValue">${money(ahorroMensual)}</span>
+          </div>
+        </div>
+
         <div className="cotGrid">
           <section className="cotMain">
+
             {/* Resumen */}
             <div className="cotCard">
               <div className="cotCardHead"><h2>Resumen</h2></div>
@@ -206,126 +250,174 @@ export default function PropuestaPublica() {
             </div>
 
             {/* Datos del cliente */}
-            <Card title="Datos del cliente">
+            <Card title="Información del cliente">
               <div className="cotTwoCol">
-                <SummaryRow label="Nombre" value={lead.nombre} />
-                <SummaryRow label="Ciudad" value={lead.ubicacion} />
-                <SummaryRow label="Correo" value={lead.correo} />
-                <SummaryRow label="Teléfono" value={lead.telefono} />
-                <SummaryRow label="Tipo de solicitud" value={lead.tipoSolicitud} />
-                <SummaryRow label="Tipo de techo" value={lead.tipoTecho} />
-                <SummaryRow label="Sistema de interés" value={lead.sistemaInteres} />
+                <SummaryRow label="Nombre"                  value={lead.nombre} />
+                <SummaryRow label="Correo"                  value={lead.correo} />
+                <SummaryRow label="Teléfono"                value={lead.telefono} />
+                <SummaryRow label="Ciudad"                  value={lead.ubicacion} />
+                <SummaryRow label="Preferencia contacto"    value={lead.preferenciaContacto} />
+                <SummaryRow label="Tipo de solicitud"       value={lead.tipoSolicitud} />
+                <SummaryRow label="Tipo de techo"           value={lead.tipoTecho} />
+                <SummaryRow label="Sistema de interés"      value={lead.sistemaInteres} />
               </div>
             </Card>
 
-            {/* Sistema solar */}
+            {/* Tu sistema solar */}
             <Card title="Tu sistema solar">
               <div className="cotTwoCol">
-                <Metric label="Potencia del sistema" value={`${lead.kwp || calc?.kwp || '—'} kWp`} />
-                <Metric label="N° de paneles" value={`${lead.npaneles ?? calc?.npaneles ?? '—'} paneles`} />
-                <Metric label="N° de inversores" value={`${lead.ninversores ?? 1} und`} />
-                <Metric label="Potencia por panel" value={`${calc?.potenciaPanel ?? cfg.potenciaPanel ?? '—'} W`} />
-                <Metric label="Producción estimada" value={`${calc?.produccionDeEnergia ?? '—'} kWh/mes`} />
-                <Metric label="Cobertura del sistema" value={`${calc?.porcentajeCoberturaProyecto ?? '—'}%`} />
-                <Metric label="Área mínima requerida" value={`${calc?.areaMinima ?? '—'} m²`} />
-                <Metric label="Radiación solar local" value={`${lead.radiacionSolar ?? '—'} kWh/m²/día`} />
+                <Metric label="Potencia del sistema"       value={`${r?.kwp ?? '—'} kWp`} />
+                <Metric label="Consumo mensual"            value={`${money(r?.consumoKwh)} kWh/mes`} />
+                <Metric label="Producción mensual"         value={`${money(r?.produccionDeEnergia)} kWh/mes`} />
+                <Metric label="Consumo promedio día"       value={`${money(r?.wPromedioDia)} W/día`} />
+                <Metric label="Radiación solar local"      value={`${r?.radiacionSolar ?? '—'} kWh/m²/día`} />
+                <Metric label="Área disponible"            value={`${money(lead?.areaDisponible)} m²`} />
+                <Metric label="Cobertura estimada"         value={`${r?.porcentajeCoberturaProyecto ?? '—'}%`} />
+                <Metric label="Área mínima requerida"      value={`${r?.areaMinima ?? '—'} m²`} />
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartSistemaSolar r={r} />
             </Card>
 
             {/* Análisis financiero */}
             <Card title="Análisis financiero">
               <div className="cotTwoCol">
-                <Metric label="Inversión estimada (con IVA)" value={`$ ${money(lead.costoProyectoMasIva || calc?.costoProyectoMasIva)}`} />
-                <Metric label="Ahorro mensual estimado" value={`$ ${money(ahorroMensual)}`} />
-                <Metric label="Ahorro anual estimado" value={`$ ${money(ahorroAnual)}`} />
-                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(ahorro10Anos)}`} />
-                <Metric label="Retorno de inversión" value={`${tiempoRetorno ?? '—'} años`} />
-                <Metric label="Descuento declaración de renta" value={`$ ${money(descuentoDeclaracion)}`} />
-                <Metric label="Vida útil estimada" value="25 años" />
+                <Metric label="Inversión estimada (con IVA)"      value={`$ ${money(r?.costoProyectoMasIva)}`} />
+                <Metric label="Ahorro mensual estimado"           value={`$ ${money(ahorroMensual)}`} />
+                <Metric label="Ahorro anual estimado"             value={`$ ${money(ahorroAnual)}`} />
+                <Metric label="Ahorro proyectado a 10 años"       value={`$ ${money(ahorro10Anos)}`} />
+                <Metric label="Retorno de inversión"              value={`${tiempoRetorno ?? '—'} años`} />
+                <Metric label="Descuento declaración de renta"    value={`$ ${money(descuentoDeclaracion)}`} />
+                <Metric label="Vida útil estimada"                value="25 años" />
+                <Metric label="Valorización aproximada"           value="4–10%" />
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartFinanciero r={r} />
             </Card>
 
             {/* Propuesta económica */}
-            <Card title="Propuesta económica">
+            <Card
+              title="Propuesta económica"
+              right={
+                <button type="button" className="cotBtn cotBtnGhost" onClick={() => setMostrarModal(true)}>
+                  Detalle de equipos
+                </button>
+              }
+            >
+              <div className="tableWrap">
+                <table className="table">
+                  <thead><tr><th>Ítem</th><th>Cantidad</th></tr></thead>
+                  <tbody>
+                    <tr><td>Paneles {r?.potenciaPanel ?? calc?.potenciaPanel ?? cfg.potenciaPanel}W</td><td className="num">{r?.npaneles}</td></tr>
+                    <tr><td>Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1 kit</td></tr>
+                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1 kit</td></tr>
+                    <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
+                    <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
+                    <tr><td>Servicio de instalación y puesta en marcha</td><td className="num">1</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="cotDivider" />
+
               <div className="tableWrap">
                 <table className="table">
                   <thead><tr><th>Resumen inversión</th><th className="num">Valor</th></tr></thead>
                   <tbody>
-                    <tr><td>Inversión del proyecto solar</td><td className="num">$ {money(calc?.costoProyecto)}</td></tr>
-                    <tr><td>IVA (5%)</td><td className="num">$ {money(calc?.ivaProyecto)}</td></tr>
-                    <tr><td><b>Total inversión</b></td><td className="num"><b>$ {money(lead.costoProyectoMasIva || calc?.costoProyectoMasIva)}</b></td></tr>
+                    <tr><td>Inversión del proyecto solar</td><td className="num">$ {money(r?.costoProyecto)}</td></tr>
+                    <tr><td>IVA (5%)</td><td className="num">$ {money(r?.ivaProyecto)}</td></tr>
+                    <tr><td><b>Total inversión</b></td><td className="num"><b>$ {money(r?.costoProyectoMasIva)}</b></td></tr>
+                    <tr><td>$/kWp</td><td className="num"><b>$ {money(r?.costokwpproyecto)}</b></td></tr>
                   </tbody>
                 </table>
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartPropuesta r={r} />
             </Card>
 
             {/* Formas de pago */}
             <Card title="Formas de pago">
-              {[
-                ['Pago de contado', 'Pago total antes de iniciar la instalación.'],
-                ['Crédito bancario', 'Financiación con tu entidad bancaria. Solartech entrega la documentación técnica.'],
-                ['Financiación interna', 'Plan de cuotas acordado directamente con Solartech Energy Systems.'],
-                ['Leasing solar', 'Arrendamiento financiero con opción de compra al finalizar el contrato.'],
-                ['Subsidio / Fondo Emprender', 'Acceso a fondos de cofinanciación FNCER y subsidios gubernamentales.'],
-              ].map(([t, d]) => (
-                <div key={t} style={{ marginBottom: 10 }}>
-                  <b style={{ color: '#b03a22', fontSize: '0.9rem' }}>{t}</b>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#5a5a5a' }}>{d}</p>
-                </div>
-              ))}
+              <div className="tableWrap">
+                <table className="table">
+                  <thead><tr><th>Hito</th><th className="num">Porcentaje</th></tr></thead>
+                  <tbody>
+                    <tr><td>Anticipo</td><td className="num">50%</td></tr>
+                    <tr><td>Entrega de materiales</td><td className="num">40%</td></tr>
+                    <tr><td>RETIE</td><td className="num">10%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartFormasPago r={r} />
             </Card>
 
             {/* Impacto ambiental */}
             <Card title="Impacto ambiental">
               <div className="cotTwoCol">
-                <Metric label="CO₂ evitado al año" value={`${calc?.co2EvitadoToneladas ?? '—'} toneladas`} isGreen />
-                <Metric label="Árboles equivalentes" value={`${money(calc?.arbolesEquivalentes)} árboles/año`} isGreen />
-                <Metric label="Gasolina evitada" value={`${money(calc?.galonesGasolinaEvitados)} galones/año`} isGreen />
+                <Metric label="CO₂ evitado al año"              value={`${r?.co2EvitadoToneladas ?? '—'} toneladas`} isGreen />
+                <Metric label="Árboles equivalentes sembrados"  value={`${money(r?.arbolesEquivalentes)} árboles/año`} isGreen />
+                <Metric label="Gasolina no consumida"           value={`${money(r?.galonesGasolinaEvitados)} galones/año`} isGreen />
               </div>
             </Card>
 
-            {/* Etapas */}
+            {/* Etapas del proyecto */}
             <Card title="Etapas del proyecto">
               <div className="cotTwoCol">
-                <MiniBlock title="Etapa 1 — Planeación, diseño e importación" lines={['Diagnóstico', 'Diseño de la solución', 'Gestión de trámites']} foot="30 días hábiles" />
-                <MiniBlock title="Etapa 2 — Construcción y puesta en marcha" lines={['Instalación', 'Puesta en marcha']} foot="90 días hábiles" />
-                <MiniBlock title="Etapa 3 — Operación" lines={['Trámites y conexión a la red', 'Monitoreo y mantenimiento']} foot="30 días hábiles" />
+                <MiniBlock title="Etapa 1 — Planeación, diseño e importación"
+                  lines={['1. Diagnóstico', '2. Diseño de la solución', '3. Gestión de trámites']}
+                  foot="30 días hábiles" />
+                <MiniBlock title="Etapa 2 — Construcción y puesta en marcha"
+                  lines={['4. Instalación', '5. Puesta en marcha']}
+                  foot="90 días hábiles" />
+                <MiniBlock title="Etapa 3 — Operación"
+                  lines={['6. Trámites y conexión a la red', '7. Monitoreo y mantenimiento']}
+                  foot="30 días hábiles" />
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartEtapas />
             </Card>
 
             {/* Garantías */}
             <Card title="Garantías">
               <div className="cotTwoCol">
-                <MiniBlock title="Paneles solares" lines={['15 años de producto', '30 años de generación']} />
-                <MiniBlock title="Inversores" lines={['10 años de producto']} />
-                <MiniBlock title="Estructuras" lines={['10 años de producto']} />
+                <MiniBlock title="Paneles solares"  lines={['15 años de producto', '30 años de generación']} />
+                <MiniBlock title="Inversores"       lines={['10 años de producto']} />
+                <MiniBlock title="Estructuras"      lines={['10 años de producto']} />
               </div>
             </Card>
 
-            {/* Marcas */}
+            {/* Marcas aliadas */}
             <Card title="Marcas aliadas">
               <div className="marcasAliadas" style={{ marginTop: 10 }}>
-                <img src="/logos/logo_longi.png" alt="Longi" style={{ width: 110, height: 'auto' }} />
+                <img src="/logos/logo_longi.png"    alt="Longi"    style={{ width: 110, height: 'auto' }} />
                 <img src="/logos/logo_ja_solar.jpg" alt="JA Solar" style={{ width: 110, height: 'auto' }} />
-                <img src="/logos/huawei.jpeg" alt="Huawei" style={{ width: 110, height: 'auto' }} />
-                <img src="/logos/growatt.png" alt="Growatt" style={{ width: 110, height: 'auto' }} />
-                <img src="/logos/goodwe.jpeg" alt="Goodwe" style={{ width: 110, height: 'auto' }} />
+                <img src="/logos/huawei.jpeg"        alt="Huawei"   style={{ width: 110, height: 'auto' }} />
+                <img src="/logos/growatt.png"        alt="Growatt"  style={{ width: 110, height: 'auto' }} />
+                <img src="/logos/goodwe.jpeg"        alt="Goodwe"   style={{ width: 110, height: 'auto' }} />
               </div>
             </Card>
 
-            {/* Condiciones */}
+            {/* Condiciones comerciales */}
             <Card title="Condiciones comerciales">
               <ol className="condicionesComerciales">
                 <li>La cantidad de paneles e inversores podrá variar dependiendo de la potencia disponible.</li>
                 <li>Con la aceptación se aceptan políticas de servicio post y garantías.</li>
                 <li>Incluye viáticos y desplazamiento técnico hasta el lugar de instalación.</li>
                 <li>Tiempo de entrega: 120 días a RETIE desde el primer pago.</li>
-                <li>Validez de la oferta: 15 días calendario.</li>
+                <li>Repuestos/reparaciones solo por el tiempo restante de garantía vigente.</li>
+                <li>Puede haber costos adicionales tras visita técnica.</li>
+                <li>El sistema no opera durante interrupciones de la red (si aplica al tipo de sistema).</li>
+                <li>Capacidad de techo: losa 50 kg/m² y teja 15 kg/m².</li>
+                <li>Garantías: Paneles 12 años · Inversores 5 años · Instalación 5 años *(sujeto a mantenimientos anuales)*</li>
+                <li>Legalización sujeta a CREG 174 de 2021 y resoluciones aplicables (cuando aplique).</li>
                 <li>Los ahorros dependen de radiación, precio kWh y excedentes reconocidos por el OR.</li>
+                <li>No incluye adecuación de frontera comercial; se define tras visita del OR.</li>
+                <li>Validez de la oferta: 15 días calendario.</li>
               </ol>
             </Card>
 
-            {/* Asesor */}
+            {/* Asesor comercial */}
             {lead.vendedor && (
               <Card title="Tu asesor comercial">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -334,7 +426,7 @@ export default function PropuestaPublica() {
                   </div>
                   <div>
                     <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem' }}>{lead.vendedor}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: '0.85rem', opacity: 0.7 }}>Asesor Comercial</p>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.85rem', opacity: 0.7 }}>Asesor Comercial · Solartech Energy Systems</p>
                   </div>
                 </div>
               </Card>
@@ -343,7 +435,7 @@ export default function PropuestaPublica() {
             {/* Cierre */}
             <Card title="Cierre">
               <p style={{ marginTop: 0, lineHeight: 1.6 }}>
-                ¡Muchas gracias por confiar en Solartech Energy Systems! Estamos para atender tus dudas.
+                ¡Muchas gracias por confiar en Solartech Energy Systems! Estamos para atender tus dudas e inquietudes.
               </p>
               <div className="cotActions" style={{ marginTop: 14 }}>
                 <button className="cotBtn cotBtnPrimary" onClick={descargarPdf} disabled={generandoPdf}>
@@ -354,32 +446,28 @@ export default function PropuestaPublica() {
                 </button>
               </div>
             </Card>
+
           </section>
 
           {/* Sidebar */}
           <aside className="cotSide">
             <Card title="Resumen rápido">
-              <SummaryRow label="Cotización" value={`N-${lead.numeroCotizacion}`} />
-              <SummaryRow label="Cliente" value={lead.nombre} />
-              <SummaryRow label="Ciudad" value={lead.ubicacion} />
+              <SummaryRow label="Cotización"    value={`N-${lead.numeroCotizacion}`} />
+              <SummaryRow label="Cliente"       value={lead.nombre} />
+              <SummaryRow label="Ciudad"        value={lead.ubicacion} />
               <div className="cotDivider" />
-              <SummaryRow label="Potencia" value={`${lead.kwp || calc?.kwp || '—'} kWp`} />
-              <SummaryRow label="Producción" value={`${calc?.produccionDeEnergia ?? '—'} kWh/mes`} />
-              <SummaryRow label="Cobertura" value={`${calc?.porcentajeCoberturaProyecto ?? '—'}%`} />
+              <SummaryRow label="Potencia"      value={`${r?.kwp ?? '—'} kWp`} />
+              <SummaryRow label="Producción"    value={`${money(r?.produccionDeEnergia)} kWh/mes`} />
+              <SummaryRow label="Cobertura"     value={`${r?.porcentajeCoberturaProyecto ?? '—'}%`} />
               <div className="cotDivider" />
-              <SummaryRow label="Total inversión" value={`$ ${money(lead.costoProyectoMasIva || calc?.costoProyectoMasIva)}`} />
-              <SummaryRow label="Retorno" value={`${tiempoRetorno ?? '—'} años`} />
-              <SummaryRow label="Ahorro anual" value={`$ ${money(ahorroAnual)}`} />
+              <SummaryRow label="Total inversión" value={`$ ${money(r?.costoProyectoMasIva)}`} />
+              <SummaryRow label="Retorno"         value={`${tiempoRetorno ?? '—'} años`} />
+              <SummaryRow label="Ahorro anual"    value={`$ ${money(ahorroAnual)}`} />
             </Card>
 
             <Card title="Acciones">
               <div className="cotActions" style={{ marginTop: 0 }}>
-                <button
-                  className="cotBtn cotBtnPrimary"
-                  onClick={descargarPdf}
-                  disabled={generandoPdf}
-                  style={{ width: '100%' }}
-                >
+                <button className="cotBtn cotBtnPrimary" onClick={descargarPdf} disabled={generandoPdf} style={{ width: '100%' }}>
                   {generandoPdf ? 'Generando PDF...' : 'Descargar PDF'}
                 </button>
                 <button className="cotBtn cotBtnGhost" onClick={compartir} style={{ width: '100%' }}>
@@ -389,15 +477,279 @@ export default function PropuestaPublica() {
             </Card>
           </aside>
         </div>
+
+        {/* Modal detalle de equipos */}
+        {mostrarModal && (
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: 16 }}
+            onClick={() => setMostrarModal(false)}
+          >
+            <div
+              style={{ background: '#fff', padding: 18, borderRadius: 14, maxWidth: 860, width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.35)', maxHeight: '80vh', overflow: 'auto' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="title" style={{ marginTop: 0 }}>Detalle de equipos</h3>
+              <div className="tableWrap">
+                <table className="table">
+                  <thead><tr><th>Equipo</th><th className="num">Cantidad</th></tr></thead>
+                  <tbody>
+                    <tr><td>Paneles {r?.potenciaPanel}W</td><td className="num">{r?.npaneles}</td></tr>
+                    <tr><td>Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Riel 47</td><td className="num">{r?.riel47}</td></tr>
+                    <tr><td>Mid Clamp</td><td className="num">{r?.midCland}</td></tr>
+                    <tr><td>End Clamp</td><td className="num">{r?.endCland}</td></tr>
+                    <tr><td>L-Foot</td><td className="num">{r?.lFoot}</td></tr>
+                    <tr><td>Grounding Loop</td><td className="num">{r?.groundingLoop}</td></tr>
+                    <tr><td>Cable solar</td><td className="num">{r?.cableSolar} m</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="cotActions" style={{ marginTop: 14 }}>
+                <button className="cotBtn cotBtnPrimary" onClick={() => setMostrarModal(false)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
 
-function Card({ title, children }) {
+/* ═══════════════════════════════════════════════════════════
+   GRÁFICOS VISUALES
+   ═══════════════════════════════════════════════════════════ */
+
+const C1 = '#b03a22';
+const C2 = '#e07060';
+const C3 = '#f0a090';
+const CGRAY = '#e8e8e8';
+
+/* 1 ─── Sistema Solar: donut de cobertura + stats clave */
+function ChartSistemaSolar({ r }) {
+  const cobertura = Number(r?.porcentajeCoberturaProyecto) || 0;
+  const kwp       = Number(r?.kwp)       || 0;
+  const paneles   = Number(r?.npaneles)  || 0;
+  const produccion= Number(r?.produccionDeEnergia) || 0;
+
+  const donutData = [
+    { name: 'Cobertura', value: cobertura > 0 ? cobertura : 100 },
+    { name: 'Resto',     value: cobertura > 0 ? Math.max(0, 100 - cobertura) : 0 },
+  ];
+
+  return (
+    <div className="chartBlock">
+      <div className="chartDonutWrap">
+        <ResponsiveContainer width={180} height={180}>
+          <PieChart>
+            <Pie data={donutData} cx="50%" cy="50%"
+              innerRadius={52} outerRadius={78}
+              startAngle={90} endAngle={-270}
+              dataKey="value" strokeWidth={0}>
+              <Cell fill={C1} />
+              <Cell fill={CGRAY} />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="chartDonutLabel">
+          <span className="chartDonutValue">{cobertura > 0 ? `${cobertura}%` : `${kwp}`}</span>
+          <span className="chartDonutSub">{cobertura > 0 ? 'Cobertura Proyecto' : 'kWp'}</span>
+        </div>
+      </div>
+      <div className="chartStatRow">
+        <ChartStat icon="☀️" label="Potencia"    value={`${kwp} kWp`} />
+        <ChartStat icon="🔋" label="Producción"  value={`${produccion} kWh/mes`} />
+        <ChartStat icon="📐" label="Paneles"     value={`${paneles} und`} />
+      </div>
+    </div>
+  );
+}
+
+/* 2 ─── Análisis financiero: área de ahorro acumulado vs inversión */
+function ChartFinanciero({ r }) {
+  const ahorroAnual = Number(r?.ahorroAnual) || 0;
+  const inversion   = Number(r?.costoProyectoMasIva) || 0;
+  const retorno     = Number(r?.tiempoRetorno) || null;
+
+  if (!ahorroAnual || !inversion) return null;
+
+  const data = Array.from({ length: 26 }, (_, i) => ({
+    año: i,
+    'Ahorro acum.': ahorroAnual * i,
+  }));
+
+  const fmtM = (v) => `$${(v / 1_000_000).toFixed(1)}M`;
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Ahorro acumulado vs inversión (25 años — vida útil del proyecto)</p>
+      <ResponsiveContainer width="100%" height={190}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gradAhorroPub" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#2ecc71" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#2ecc71" stopOpacity={0.03} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+          <XAxis
+            dataKey="año"
+            type="number"
+            domain={[0, 25]}
+            ticks={[0, 5, 10, 15, 20, 25]}
+            tickFormatter={(v) => `A${v}`}
+            tick={{ fontSize: 10, fill: '#888' }}
+          />
+          <YAxis tickFormatter={fmtM} tick={{ fontSize: 10, fill: '#888' }} width={42} />
+          <Tooltip
+            formatter={(v) => [`$${Number(v).toLocaleString('es-CO')}`, 'Ahorro acumulado']}
+            labelFormatter={(l) => `Año ${l}`}
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+          />
+          <ReferenceLine y={inversion} stroke={C1} strokeDasharray="5 4"
+            label={{ value: 'Inversión', position: 'insideTopRight', fontSize: 10, fill: C1 }} />
+          <Area type="monotone" dataKey="Ahorro acum." stroke="#2ecc71"
+            fill="url(#gradAhorroPub)" strokeWidth={2.5} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+      {retorno && (
+        <p className="chartNote">
+          Punto de retorno estimado: <b>año {retorno}</b>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* 3 ─── Propuesta económica: breakdown horizontal del costo */
+function ChartPropuesta({ r }) {
+  const base  = Number(r?.costoProyecto) || 0;
+  const iva   = Number(r?.ivaProyecto)   || 0;
+  const total = base + iva;
+  if (!total) return null;
+
+  const pBase = ((base / total) * 100).toFixed(1);
+  const pIva  = ((iva  / total) * 100).toFixed(1);
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Composición del costo del proyecto</p>
+      <div className="chartBreakBar">
+        <div style={{ flex: base, background: C1, borderRadius: '8px 0 0 8px' }} />
+        <div style={{ flex: iva,  background: C2, borderRadius: '0 8px 8px 0' }} />
+      </div>
+      <div className="chartBreakLegend">
+        <ChartBreakItem color={C1} label="Inversión base" pct={`${pBase}%`}
+          value={`$${base.toLocaleString('es-CO')}`} />
+        <ChartBreakItem color={C2} label="IVA (5%)" pct={`${pIva}%`}
+          value={`$${iva.toLocaleString('es-CO')}`} />
+      </div>
+    </div>
+  );
+}
+
+function ChartBreakItem({ color, label, pct, value }) {
+  return (
+    <div className="chartBreakItem">
+      <div className="chartBreakDot" style={{ background: color }} />
+      <div>
+        <div className="chartBreakLabel">{label} <b style={{ color }}>{pct}</b></div>
+        <div className="chartBreakValue">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+/* 4 ─── Formas de pago: barra proporcional con montos */
+function ChartFormasPago({ r }) {
+  const total = Number(r?.costoProyectoMasIva) || 0;
+  const hitos = [
+    { label: 'Anticipo',           pct: 50, color: C1 },
+    { label: 'Entrega materiales', pct: 40, color: C2 },
+    { label: 'RETIE',              pct: 10, color: C3 },
+  ];
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Distribución del pago</p>
+      <div className="chartPayBar">
+        {hitos.map((h, i) => (
+          <div key={i} style={{ flex: h.pct, background: h.color,
+            borderRadius: i === 0 ? '8px 0 0 8px' : i === hitos.length - 1 ? '0 8px 8px 0' : 0 }} />
+        ))}
+      </div>
+      <div className="chartPayCards">
+        {hitos.map((h, i) => (
+          <div key={i} className="chartPayCard" style={{ borderTop: `3px solid ${h.color}` }}>
+            <div className="chartPayPct" style={{ color: h.color }}>{h.pct}%</div>
+            <div className="chartPayLabel">{h.label}</div>
+            {total > 0 && (
+              <div className="chartPayAmount">
+                ${Math.round(total * h.pct / 100).toLocaleString('es-CO')}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* 5 ─── Etapas: timeline visual CSS */
+function ChartEtapas() {
+  const etapas = [
+    { icon: '📋', title: 'Planeación',   sub: 'Diagnóstico · Diseño · Trámites',  dias: '30 días', color: C1 },
+    { icon: '🔧', title: 'Construcción', sub: 'Instalación · Puesta en marcha',    dias: '90 días', color: C2 },
+    { icon: '⚡', title: 'Operación',    sub: 'Conexión a red · Monitoreo',         dias: '30 días', color: C3 },
+  ];
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Línea de tiempo del proyecto</p>
+      <div className="chartTimeline">
+        {etapas.map((e, i) => (
+          <div key={i} className="chartTimelineStep">
+            <div className="chartTimelineCircle" style={{ background: e.color }}>
+              <span>{e.icon}</span>
+            </div>
+            {i < etapas.length - 1 && (
+              <div className="chartTimelineConnector"
+                style={{ background: `linear-gradient(90deg, ${e.color}, ${etapas[i+1].color})` }} />
+            )}
+            <div className="chartTimelineInfo">
+              <b style={{ color: e.color }}>{e.title}</b>
+              <span>{e.sub}</span>
+              <span className="chartTimelineDias">{e.dias}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="chartTimelineTotal">
+        Total estimado: <b>150 días hábiles</b>
+      </div>
+    </div>
+  );
+}
+
+/* Helpers de gráficos */
+function ChartStat({ icon, label, value }) {
+  return (
+    <div className="chartStatItem">
+      <span className="chartStatIcon">{icon}</span>
+      <span className="chartStatLabel">{label}</span>
+      <b className="chartStatValue">{value}</b>
+    </div>
+  );
+}
+
+/* Componentes UI */
+function Card({ title, right, children }) {
   return (
     <div className="cotCard">
-      <div className="cotCardHead"><h2>{title}</h2></div>
+      <div className="cotCardHead">
+        <h2>{title}</h2>
+        {right}
+      </div>
       <div className="cotCardBody">{children}</div>
     </div>
   );
