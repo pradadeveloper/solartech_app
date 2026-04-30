@@ -660,7 +660,6 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     { t: '2. Credito bancario', d: 'Financiacion directa con su entidad bancaria. Solartech entrega la documentacion tecnica requerida para la solicitud.' },
     { t: '3. Financiacion interna', d: 'Plan de cuotas mensuales acordado directamente con Solartech Energy Systems. Solicite condiciones personalizadas.' },
     { t: '4. Leasing solar', d: 'Arrendamiento financiero del sistema fotovoltaico con opcion de compra al finalizar el contrato pactado.' },
-    { t: '5. Subsidio / Fondo Emprender', d: 'Para proyectos que apliquen, gestionamos el acceso a fondos de cofinanciacion FNCER y subsidios gubernamentales.' },
   ];
   formasPago.forEach(({ t, d }) => {
     checkY(42);
