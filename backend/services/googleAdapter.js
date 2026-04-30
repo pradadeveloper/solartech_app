@@ -175,13 +175,19 @@ async function getAllLeads() {
 
       if (!lead.id) lead.id = String(lead.numeroCotizacion || Math.random());
 
-      // Derivar consumoKwh desde kwp si falta (versiones guardadas con kwp explícito)
+      // Derivar kwp/consumoKwh cuando alguno falta en Sheets
+      // Caso 1: ambos en 0 pero hay npaneles (versión guardada sin kwp)
+      if (!lead.kwp && !lead.consumoKwh && Number(lead.npaneles) > 0) {
+        const potPanel = 585;
+        lead.kwp = Number(((Number(lead.npaneles) * potPanel) / 1000).toFixed(1));
+      }
+      // Caso 2: kwp presente, falta consumoKwh
       if (!lead.consumoKwh && lead.kwp > 0) {
         const rad = 3.8, margen = 0.8;
         const wProm = lead.kwp * rad * margen * 1000;
         lead.consumoKwh = Number(((wProm * 365) / (1000 * 12)).toFixed(1));
       }
-      // Derivar kwp desde consumoKwh si falta (leads originales sin kwp guardado)
+      // Caso 3: consumoKwh presente, falta kwp
       if (!lead.kwp && lead.consumoKwh > 0) {
         const rad = 3.8, margen = 0.8;
         const wProm = (lead.consumoKwh * 1000 * 12) / 365;

@@ -1120,17 +1120,24 @@ app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res
     };
 
     // Garantizar que consumoKwh y kwp estén siempre poblados en la versión.
-    // Las versiones vienen con kwp explícito; derivar consumoKwh desde kwp si falta.
     const cfg = await leerConfig();
-    const vKwp = Number(newLead.kwp) || 0;
-    const vConsumo = Number(newLead.consumoKwh) || 0;
+    let vKwp = Number(newLead.kwp) || 0;
+    let vConsumo = Number(newLead.consumoKwh) || 0;
+
+    // Caso 1: ambos en 0 pero hay npaneles → derivar kwp desde npaneles
+    if (!vKwp && !vConsumo && Number(newLead.npaneles) > 0) {
+      const potPanel = cfg.potenciaPanel || 585;
+      vKwp = Number(((Number(newLead.npaneles) * potPanel) / 1000).toFixed(1));
+      newLead.kwp = vKwp;
+    }
+    // Caso 2: kwp presente, falta consumoKwh
     if (!vConsumo && vKwp > 0) {
       const rad = (Number(newLead.radiacionSolar) > 0 ? Number(newLead.radiacionSolar) : cfg.radiacionSolar) || 3.8;
       const margen = cfg.margenCobertura || 0.8;
       const wProm = vKwp * rad * margen * 1000;
       newLead.consumoKwh = Number(((wProm * 365) / (1000 * 12)).toFixed(1));
     }
-    // Si la versión no trae kwp (caso raro), derivar desde consumoKwh
+    // Caso 3: consumoKwh presente, falta kwp
     if (!vKwp && vConsumo > 0) {
       const rad = (Number(newLead.radiacionSolar) > 0 ? Number(newLead.radiacionSolar) : cfg.radiacionSolar) || 3.8;
       const margen = cfg.margenCobertura || 0.8;
