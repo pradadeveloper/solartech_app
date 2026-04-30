@@ -400,9 +400,24 @@ export default function Resultado() {
               title="Comparador de opciones"
               right={
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {guardado && <span style={{ fontSize: '0.8rem', color: '#2ecc71' }}>✓ Guardado</span>}
-                  <button className="cotBtn cotBtnGhost" style={{ padding: '4px 12px', fontSize: '0.82rem' }} onClick={guardarOpciones}>
-                    Guardar cambios
+                  {guardado && <span style={{ fontSize: '0.8rem', color: '#2ecc71' }}>✓ Actualizado</span>}
+                  <button
+                    onClick={guardarOpciones}
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      background: 'linear-gradient(135deg, #1a6edc 0%, #0d4fa8 100%)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 7,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(13,79,168,0.35)',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    ↻ Refrescar datos
                   </button>
                 </div>
               }
