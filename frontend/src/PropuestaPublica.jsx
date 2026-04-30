@@ -439,19 +439,39 @@ export default function PropuestaPublica() {
             </Card>
 
             {/* Asesor comercial */}
-            {lead.vendedor && (
-              <Card title="Tu asesor comercial">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#b03a22', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', flexShrink: 0 }}>
-                    {lead.vendedor.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+            {lead.vendedor && (() => {
+              const ai = lead.asesorInfo;
+              const nombreCompleto = ai ? `${ai.nombre} ${ai.apellido}`.trim() : lead.vendedor;
+              const cargo = ai?.cargo || 'Asesor Comercial';
+              const initials = nombreCompleto.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+              return (
+                <Card title="Tu asesor comercial">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#b03a22', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.3rem', flexShrink: 0 }}>
+                      {initials}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem' }}>{nombreCompleto}</p>
+                      <p style={{ margin: '2px 0 6px', fontSize: '0.82rem', opacity: 0.65 }}>{cargo} · Solartech Energy Systems</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px' }}>
+                        {ai?.celular && (
+                          <a href={`https://wa.me/57${ai.celular.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                            style={{ fontSize: '0.82rem', color: '#25d366', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            📱 {ai.celular}
+                          </a>
+                        )}
+                        {ai?.correo && (
+                          <a href={`mailto:${ai.correo}`}
+                            style={{ fontSize: '0.82rem', color: '#b03a22', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            ✉ {ai.correo}
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem' }}>{lead.vendedor}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: '0.85rem', opacity: 0.7 }}>Asesor Comercial · Solartech Energy Systems</p>
-                  </div>
-                </div>
-              </Card>
-            )}
+                </Card>
+              );
+            })()}
 
             {/* Cierre */}
             <Card title="Cierre">

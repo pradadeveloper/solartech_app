@@ -1177,10 +1177,24 @@ app.put('/api/config', express.json(), async (req, res) => {
 // ====== GET /api/propuesta/:num (público — sin auth, para compartir con cliente) ======
 app.get('/api/propuesta/:num', async (req, res) => {
   try {
-    const leads = await getAllLeads();
+    const [leads, asesores] = await Promise.all([getAllLeads(), gAdapter.getAsesores()]);
     const lead = leads.find(l => String(l.numeroCotizacion) === String(req.params.num));
     if (!lead) return res.status(404).json({ error: 'Propuesta no encontrada' });
     const { id, estado, ...pub } = lead;
+    const asesor = asesores.find(a =>
+      a.nombre === pub.vendedor ||
+      `${a.nombre} ${a.apellido}`.trim() === pub.vendedor ||
+      a.usuario === pub.vendedor
+    );
+    if (asesor) {
+      pub.asesorInfo = {
+        nombre:   asesor.nombre,
+        apellido: asesor.apellido || '',
+        cargo:    asesor.cargo   || 'Asesor Comercial',
+        celular:  asesor.celular || '',
+        correo:   asesor.correo  || '',
+      };
+    }
     res.json(pub);
   } catch (err) {
     res.status(500).json({ error: err.message });
