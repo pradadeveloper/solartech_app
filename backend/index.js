@@ -1238,7 +1238,7 @@ app.delete('/api/asesores/:id', (req, res) => {
 
 // ====== PATCH /api/leads/:numeroCotizacion/estado ======
 app.patch('/api/leads/:numeroCotizacion/estado', express.json(), async (req, res) => {
-  const num = Number(req.params.numeroCotizacion);
+  const num = String(req.params.numeroCotizacion);
   const { estado } = req.body;
   try {
     await updateLeadField(num, { estado });
@@ -1250,7 +1250,7 @@ app.patch('/api/leads/:numeroCotizacion/estado', express.json(), async (req, res
 
 // ====== PATCH /api/leads/:numeroCotizacion/opciones ======
 app.patch('/api/leads/:numeroCotizacion/opciones', express.json(), async (req, res) => {
-  const num = Number(req.params.numeroCotizacion);
+  const num = String(req.params.numeroCotizacion);
   const { opciones } = req.body;
   try {
     await updateLeadField(num, { opciones });
