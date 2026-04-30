@@ -116,6 +116,48 @@ color: var(--muted2);
 padding: 0 10px;
 }
 
+.sidebar__userInfo{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.sidebar__userName{
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.rolBadge{
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rolBadge--admin{
+  border-color: rgba(176,58,34,.35);
+  background: rgba(176,58,34,.10);
+  color: var(--accent);
+}
+
+.rolBadge--asesor{
+  border-color: rgba(59,130,246,.35);
+  background: rgba(59,130,246,.10);
+  color: #2563EB;
+}
+
 .main{ display: flex; flex-direction: column; min-width: 0; }
 
 .topbar{

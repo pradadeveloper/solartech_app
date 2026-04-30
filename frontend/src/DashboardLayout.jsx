@@ -1,12 +1,34 @@
 import { useState, useEffect, useRef } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import "./dashboardAdmon.css";
+
+// Módulos y qué roles tienen acceso
+const NAV_ITEMS = [
+  { label: 'Resumen',              path: '/',              adminOnly: false },
+  { label: 'Leads y Cotizaciones', path: '/leads',         adminOnly: false },
+  { label: 'Asesores',             path: '/asesores',      adminOnly: true  },
+  { label: 'Proyectos',            path: null,             adminOnly: false },
+  { label: 'Configuración',        path: '/configuracion', adminOnly: true  },
+];
+
+const RUTAS_ADMIN = ['/asesores', '/configuracion'];
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const sidebarRef = useRef(null);
+
+  const rol = localStorage.getItem('rolUsuario') || 'Asesor';
+  const isAdmin = rol === 'Admin';
+
+  // Redirigir si Asesor intenta acceder a ruta restringida
+  useEffect(() => {
+    if (!isAdmin && RUTAS_ADMIN.includes(location.pathname)) {
+      navigate('/', { replace: true });
+    }
+  }, [location.pathname, isAdmin, navigate]);
 
   // Cerrar sidebar mobile al hacer clic fuera
   useEffect(() => {
@@ -74,20 +96,41 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="sidebar__nav">
-          <button className="navItem" onClick={() => navTo("/")}>Resumen</button>
-          <button className="navItem" onClick={() => navTo("/leads")}>Leads y Cotizaciones</button>
-          <button className="navItem" onClick={() => navTo("/asesores")}>Asesores</button>
-          <button className="navItem">Proyectos</button>
-          <button className="navItem" onClick={() => navTo("/configuracion")}>Configuración</button>
+          {NAV_ITEMS
+            .filter(item => isAdmin || !item.adminOnly)
+            .map(item => (
+              <button
+                key={item.label}
+                className={`navItem${item.path && location.pathname === item.path ? ' navItem--active' : ''}`}
+                onClick={() => item.path && navTo(item.path)}
+                style={!item.path ? { opacity: 0.5, cursor: 'default' } : {}}
+              >
+                {item.label}
+              </button>
+            ))
+          }
         </nav>
 
         <div className="sidebar__footer">
+          <div className="sidebar__userInfo">
+            <span className="sidebar__userName">
+              {localStorage.getItem('nombreUsuario') || 'Usuario'}
+            </span>
+            <span className={`rolBadge rolBadge--${isAdmin ? 'admin' : 'asesor'}`}>
+              {rol}
+            </span>
+          </div>
           <button
             className="navItem"
-            style={{ color: "var(--accent)", marginTop: "auto" }}
+            style={{ color: "var(--accent)", marginTop: 4 }}
             onClick={() => {
               localStorage.removeItem("token");
               localStorage.removeItem("nombreUsuario");
+              localStorage.removeItem("apellidoUsuario");
+              localStorage.removeItem("cargoUsuario");
+              localStorage.removeItem("celularUsuario");
+              localStorage.removeItem("correoUsuario");
+              localStorage.removeItem("rolUsuario");
               navigate("/login");
             }}
           >

@@ -35,6 +35,7 @@ export default function Login() {
       localStorage.setItem('cargoUsuario', data.cargo || '');
       localStorage.setItem('celularUsuario', data.celular || '');
       localStorage.setItem('correoUsuario', data.correo || '');
+      localStorage.setItem('rolUsuario', data.rol || 'Asesor');
       navigate('/');
     } catch (err) {
       setError('No se pudo conectar con el servidor. Verifica que el backend esté activo.');

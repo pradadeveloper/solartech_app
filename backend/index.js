@@ -920,7 +920,7 @@ app.post('/api/login', (req, res) => {
     { expiresIn: '8h' }
   );
 
-  res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, celular: user.celular || '', correo: user.correo || '' });
+  res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, celular: user.celular || '', correo: user.correo || '', rol: user.rol || 'Asesor' });
 });
 
 // ====== Endpoint ======
