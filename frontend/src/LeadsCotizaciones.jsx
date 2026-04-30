@@ -40,7 +40,41 @@ export default function LeadsCotizaciones() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [f, setF] = useState(FILTRO_INIT);
+  const [generandoPdf, setGenerandoPdf] = useState({});
   const navigate = useNavigate();
+
+  const generarPdfLead = async (lead) => {
+    const num = String(lead.numeroCotizacion);
+    setGenerandoPdf(prev => ({ ...prev, [num]: true }));
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        ...lead,
+        consumoKwh: lead.consumoKwh || 0,
+        costoKwh: lead.costoKwh ||
+          (lead.ahorroMensual > 0 && lead.consumoKwh > 0
+            ? Math.round(lead.ahorroMensual / lead.consumoKwh)
+            : 0),
+      };
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.pdfUrl) {
+        setLeads(prev => prev.map(l =>
+          String(l.numeroCotizacion) === num ? { ...l, pdfUrl: data.pdfUrl } : l
+        ));
+      } else {
+        alert(data.error || 'No se pudo generar el PDF');
+      }
+    } catch {
+      alert('Error generando PDF');
+    } finally {
+      setGenerandoPdf(prev => ({ ...prev, [num]: false }));
+    }
+  };
 
   useEffect(() => {
     fetch(`${process.env.REACT_APP_API_URL}/api/leads`)
@@ -215,7 +249,20 @@ export default function LeadsCotizaciones() {
                       >
                         ↓ PDF
                       </a>
-                    ) : null}
+                    ) : (
+                      <button
+                        onClick={() => generarPdfLead(lead)}
+                        disabled={generandoPdf[String(lead.numeroCotizacion)]}
+                        style={{
+                          background: "var(--panel2)", color: "var(--muted)",
+                          border: "1px solid var(--border)",
+                          padding: "5px 14px", borderRadius: 8,
+                          fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+                        }}
+                      >
+                        {generandoPdf[String(lead.numeroCotizacion)] ? '...' : '+ PDF'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -414,7 +461,19 @@ export default function LeadsCotizaciones() {
                               ↓ PDF
                             </a>
                           ) : (
-                            <span style={{ color: "var(--muted2)", fontSize: "0.78rem" }}>Sin PDF</span>
+                            <button
+                              onClick={() => generarPdfLead(lead)}
+                              disabled={generandoPdf[String(lead.numeroCotizacion)]}
+                              style={{
+                                background: "var(--panel2)", color: "var(--muted)",
+                                border: "1px solid var(--border)",
+                                padding: "4px 10px", borderRadius: 6,
+                                fontSize: "0.78rem", fontWeight: 600,
+                                cursor: "pointer", whiteSpace: "nowrap",
+                              }}
+                            >
+                              {generandoPdf[String(lead.numeroCotizacion)] ? '...' : '+ PDF'}
+                            </button>
                           )}
                         </div>
                       </td>

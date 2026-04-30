@@ -1313,6 +1313,14 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
     const dataWithFix = { ...data, consumoKwh, costoKwh };
     const resultados = calcularProyecto(dataWithFix, cfgForCalc);
     const pdfUrl = await generarPDF(dataWithFix, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '-' }, asesorPDF, cfgForCalc);
+
+    // Persistir pdfUrl en el registro del lead (si se conoce la cotización)
+    if (data.numeroCotizacion) {
+      try {
+        await updateLeadField(String(data.numeroCotizacion), { pdfUrl });
+      } catch (_) { /* no crítico: el PDF igual se devuelve */ }
+    }
+
     res.json({ pdfUrl });
   } catch (err) {
     console.error(err);
