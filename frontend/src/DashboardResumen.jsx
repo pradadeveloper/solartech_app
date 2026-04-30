@@ -152,17 +152,20 @@ export default function DashboardResumen() {
   [leads]);
 
   const pipelineRows = useMemo(() =>
-    [...leads].reverse().map((l) => ({
-      id: `N-${l.numeroCotizacion}`,
-      cliente: l.nombre,
-      ciudad: l.ubicacion,
-      kwh: l.consumoKwh,
-      sistema: l.kwp ? `${l.kwp} kWp` : "—",
-      valorCOP: l.costoProyectoMasIva || 0,
-      estado: l.estado || "Nuevo",
-      pdfUrl: l.pdfUrl || null,
-      _lead: l,
-    })),
+    [...leads]
+      .sort((a, b) => (b.costoProyectoMasIva || 0) - (a.costoProyectoMasIva || 0))
+      .slice(0, 5)
+      .map((l) => ({
+        id: `N-${l.numeroCotizacion}`,
+        cliente: l.nombre,
+        ciudad: l.ubicacion,
+        kwh: l.consumoKwh,
+        sistema: l.kwp ? `${l.kwp} kWp` : "—",
+        valorCOP: l.costoProyectoMasIva || 0,
+        estado: l.estado || "Nuevo",
+        pdfUrl: l.pdfUrl || null,
+        _lead: l,
+      })),
   [leads]);
 
   return (
