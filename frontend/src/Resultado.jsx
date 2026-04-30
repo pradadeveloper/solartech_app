@@ -322,6 +322,29 @@ export default function Resultado() {
           </div>
         </header>
 
+        {/* Hero mobile: métricas clave visibles solo en pantallas pequeñas */}
+        <div className="mobileHero">
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Potencia</span>
+            <span className="mobileHeroValue">{resultadoActivo?.kwp ?? '—'} kWp</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Inversión</span>
+            <span className="mobileHeroValue">${money(resultadoActivo?.costoProyectoMasIva)}</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Retorno</span>
+            <span className="mobileHeroValue">{resultadoActivo?.tiempoRetorno ?? '—'} años</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Ahorro/mes</span>
+            <span className="mobileHeroValue">${money(resultadoActivo?.ahorroMensual)}</span>
+          </div>
+        </div>
+
         {/* Intro */}
         <div className="cotGrid">
           <section className="cotMain">
@@ -452,7 +475,7 @@ export default function Resultado() {
 
               {/* Tabla comparativa */}
               {calculos.some(Boolean) && (
-                <div className="tableWrap" style={{ marginTop: 4 }}>
+                <div className="tableWrap comparadorTablaWrap" style={{ marginTop: 4 }}>
                   <table className="table">
                     <thead>
                       <tr>

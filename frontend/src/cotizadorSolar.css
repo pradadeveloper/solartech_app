@@ -711,105 +711,60 @@
 
 @media (max-width: 600px) {
   .cotizadorShell {
-    padding: 12px;
+    padding: 10px;
   }
 
+  /* ── Header: apila elementos, oculta steps ── */
+  .cotHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .cotLogo,
+  .cotizador-logo,
+  .cotLogoSolartech {
+    width: 80px;
+  }
+  .cotHeaderText {
+    min-width: unset;
+    flex: 1;
+  }
+  .cotTitle {
+    font-size: 16px;
+  }
+  .cotSubtitle {
+    font-size: 11px;
+  }
+  .cotSteps {
+    display: none;
+  }
+
+  /* ── Grid principal: columna única ── */
   .cotGrid {
     grid-template-columns: 1fr;
   }
-
   .cotTwoCol {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
 
+  /* Sidebar: sin sticky en mobile, aparece al final ── */
+  .cotSide {
+    position: static;
+    top: unset;
+  }
+
+  /* ── Card head: botón auxiliar baja a nueva línea ── */
+  .cotCardHead {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  /* ── Botones ── */
   .cotBtnPrimary,
   .cotBtnSecondary {
     width: 100%;
     justify-content: center;
-  }
-
-  .cotSteps {
-    gap: 6px;
-  }
-
-  .cotStep {
-    padding: 8px 10px;
-    font-size: 0.8rem;
-  }
-
-  .overlay {
-    padding: 0%;
-  }
-
-  .container {
-    padding: 1.5rem;
-  }
-
-  .form-container {
-    text-align: center;
-  }
-
-  .cotizador table {
-    width: 100%;
-  }
-
-  .button {
-    width: 100%;
-    padding: 0.8rem;
-    font-size: 0.95rem;
-  }
-
-  .etapasProyecto,
-  .garantiasContainer {
-    flex-direction: column;
-  }
-
-  .cotizador input,
-  .cotizador select,
-  .cotizador textarea {
-    font-size: 0.95rem;
-  }
-
-  .Banner_Casos_Desktop {
-    display: none;
-  }
-
-  .Banner_Casos_mobile {
-    display: block;
-    height: auto;
-    width: 100px;
-    margin: 10px;
-  }
-
-  .container_casos_exito {
-    align-items: center;
-  }
-
-  .container_casos_exito_2 {
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-  }
-
-  .marcasAliadas {
-    flex-direction: column;
-  }
-
-  .marcasAliadas img {
-    flex-direction: column;
-    width: 50%;
-    margin: 10px;
-  }
-
-  .icono {
-    display: none;
-  }
-
-  .cotizador .table {
-    min-width: 520px;
-  }
-  .opcionesGrid {
-    grid-template-columns: 1fr !important;
   }
   .cotActions {
     flex-wrap: wrap;
@@ -818,6 +773,102 @@
     width: 100%;
     box-sizing: border-box;
     text-align: center;
+  }
+
+  /* ── Tablas: sin min-width, texto puede envolver ── */
+  .cotizador .table {
+    min-width: unset;
+    width: 100%;
+  }
+  .cotizador .table th,
+  .cotizador .table td {
+    white-space: normal;
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+  /* Celdas numéricas siguen alineadas a la derecha */
+  .cotizador .table .num {
+    text-align: right;
+  }
+
+  /* ── Tabla comparativa de opciones: scroll horizontal ── */
+  .comparadorTablaWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .comparadorTablaWrap .table {
+    min-width: 420px;
+  }
+
+  /* ── Comparador de opciones: 1 columna ── */
+  .opcionesGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Legacy ── */
+  .overlay { padding: 0%; }
+  .container { padding: 1.5rem; }
+  .form-container { text-align: center; }
+  .cotizador table { width: 100%; }
+  .button { width: 100%; padding: 0.8rem; font-size: 0.95rem; }
+  .etapasProyecto, .garantiasContainer { flex-direction: column; }
+  .cotizador input, .cotizador select, .cotizador textarea { font-size: 0.95rem; }
+  .Banner_Casos_Desktop { display: none; }
+  .Banner_Casos_mobile { display: block; height: auto; width: 100px; margin: 10px; }
+  .container_casos_exito { align-items: center; }
+  .container_casos_exito_2 { display: flex; justify-content: center; flex-direction: column; }
+  .marcasAliadas { flex-direction: column; }
+  .marcasAliadas img { flex-direction: column; width: 50%; margin: 10px; }
+  .icono { display: none; }
+}
+
+/* =========================================================
+   HERO MOBILE — barra de métricas clave (solo en mobile)
+   ========================================================= */
+.mobileHero {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .mobileHero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 14px;
+    padding: 12px 10px;
+    margin-bottom: 10px;
+    gap: 4px;
+  }
+  .mobileHeroItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+  .mobileHeroLabel {
+    font-size: 10px;
+    color: #5a5a5a;
+    margin-bottom: 2px;
+    text-align: center;
+  }
+  .mobileHeroValue {
+    font-size: 12px;
+    font-weight: 700;
+    color: #b03a22;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+  .mobileHeroDivider {
+    width: 1px;
+    height: 28px;
+    background: #e0e0e0;
+    flex-shrink: 0;
   }
 }
 
