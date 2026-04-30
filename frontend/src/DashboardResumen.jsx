@@ -170,6 +170,114 @@ export default function DashboardResumen() {
 
   return (
     <>
+      {/* ── PIPELINE FULL WIDTH — primero ── */}
+      <Panel title="Pipeline de Leads">
+        {loading ? (
+          <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>Cargando…</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "flex", alignItems: "stretch", gap: 0, minWidth: 520 }}>
+              {/* Etapas principales (sin Perdido) */}
+              {pipelineData.slice(0, 5).map((stage, i) => {
+                const total = leads.length - (pipelineData[5]?.count || 0);
+                const pct = total > 0 ? Math.round((stage.count / total) * 100) : 0;
+                return (
+                  <React.Fragment key={stage.estado}>
+                    <div style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      padding: "14px 8px 12px",
+                      borderTop: `3px solid ${stage.color}`,
+                      background: `linear-gradient(180deg, ${stage.color}14 0%, transparent 100%)`,
+                      borderRadius: i === 0 ? "10px 0 0 10px" : i === 4 ? "0 10px 10px 0" : 0,
+                      borderRight: i < 4 ? "1px solid var(--border)" : "none",
+                      position: "relative",
+                      minWidth: 80,
+                    }}>
+                      {i < 4 && (
+                        <div style={{
+                          position: "absolute",
+                          right: -13,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          zIndex: 2,
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          background: "var(--panel)",
+                          border: "1px solid var(--border)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          color: "var(--muted)",
+                          fontWeight: 700,
+                        }}>›</div>
+                      )}
+                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: stage.color, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6, textAlign: "center" }}>
+                        {stage.estado}
+                      </span>
+                      <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
+                        {stage.count}
+                      </span>
+                      <span style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 2, marginBottom: 8 }}>
+                        lead{stage.count !== 1 ? "s" : ""}
+                      </span>
+                      <div style={{ width: "80%", height: 4, borderRadius: 4, background: "var(--border)", marginBottom: 6, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, background: stage.color, borderRadius: 4, transition: "width .5s" }} />
+                      </div>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text)", opacity: 0.8, textAlign: "center" }}>
+                        {stage.valor > 0 ? formatCOP(stage.valor) : "—"}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+
+              {/* Separador + Perdido */}
+              <div style={{ display: "flex", alignItems: "stretch", marginLeft: 10 }}>
+                <div style={{ width: 2, background: "var(--border)", borderRadius: 2, margin: "8px 0" }} />
+                {(() => {
+                  const stage = pipelineData[5];
+                  if (!stage) return null;
+                  return (
+                    <div style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      padding: "14px 14px 12px",
+                      borderTop: `3px solid ${stage.color}`,
+                      background: `linear-gradient(180deg, ${stage.color}14 0%, transparent 100%)`,
+                      borderRadius: "0 10px 10px 0",
+                      minWidth: 90,
+                      marginLeft: 10,
+                    }}>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: stage.color, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>
+                        {stage.estado}
+                      </span>
+                      <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
+                        {stage.count}
+                      </span>
+                      <span style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 2, marginBottom: 8 }}>
+                        lead{stage.count !== 1 ? "s" : ""}
+                      </span>
+                      <div style={{ width: "80%", height: 4, borderRadius: 4, background: "var(--border)", marginBottom: 6, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: leads.length > 0 ? `${Math.round((stage.count / leads.length) * 100)}%` : "0%", background: stage.color, borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text)", opacity: 0.8 }}>
+                        {stage.valor > 0 ? formatCOP(stage.valor) : "—"}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+      </Panel>
+
       <div className="grid kpiGrid">
         <KpiCard
           title="Valor cotizado mes"
@@ -249,114 +357,6 @@ export default function DashboardResumen() {
           )}
         </Panel>
       </div>
-
-      {/* ── PIPELINE FULL WIDTH ── */}
-      <Panel title="Pipeline de Leads">
-        {loading ? (
-          <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>Cargando…</p>
-        ) : (
-          <div style={{ display: "flex", alignItems: "stretch", gap: 0 }}>
-            {/* Etapas principales (sin Perdido) */}
-            {pipelineData.slice(0, 5).map((stage, i) => {
-              const total = leads.length - (pipelineData[5]?.count || 0);
-              const pct = total > 0 ? Math.round((stage.count / total) * 100) : 0;
-              return (
-                <React.Fragment key={stage.estado}>
-                  <div style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    padding: "18px 10px 14px",
-                    borderTop: `3px solid ${stage.color}`,
-                    background: `linear-gradient(180deg, ${stage.color}14 0%, transparent 100%)`,
-                    borderRadius: i === 0 ? "10px 0 0 10px" : i === 4 ? "0 10px 10px 0" : 0,
-                    borderRight: i < 4 ? "1px solid var(--border)" : "none",
-                    position: "relative",
-                    minWidth: 0,
-                  }}>
-                    {/* Flecha entre etapas */}
-                    {i < 4 && (
-                      <div style={{
-                        position: "absolute",
-                        right: -13,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        zIndex: 2,
-                        width: 24,
-                        height: 24,
-                        borderRadius: "50%",
-                        background: "var(--panel)",
-                        border: "1px solid var(--border)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 11,
-                        color: "var(--muted)",
-                        fontWeight: 700,
-                      }}>›</div>
-                    )}
-                    <span style={{ fontSize: "0.72rem", fontWeight: 600, color: stage.color, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 8 }}>
-                      {stage.estado}
-                    </span>
-                    <span style={{ fontSize: "2rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
-                      {stage.count}
-                    </span>
-                    <span style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: 2, marginBottom: 10 }}>
-                      lead{stage.count !== 1 ? "s" : ""}
-                    </span>
-                    <div style={{ width: "80%", height: 4, borderRadius: 4, background: "var(--border)", marginBottom: 8, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: stage.color, borderRadius: 4, transition: "width .5s" }} />
-                    </div>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text)", opacity: 0.8 }}>
-                      {stage.valor > 0 ? formatCOP(stage.valor) : "—"}
-                    </span>
-                  </div>
-                </React.Fragment>
-              );
-            })}
-
-            {/* Separador + Perdido */}
-            <div style={{ display: "flex", alignItems: "stretch", marginLeft: 12 }}>
-              <div style={{ width: 2, background: "var(--border)", borderRadius: 2, margin: "8px 0" }} />
-              {(() => {
-                const stage = pipelineData[5];
-                if (!stage) return null;
-                return (
-                  <div style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    padding: "18px 18px 14px",
-                    borderTop: `3px solid ${stage.color}`,
-                    background: `linear-gradient(180deg, ${stage.color}14 0%, transparent 100%)`,
-                    borderRadius: "0 10px 10px 0",
-                    minWidth: 110,
-                    marginLeft: 12,
-                  }}>
-                    <span style={{ fontSize: "0.72rem", fontWeight: 600, color: stage.color, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 8 }}>
-                      {stage.estado}
-                    </span>
-                    <span style={{ fontSize: "2rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
-                      {stage.count}
-                    </span>
-                    <span style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: 2, marginBottom: 10 }}>
-                      lead{stage.count !== 1 ? "s" : ""}
-                    </span>
-                    <div style={{ width: "80%", height: 4, borderRadius: 4, background: "var(--border)", marginBottom: 8, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: leads.length > 0 ? `${Math.round((stage.count / leads.length) * 100)}%` : "0%", background: stage.color, borderRadius: 4 }} />
-                    </div>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text)", opacity: 0.8 }}>
-                      {stage.valor > 0 ? formatCOP(stage.valor) : "—"}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-      </Panel>
 
       <PipelineTable
         title="Últimos leads — Pipeline"
