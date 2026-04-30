@@ -201,6 +201,41 @@ grid-template-columns: repeat(2, minmax(0, 1fr));
 .chartsGrid{ grid-template-columns: 1fr; }
 }
 
+/* ── Topbar mobile ── */
+@media (max-width: 600px) {
+  .topbar {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  /* Ocultar subtítulo para ganar altura */
+  .pageTitle p {
+    display: none;
+  }
+  .pageTitle h1 {
+    font-size: 15px;
+  }
+  .iconBtn {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+  /* Botones más compactos */
+  .topbar__right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .topbar__right .btn {
+    padding: 7px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  /* "Exportar CSV" se oculta en mobile — acción poco frecuente en campo */
+  .topbar__right .btn:not(.btn--primary) {
+    display: none;
+  }
+}
+
 /* ── Mobile sidebar overlay ── */
 .sidebar-backdrop {
   display: none;
