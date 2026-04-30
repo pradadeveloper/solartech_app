@@ -2,6 +2,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import logo from "./assets/logo_solartech.webp";
 import { useMemo, useState, useEffect } from "react";
 import "./cotizadorSolar.css"; // usa tu misma hoja
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
+} from "recharts";
 
 // ── Replica las fórmulas del backend para calcular en el frontend ──
 function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
@@ -539,6 +543,8 @@ export default function Resultado() {
                 <Metric label="Cobertura estimada" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
                 <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartSistemaSolar r={resultadoActivo} />
             </Card>
 
             {/* FINANCIERO */}
@@ -553,6 +559,8 @@ export default function Resultado() {
                 <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultadoActivo?.ahorro10Anos)}`} />
                 <Metric label="Valorización aproximada" value={`4–10%`} />
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartFinanciero r={resultadoActivo} />
             </Card>
 
             {/* PROPUESTA ECONÓMICA */}
@@ -606,6 +614,8 @@ export default function Resultado() {
                   </tbody>
                 </table>
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartPropuesta r={resultadoActivo} />
             </Card>
 
             {/* FORMAS DE PAGO */}
@@ -625,6 +635,8 @@ export default function Resultado() {
                   </tbody>
                 </table>
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartFormasPago r={resultadoActivo} />
             </Card>
 
             {/* IMPACTO AMBIENTAL */}
@@ -655,6 +667,8 @@ export default function Resultado() {
                   foot="30 días hábiles"
                 />
               </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartEtapas />
             </Card>
 
             {/* GARANTÍAS */}
@@ -850,6 +864,225 @@ export default function Resultado() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GRÁFICOS VISUALES — solo mejora visual, sin tocar cálculos
+   ═══════════════════════════════════════════════════════════ */
+
+const C1 = '#b03a22';
+const C2 = '#e07060';
+const C3 = '#f0a090';
+const CGRAY = '#e8e8e8';
+
+/* 1 ─── Sistema Solar: donut de cobertura + stats clave */
+function ChartSistemaSolar({ r }) {
+  const cobertura = Number(r?.porcentajeCoberturaProyecto) || 0;
+  const kwp       = Number(r?.kwp) || 0;
+  const paneles   = Number(r?.npaneles) || 0;
+  const produccion= Number(r?.produccionDeEnergia) || 0;
+
+  const donutData = [
+    { name: 'Cobertura', value: cobertura > 0 ? cobertura : 100 },
+    { name: 'Resto',     value: cobertura > 0 ? Math.max(0, 100 - cobertura) : 0 },
+  ];
+
+  return (
+    <div className="chartBlock">
+      <div className="chartDonutWrap">
+        <ResponsiveContainer width={180} height={180}>
+          <PieChart>
+            <Pie data={donutData} cx="50%" cy="50%"
+              innerRadius={52} outerRadius={78}
+              startAngle={90} endAngle={-270}
+              dataKey="value" strokeWidth={0}>
+              <Cell fill={C1} />
+              <Cell fill={CGRAY} />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="chartDonutLabel">
+          <span className="chartDonutValue">{cobertura > 0 ? `${cobertura}%` : `${kwp}`}</span>
+          <span className="chartDonutSub">{cobertura > 0 ? 'Cobertura área' : 'kWp'}</span>
+        </div>
+      </div>
+      <div className="chartStatRow">
+        <ChartStat icon="☀️" label="Potencia" value={`${kwp} kWp`} />
+        <ChartStat icon="🔋" label="Producción" value={`${produccion} kWh/mes`} />
+        <ChartStat icon="📐" label="Paneles" value={`${paneles} und`} />
+      </div>
+    </div>
+  );
+}
+
+/* 2 ─── Análisis financiero: área de ahorro acumulado vs inversión */
+function ChartFinanciero({ r }) {
+  const ahorroAnual = Number(r?.ahorroAnual) || 0;
+  const inversion   = Number(r?.costoProyectoMasIva) || 0;
+  const retorno     = Number(r?.tiempoRetorno) || null;
+
+  if (!ahorroAnual || !inversion) return null;
+
+  const data = Array.from({ length: 11 }, (_, i) => ({
+    año: `A${i}`,
+    'Ahorro acum.': ahorroAnual * i,
+  }));
+
+  const fmtM = (v) => `$${(v / 1_000_000).toFixed(1)}M`;
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Ahorro acumulado vs inversión (10 años)</p>
+      <ResponsiveContainer width="100%" height={190}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gradAhorro" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#2ecc71" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#2ecc71" stopOpacity={0.03} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+          <XAxis dataKey="año" tick={{ fontSize: 10, fill: '#888' }} />
+          <YAxis tickFormatter={fmtM} tick={{ fontSize: 10, fill: '#888' }} width={42} />
+          <Tooltip
+            formatter={(v) => [`$${Number(v).toLocaleString('es-CO')}`, 'Ahorro acumulado']}
+            labelFormatter={(l) => `Año ${l.replace('A', '')}`}
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+          />
+          <ReferenceLine y={inversion} stroke={C1} strokeDasharray="5 4"
+            label={{ value: 'Inversión', position: 'insideTopRight', fontSize: 10, fill: C1 }} />
+          <Area type="monotone" dataKey="Ahorro acum." stroke="#2ecc71"
+            fill="url(#gradAhorro)" strokeWidth={2.5} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+      {retorno && (
+        <p className="chartNote">
+          Punto de retorno estimado: <b>año {retorno}</b>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* 3 ─── Propuesta económica: breakdown horizontal del costo */
+function ChartPropuesta({ r }) {
+  const base  = Number(r?.costoProyecto) || 0;
+  const iva   = Number(r?.ivaProyecto)   || 0;
+  const total = base + iva;
+  if (!total) return null;
+
+  const pBase = ((base / total) * 100).toFixed(1);
+  const pIva  = ((iva  / total) * 100).toFixed(1);
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Composición del costo del proyecto</p>
+      <div className="chartBreakBar">
+        <div style={{ flex: base, background: C1, borderRadius: '8px 0 0 8px' }} />
+        <div style={{ flex: iva,  background: C2, borderRadius: '0 8px 8px 0' }} />
+      </div>
+      <div className="chartBreakLegend">
+        <ChartBreakItem color={C1} label="Inversión base" pct={`${pBase}%`}
+          value={`$${base.toLocaleString('es-CO')}`} />
+        <ChartBreakItem color={C2} label="IVA (5%)" pct={`${pIva}%`}
+          value={`$${iva.toLocaleString('es-CO')}`} />
+      </div>
+    </div>
+  );
+}
+
+function ChartBreakItem({ color, label, pct, value }) {
+  return (
+    <div className="chartBreakItem">
+      <div className="chartBreakDot" style={{ background: color }} />
+      <div>
+        <div className="chartBreakLabel">{label} <b style={{ color }}>{pct}</b></div>
+        <div className="chartBreakValue">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+/* 4 ─── Formas de pago: barra proporcional con montos */
+function ChartFormasPago({ r }) {
+  const total = Number(r?.costoProyectoMasIva) || 0;
+  const hitos = [
+    { label: 'Anticipo',           pct: 50, color: C1 },
+    { label: 'Entrega materiales', pct: 40, color: C2 },
+    { label: 'RETIE',              pct: 10, color: C3 },
+  ];
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Distribución del pago</p>
+      <div className="chartPayBar">
+        {hitos.map((h, i) => (
+          <div key={i} style={{ flex: h.pct, background: h.color,
+            borderRadius: i === 0 ? '8px 0 0 8px' : i === hitos.length - 1 ? '0 8px 8px 0' : 0 }} />
+        ))}
+      </div>
+      <div className="chartPayCards">
+        {hitos.map((h, i) => (
+          <div key={i} className="chartPayCard" style={{ borderTop: `3px solid ${h.color}` }}>
+            <div className="chartPayPct" style={{ color: h.color }}>{h.pct}%</div>
+            <div className="chartPayLabel">{h.label}</div>
+            {total > 0 && (
+              <div className="chartPayAmount">
+                ${Math.round(total * h.pct / 100).toLocaleString('es-CO')}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* 5 ─── Etapas: timeline visual CSS */
+function ChartEtapas() {
+  const etapas = [
+    { icon: '📋', title: 'Planeación',    sub: 'Diagnóstico · Diseño · Trámites',   dias: '30 días',  color: C1 },
+    { icon: '🔧', title: 'Construcción',  sub: 'Instalación · Puesta en marcha',     dias: '90 días',  color: C2 },
+    { icon: '⚡', title: 'Operación',     sub: 'Conexión a red · Monitoreo',          dias: '30 días',  color: C3 },
+  ];
+
+  return (
+    <div className="chartBlock">
+      <p className="chartTitle">Línea de tiempo del proyecto</p>
+      <div className="chartTimeline">
+        {etapas.map((e, i) => (
+          <div key={i} className="chartTimelineStep">
+            <div className="chartTimelineCircle" style={{ background: e.color }}>
+              <span>{e.icon}</span>
+            </div>
+            {i < etapas.length - 1 && (
+              <div className="chartTimelineConnector"
+                style={{ background: `linear-gradient(90deg, ${e.color}, ${etapas[i+1].color})` }} />
+            )}
+            <div className="chartTimelineInfo">
+              <b style={{ color: e.color }}>{e.title}</b>
+              <span>{e.sub}</span>
+              <span className="chartTimelineDias">{e.dias}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="chartTimelineTotal">
+        Total estimado: <b>150 días hábiles</b>
+      </div>
+    </div>
+  );
+}
+
+/* helpers reutilizables de los gráficos */
+function ChartStat({ icon, label, value }) {
+  return (
+    <div className="chartStatItem">
+      <span className="chartStatIcon">{icon}</span>
+      <span className="chartStatLabel">{label}</span>
+      <b className="chartStatValue">{value}</b>
     </div>
   );
 }

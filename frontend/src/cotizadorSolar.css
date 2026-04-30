@@ -992,3 +992,220 @@
 .cotizador--light p {
   color: #1a1a1a;
 }
+
+/* =========================================================
+   GRÁFICOS VISUALES — Resultado.jsx
+   ========================================================= */
+
+.chartBlock {
+  padding: 4px 0 6px;
+}
+
+.chartTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a5a5a;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chartNote {
+  text-align: center;
+  font-size: 11px;
+  color: #888;
+  margin: 6px 0 0;
+}
+
+/* ── Donut (sistema solar) ── */
+.chartDonutWrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.chartDonutLabel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  line-height: 1.2;
+  pointer-events: none;
+}
+.chartDonutValue {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: #b03a22;
+}
+.chartDonutSub {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* stat row debajo del donut */
+.chartStatRow {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.chartStatItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.chartStatIcon  { font-size: 18px; }
+.chartStatLabel { font-size: 11px; color: #888; }
+.chartStatValue { font-size: 13px; color: #b03a22; }
+
+/* ── Breakdown bar (propuesta económica) ── */
+.chartBreakBar {
+  display: flex;
+  height: 24px;
+  border-radius: 8px;
+  overflow: hidden;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+.chartBreakLegend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.chartBreakItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chartBreakDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.chartBreakLabel {
+  font-size: 12px;
+  color: #5a5a5a;
+}
+.chartBreakValue {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-top: 1px;
+}
+
+/* ── Payment bar (formas de pago) ── */
+.chartPayBar {
+  display: flex;
+  height: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+.chartPayCards {
+  display: flex;
+  gap: 8px;
+}
+.chartPayCard {
+  flex: 1;
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.chartPayPct {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+.chartPayLabel {
+  font-size: 10px;
+  color: #5a5a5a;
+  margin-top: 4px;
+}
+.chartPayAmount {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-top: 5px;
+}
+
+/* ── Timeline (etapas) ── */
+.chartTimeline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 14px;
+}
+.chartTimelineStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+.chartTimelineCircle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 3px 10px rgba(176,58,34,0.25);
+  z-index: 1;
+  margin-bottom: 10px;
+}
+.chartTimelineConnector {
+  position: absolute;
+  top: 25px;
+  left: 50%;
+  right: -50%;
+  height: 3px;
+  z-index: 0;
+}
+.chartTimelineInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #5a5a5a;
+  padding: 0 4px;
+}
+.chartTimelineDias {
+  font-weight: 700;
+  color: #1a1a1a;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.chartTimelineTotal {
+  text-align: center;
+  background: #fff5f3;
+  border: 1px solid rgba(176,58,34,0.2);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #b03a22;
+  margin-top: 6px;
+}
+
+/* ── Responsive: mobile ── */
+@media (max-width: 600px) {
+  .chartPayCards { gap: 4px; }
+  .chartPayCard  { padding: 8px 4px; }
+  .chartPayPct   { font-size: 18px; }
+  .chartPayAmount { font-size: 10px; }
+  .chartTimelineCircle { width: 40px; height: 40px; font-size: 18px; }
+  .chartTimelineInfo { font-size: 10px; }
+  .chartStatRow  { gap: 12px; }
+  .chartBreakLegend { flex-direction: column; gap: 8px; }
+}
