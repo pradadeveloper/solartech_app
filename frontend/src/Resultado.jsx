@@ -14,6 +14,9 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const costokWp = Number(costokWpInput) > 0 ? Number(costokWpInput) : 3500000;
   if (!kwp || !costoUnidad) return null;
 
+  // Consumo real del cliente (factura original) — capturado antes de derivar el propio consumo
+  const consumoRealFactura = Number(base.consumoKwh) || 0;
+
   const potenciaPanel = Number(base.potenciaPanel) || 585;
   const radiacionSolar = Number(base.radiacionSolar) || 3.8;
   const margenCobertura = Number(base.margenCobertura) || 0.8;
@@ -35,7 +38,12 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
   const areaMinima = Math.round(kwp * 5.8);
 
-  // Cobertura por área (conserva el área del resultado original)
+  // Cobertura de la factura energética: qué % del consumo real cubre el sistema
+  const coberturaFactura = consumoRealFactura > 0
+    ? Math.min(100, Number(((produccionDeEnergia / consumoRealFactura) * 100).toFixed(1)))
+    : 0;
+
+  // Cobertura por área disponible vs área mínima requerida
   const areaDisp = Number(base.areaDisponible ?? 0);
   let porcentajeCoberturaProyecto = 0;
   if (areaDisp > 0 && areaMinima > 0) {
@@ -66,7 +74,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
     consumoKwh, costoKwh: costoUnidad, wPromedioDia,
     kwp, potenciaPanel, capacidadInversor, radiacionSolar, radiacionSolarCobertura, margenCobertura,
     npaneles, ninversores, riel47, midCland, endCland, lFoot, groundingLoop, cableSolar,
-    produccionDeEnergia, areaMinima, porcentajeCoberturaProyecto,
+    produccionDeEnergia, areaMinima, porcentajeCoberturaProyecto, coberturaFactura,
     costoProyecto, ivaProyecto, costoProyectoMasIva, costokwpproyecto,
     descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
     co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
@@ -462,6 +470,7 @@ export default function Resultado() {
                         <OpRow label="Inversores" value={calculos[idx].ninversores} />
                         <OpRow label="Producción" value={`${calculos[idx].produccionDeEnergia} kWh/mes`} />
                         <OpRow label="Área mínima" value={`${calculos[idx].areaMinima} m²`} />
+                        <OpRow label="Cobertura factura" value={`${calculos[idx].coberturaFactura}%`} accent />
                         <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                         <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
                         <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
@@ -545,7 +554,7 @@ export default function Resultado() {
                 <Metric label="Consumo promedio día" value={`${money(resultadoActivo?.wPromedioDia)} W/día`} />
                 <Metric label="Radiación promedio" value={`${resultadoActivo?.radiacionSolar ?? "—"}`} />
                 <Metric label="Área disponible" value={`${money(resultadoActivo?.areaDisponible)} m²`} />
-                <Metric label="Cobertura estimada" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
+                <Metric label="Cobertura de factura" value={`${resultadoActivo?.coberturaFactura ?? resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
                 <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
@@ -884,7 +893,7 @@ const CGRAY = '#e8e8e8';
 
 /* 1 ─── Sistema Solar: donut de cobertura + stats clave */
 function ChartSistemaSolar({ r }) {
-  const cobertura = Number(r?.porcentajeCoberturaProyecto) || 0;
+  const cobertura = Number(r?.coberturaFactura) || 0;
   const kwp       = Number(r?.kwp) || 0;
   const paneles   = Number(r?.npaneles) || 0;
   const produccion= Number(r?.produccionDeEnergia) || 0;
@@ -909,8 +918,8 @@ function ChartSistemaSolar({ r }) {
           </PieChart>
         </ResponsiveContainer>
         <div className="chartDonutLabel">
-          <span className="chartDonutValue">{cobertura > 0 ? `${cobertura}%` : `${kwp}`}</span>
-          <span className="chartDonutSub">{cobertura > 0 ? 'Cobertura Proyecto' : 'kWp'}</span>
+          <span className="chartDonutValue">{cobertura > 0 ? `${cobertura}%` : `${kwp} kWp`}</span>
+          <span className="chartDonutSub">{cobertura > 0 ? 'Cobertura Factura' : 'kWp'}</span>
         </div>
       </div>
       <div className="chartStatRow">
