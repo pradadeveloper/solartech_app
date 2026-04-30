@@ -705,7 +705,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   //   y -= bH + 12;
   // }
 
-  // 9. ETAPAS DEL PROYECTO — 2 columnas de 3 para que queden todas en la misma página
+  // 9. ETAPAS DEL PROYECTO — página 4 (forzada), 2 columnas de 3 + Garantías al final
+  newPage(false);
+  gap(4);
   sectionHeader('ETAPAS DEL PROYECTO');
   const etapas = [
     { n: '01', t: 'Visita tecnica',           d: 'Inspeccion del sitio, medicion de area disponible y evaluacion estructural de la cubierta.' },
@@ -762,9 +764,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     gap(6);
   }
 
-  // 10. GARANTIAS + PROYECTOS INSTALADOS — nueva página
-  newPage(false);
-  gap(4);
+  // 10. GARANTIAS — misma página que Etapas
+  gap(8);
   sectionHeader('GARANTIAS');
   {
     const col1Items = [
@@ -820,7 +821,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     gap(10);
   }
 
-  // PROYECTOS INSTALADOS — misma página que Garantías
+  // PROYECTOS INSTALADOS — página 5 (forzada)
+  newPage(false);
+  gap(4);
   sectionHeader('PROYECTOS INSTALADOS');
   {
     const proyectos = [
