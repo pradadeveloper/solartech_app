@@ -174,6 +174,20 @@ async function getAllLeads() {
       });
 
       if (!lead.id) lead.id = String(lead.numeroCotizacion || Math.random());
+
+      // Derivar consumoKwh desde kwp si falta (versiones guardadas con kwp explícito)
+      if (!lead.consumoKwh && lead.kwp > 0) {
+        const rad = 3.8, margen = 0.8;
+        const wProm = lead.kwp * rad * margen * 1000;
+        lead.consumoKwh = Number(((wProm * 365) / (1000 * 12)).toFixed(1));
+      }
+      // Derivar kwp desde consumoKwh si falta (leads originales sin kwp guardado)
+      if (!lead.kwp && lead.consumoKwh > 0) {
+        const rad = 3.8, margen = 0.8;
+        const wProm = (lead.consumoKwh * 1000 * 12) / 365;
+        lead.kwp = Number((wProm / (rad * margen * 1000)).toFixed(1));
+      }
+
       return lead;
     });
   } catch (err) {

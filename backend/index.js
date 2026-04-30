@@ -1119,6 +1119,25 @@ app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res
       opciones: [],
     };
 
+    // Garantizar que consumoKwh y kwp estén siempre poblados en la versión.
+    // Las versiones vienen con kwp explícito; derivar consumoKwh desde kwp si falta.
+    const cfg = await leerConfig();
+    const vKwp = Number(newLead.kwp) || 0;
+    const vConsumo = Number(newLead.consumoKwh) || 0;
+    if (!vConsumo && vKwp > 0) {
+      const rad = (Number(newLead.radiacionSolar) > 0 ? Number(newLead.radiacionSolar) : cfg.radiacionSolar) || 3.8;
+      const margen = cfg.margenCobertura || 0.8;
+      const wProm = vKwp * rad * margen * 1000;
+      newLead.consumoKwh = Number(((wProm * 365) / (1000 * 12)).toFixed(1));
+    }
+    // Si la versión no trae kwp (caso raro), derivar desde consumoKwh
+    if (!vKwp && vConsumo > 0) {
+      const rad = (Number(newLead.radiacionSolar) > 0 ? Number(newLead.radiacionSolar) : cfg.radiacionSolar) || 3.8;
+      const margen = cfg.margenCobertura || 0.8;
+      const wProm = (vConsumo * 1000 * 12) / 365;
+      newLead.kwp = Number((wProm / (rad * margen * 1000)).toFixed(1));
+    }
+
     await saveLeadStorage(newLead);
     res.json({ ok: true, versionId });
   } catch (err) {
