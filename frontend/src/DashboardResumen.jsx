@@ -151,9 +151,8 @@ export default function DashboardResumen() {
     }),
   [leads]);
 
-  // Últimos 5 leads para el resumen del dashboard
   const pipelineRows = useMemo(() =>
-    [...leads].reverse().slice(0, 5).map((l) => ({
+    [...leads].reverse().map((l) => ({
       id: `N-${l.numeroCotizacion}`,
       cliente: l.nombre,
       ciudad: l.ubicacion,
