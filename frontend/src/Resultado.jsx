@@ -207,6 +207,11 @@ export default function Resultado() {
     op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, { ...resultado, ...cfg }) : null
   );
 
+  // Datos live para los gráficos: opción activa seleccionada (kWp + costokWp en tiempo real)
+  const chartData = calculos[opcionSeleccionada]
+    ? { ...resultadoActivo, ...calculos[opcionSeleccionada] }
+    : resultadoActivo;
+
   const actualizarOpcion = (idx, campo, valor) => {
     setOpciones((prev) => prev.map((op, i) => i === idx ? { ...op, [campo]: valor } : op));
     setGuardado(false);
@@ -544,7 +549,7 @@ export default function Resultado() {
                 <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
-              <ChartSistemaSolar r={resultadoActivo} />
+              <ChartSistemaSolar r={chartData} />
             </Card>
 
             {/* FINANCIERO */}
@@ -560,7 +565,7 @@ export default function Resultado() {
                 <Metric label="Valorización aproximada" value={`4–10%`} />
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
-              <ChartFinanciero r={resultadoActivo} />
+              <ChartFinanciero r={chartData} />
             </Card>
 
             {/* PROPUESTA ECONÓMICA */}
@@ -615,7 +620,7 @@ export default function Resultado() {
                 </table>
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
-              <ChartPropuesta r={resultadoActivo} />
+              <ChartPropuesta r={chartData} />
             </Card>
 
             {/* FORMAS DE PAGO */}
@@ -636,7 +641,7 @@ export default function Resultado() {
                 </table>
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
-              <ChartFormasPago r={resultadoActivo} />
+              <ChartFormasPago r={chartData} />
             </Card>
 
             {/* IMPACTO AMBIENTAL */}
@@ -905,7 +910,7 @@ function ChartSistemaSolar({ r }) {
         </ResponsiveContainer>
         <div className="chartDonutLabel">
           <span className="chartDonutValue">{cobertura > 0 ? `${cobertura}%` : `${kwp}`}</span>
-          <span className="chartDonutSub">{cobertura > 0 ? 'Cobertura área' : 'kWp'}</span>
+          <span className="chartDonutSub">{cobertura > 0 ? 'Cobertura Proyecto' : 'kWp'}</span>
         </div>
       </div>
       <div className="chartStatRow">
@@ -925,7 +930,7 @@ function ChartFinanciero({ r }) {
 
   if (!ahorroAnual || !inversion) return null;
 
-  const data = Array.from({ length: 11 }, (_, i) => ({
+  const data = Array.from({ length: 26 }, (_, i) => ({
     año: `A${i}`,
     'Ahorro acum.': ahorroAnual * i,
   }));
@@ -934,7 +939,7 @@ function ChartFinanciero({ r }) {
 
   return (
     <div className="chartBlock">
-      <p className="chartTitle">Ahorro acumulado vs inversión (10 años)</p>
+      <p className="chartTitle">Ahorro acumulado vs inversión (25 años — vida útil del proyecto)</p>
       <ResponsiveContainer width="100%" height={190}>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
