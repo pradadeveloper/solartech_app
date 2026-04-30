@@ -381,9 +381,9 @@ export default function PropuestaPublica() {
             {/* Garantías */}
             <Card title="Garantías">
               <div className="cotTwoCol">
-                <MiniBlock title="Paneles solares"  lines={['15 años de producto', '30 años de generación']} />
-                <MiniBlock title="Inversores"       lines={['10 años de producto']} />
-                <MiniBlock title="Estructuras"      lines={['10 años de producto']} />
+                <MiniBlock title="Paneles solares"  lines={['12 años de garantía']} />
+                <MiniBlock title="Inversores"       lines={['5 años de garantía']} />
+                <MiniBlock title="Instalación"      lines={['5 años de garantía']} />
               </div>
             </Card>
 
