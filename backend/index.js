@@ -1146,9 +1146,23 @@ app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res
 });
 
 // ====== GET /api/leads ======
-app.get('/api/leads', async (_req, res) => {
-  try { res.json(await getAllLeads()); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+app.get('/api/leads', async (req, res) => {
+  try {
+    let leads = await getAllLeads();
+    // Filtrar por vendedor para usuarios no-admin
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+        const esAdmin = (decoded.rol || '').toLowerCase() === 'admin';
+        if (!esAdmin) {
+          const nombre = decoded.nombre || decoded.usuario;
+          leads = leads.filter(l => l.vendedor === nombre);
+        }
+      } catch (_) { /* token inválido → devolver todo (fallback seguro) */ }
+    }
+    res.json(leads);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ====== GET /api/leads/buscar ======

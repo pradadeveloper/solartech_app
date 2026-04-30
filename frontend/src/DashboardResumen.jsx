@@ -84,7 +84,10 @@ export default function DashboardResumen() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/api/leads`)
+    const token = localStorage.getItem('token');
+    fetch(`${process.env.REACT_APP_API_URL}/api/leads`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((r) => r.json())
       .then((data) => { setLeads(data); setLoading(false); })
       .catch(() => setLoading(false));

@@ -43,6 +43,9 @@ export default function LeadsCotizaciones() {
   const [generandoPdf, setGenerandoPdf] = useState({});
   const navigate = useNavigate();
 
+  const rol = localStorage.getItem('rolUsuario') || 'Asesor';
+  const isAdmin = rol === 'Admin';
+
   const generarPdfLead = async (lead) => {
     const num = String(lead.numeroCotizacion);
     setGenerandoPdf(prev => ({ ...prev, [num]: true }));
@@ -77,7 +80,10 @@ export default function LeadsCotizaciones() {
   };
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/api/leads`)
+    const token = localStorage.getItem('token');
+    fetch(`${process.env.REACT_APP_API_URL}/api/leads`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((r) => r.json())
       .then((data) => { setLeads(data); setLoading(false); })
       .catch(() => setLoading(false));
@@ -277,19 +283,19 @@ export default function LeadsCotizaciones() {
               {/* Fila de encabezados */}
               <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>
                 {[
-                  { label: "Cot.",             hide: true  },
-                  { label: "Fecha",            hide: false },
-                  { label: "Cliente",          hide: false },
-                  { label: "Ciudad",           hide: true  },
-                  { label: "kWh",              hide: true  },
-                  { label: "kWp",              hide: true  },
-                  { label: "Sistema",          hide: true  },
-                  { label: "Valor",            hide: false },
-                  { label: "Opción principal", hide: true  },
-                  { label: "Estado",           hide: false },
-                  { label: "Asesor",           hide: true  },
-                  { label: "Acciones",         hide: false },
-                ].map(({ label, hide }) => (
+                  { label: "Cot.",             hide: true,      adminOnly: false },
+                  { label: "Fecha",            hide: false,     adminOnly: false },
+                  { label: "Cliente",          hide: false,     adminOnly: false },
+                  { label: "Ciudad",           hide: true,      adminOnly: false },
+                  { label: "kWh",              hide: true,      adminOnly: false },
+                  { label: "kWp",              hide: true,      adminOnly: false },
+                  { label: "Sistema",          hide: true,      adminOnly: false },
+                  { label: "Valor",            hide: false,     adminOnly: false },
+                  { label: "Opción principal", hide: true,      adminOnly: false },
+                  { label: "Estado",           hide: false,     adminOnly: false },
+                  { label: "Asesor",           hide: true,      adminOnly: true  },
+                  { label: "Acciones",         hide: false,     adminOnly: false },
+                ].filter(col => !col.adminOnly || isAdmin).map(({ label, hide }) => (
                   <th key={label} className={hide ? "col-hide-mobile" : ""} style={{ padding: "10px 12px", fontWeight: 600, whiteSpace: "nowrap" }}>{label}</th>
                 ))}
               </tr>
@@ -356,12 +362,14 @@ export default function LeadsCotizaciones() {
                   </select>
                 </td>
 
-                {/* Asesor */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
-                  <select style={selectStyle} value={f.asesor} onChange={set("asesor")}>
-                    {asesores.map((a) => <option key={a} value={a}>{a || "Todos"}</option>)}
-                  </select>
-                </td>
+                {/* Asesor — solo admin */}
+                {isAdmin && (
+                  <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
+                    <select style={selectStyle} value={f.asesor} onChange={set("asesor")}>
+                      {asesores.map((a) => <option key={a} value={a}>{a || "Todos"}</option>)}
+                    </select>
+                  </td>
+                )}
 
                 {/* Acciones — sin filtro */}
                 <td style={{ padding: "6px 8px" }} />
@@ -430,7 +438,9 @@ export default function LeadsCotizaciones() {
                         </select>
                       </td>
 
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.vendedor}</td>
+                      {isAdmin && (
+                        <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.vendedor}</td>
+                      )}
 
                       <td style={{ padding: "10px 12px" }}>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
