@@ -124,7 +124,17 @@ export default function DashboardResumen() {
       .filter((l) => isSameMonth(new Date(l.fecha), ahora))
       .reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0);
 
-    return { leadsHoy, leadsMes, cotizacionesMes, tasaCierre, ticketPromedio, kwpProyectadosMes, valorCotizadoMes };
+    // Principal fuente de leads (campo conociste)
+    const fuenteMap = {};
+    leads.forEach(l => {
+      const f = l.conociste || "";
+      if (f) fuenteMap[f] = (fuenteMap[f] || 0) + 1;
+    });
+    const topFuenteEntry = Object.entries(fuenteMap).sort((a, b) => b[1] - a[1])[0];
+    const topFuente      = topFuenteEntry ? topFuenteEntry[0] : "—";
+    const topFuenteCount = topFuenteEntry ? topFuenteEntry[1] : 0;
+
+    return { leadsHoy, leadsMes, cotizacionesMes, tasaCierre, ticketPromedio, kwpProyectadosMes, valorCotizadoMes, topFuente, topFuenteCount };
   }, [leads]);
 
   const leadsPorDia = useMemo(() => buildLeadsPorDia(leads, 14), [leads]);
@@ -172,6 +182,7 @@ export default function DashboardResumen() {
         <KpiCard title="Tasa de cierre" value={loading ? "—" : `${kpis.tasaCierre}%`} hint="Sobre total leads" />
         <KpiCard title="Ticket promedio" value={loading ? "—" : formatCOP(kpis.ticketPromedio)} hint="COP" />
         <KpiCard title="kWp proyectados" value={loading ? "—" : Number(kpis.kwpProyectadosMes.toFixed(1))} hint="Mes actual" />
+        <KpiCard title="Principal fuente" value={loading ? "—" : kpis.topFuente} hint={loading ? "" : `${kpis.topFuenteCount} lead${kpis.topFuenteCount !== 1 ? "s" : ""}`} />
       </div>
 
       <div className="grid chartsGrid">
