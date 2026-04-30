@@ -331,8 +331,10 @@ async function getAsesores() {
       spreadsheetId: process.env.SHEET_ID,
       range: 'ASESORES!A:I',
     });
-    const [headers, ...rows] = res.data.values || [[]];
-    if (!headers || !headers.length) return [];
+    const [rawHeaders, ...rows] = res.data.values || [[]];
+    if (!rawHeaders || !rawHeaders.length) return [];
+    // Normalizar encabezados a minúscula para tolerar "Rol", "ROL", etc.
+    const headers = rawHeaders.map(h => String(h).toLowerCase().trim());
     return rows.map(row => {
       const obj = {};
       headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
