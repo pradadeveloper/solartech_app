@@ -212,7 +212,7 @@ export default function Resultado() {
   };
 
   const calculos = opciones.map((op) =>
-    op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, { ...resultado, ...cfg }) : null
+    op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, { ...cfg, ...resultado }) : null
   );
 
   // Datos live para los gráficos: opción activa seleccionada (kWp + costokWp en tiempo real)
