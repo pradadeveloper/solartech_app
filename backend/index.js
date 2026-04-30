@@ -642,7 +642,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 14;
   const componentes = [
     `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi / JA Solar)`,
-    `1 inversor de ${resultados.kwp} kW (Huawei / Growatt / GoodWe)`,
+    `1 inversor capacidad aprox. ${resultados.kwp} kW (Huawei / Growatt / GoodWe)`,
     'Estructura de montaje (rieles, clamps, L-Foot y puesta a tierra)',
     'Cableado solar AC/DC, protecciones electricas y fusibles',
     'Instalacion, puesta en marcha y configuracion de monitoreo remoto',

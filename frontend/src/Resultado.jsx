@@ -615,9 +615,9 @@ export default function Resultado() {
                   </thead>
                   <tbody>
                     <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
-                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1 kit</td></tr>
-                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1 kit</td></tr>
+                    <tr><td>Capacidad aprox. Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1</td></tr>
+                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1</td></tr>
                     <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
                     <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
                     <tr><td>Servicio de instalación y puesta en marcha</td><td className="num">1</td></tr>
@@ -877,7 +877,7 @@ export default function Resultado() {
                   </thead>
                   <tbody>
                     <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Capacidad aprox. Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
                     <tr><td>Riel 47</td><td className="num">{resultadoActivo.riel47}</td></tr>
                     <tr><td>Mid Clamp</td><td className="num">{resultadoActivo.midCland}</td></tr>
                     <tr><td>End Clamp</td><td className="num">{resultadoActivo.endCland}</td></tr>

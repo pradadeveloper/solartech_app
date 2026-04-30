@@ -330,9 +330,9 @@ export default function PropuestaPublica() {
                   <thead><tr><th>Ítem</th><th>Cantidad</th></tr></thead>
                   <tbody>
                     <tr><td>Paneles {r?.potenciaPanel ?? calc?.potenciaPanel ?? cfg.potenciaPanel}W</td><td className="num">{r?.npaneles}</td></tr>
-                    <tr><td>Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
-                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1 kit</td></tr>
-                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1 kit</td></tr>
+                    <tr><td>Capacidad aprox. Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1</td></tr>
+                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1</td></tr>
                     <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
                     <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
                     <tr><td>Servicio de instalación y puesta en marcha</td><td className="num">1</td></tr>
