@@ -485,7 +485,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     page.drawRectangle({ x: margin, y: y - 28, width: cW, height: 28, color: COLOR_LIGHT, borderColor: COLOR_BORDER, borderWidth: 1.5 });
     page.drawRectangle({ x: margin, y: y - 28, width: 5, height: 28, color: COLOR_ACCENT });
     page.drawText(title.toUpperCase(), { x: margin + 14, y: y - 18, size: 11, font: fontBold, color: COLOR_TITLE });
-    y -= 36;
+    y -= 44; // +8px breathing room between header bar and content
   }
 
   function infoRow(label, value, highlight) {
@@ -557,6 +557,24 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   }
 
   const gap = (n) => { y -= (n || 10); };
+
+  // Shared word-wrap helper used by Etapas and Garantías
+  const wrapWords = (text, maxW, sz) => {
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const candidate = line ? `${line} ${w}` : w;
+      if (font.widthOfTextAtSize(candidate, sz) > maxW) {
+        if (line) lines.push(line);
+        line = w;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
 
   // ─── INICIO ───
   newPage();
@@ -688,29 +706,66 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   //   y -= bH + 12;
   // }
 
-  // 9. ETAPAS DEL PROYECTO
+  // 9. ETAPAS DEL PROYECTO — 2 columnas de 3 para que queden todas en la misma página
   sectionHeader('ETAPAS DEL PROYECTO');
   const etapas = [
-    { n: '01', t: 'Visita tecnica', d: 'Inspeccion del sitio, medicion de area disponible y evaluacion estructural de la cubierta.' },
-    { n: '02', t: 'Diseno e ingenieria', d: 'Elaboracion de planos, memorias de calculo, diseno electrico y simulacion de produccion solar.' },
-    { n: '03', t: 'Aprobacion UPME / RETIE', d: 'Gestion de permisos ante el operador de red local y cumplimiento de normativa RETIE vigente.' },
-    { n: '04', t: 'Adquisicion de equipos', d: 'Compra e importacion de paneles, inversores y materiales de instalacion de marcas aliadas.' },
-    { n: '05', t: 'Instalacion y montaje', d: 'Ejecucion de obra, montaje de estructura, instalacion de paneles y conexiones electricas certificadas.' },
+    { n: '01', t: 'Visita tecnica',           d: 'Inspeccion del sitio, medicion de area disponible y evaluacion estructural de la cubierta.' },
+    { n: '02', t: 'Diseno e ingenieria',       d: 'Elaboracion de planos, memorias de calculo, diseno electrico y simulacion de produccion solar.' },
+    { n: '03', t: 'Aprobacion UPME / RETIE',  d: 'Gestion de permisos ante el operador de red local y cumplimiento de normativa RETIE vigente.' },
+    { n: '04', t: 'Adquisicion de equipos',   d: 'Compra e importacion de paneles, inversores y materiales de instalacion de marcas aliadas.' },
+    { n: '05', t: 'Instalacion y montaje',    d: 'Ejecucion de obra, montaje de estructura, instalacion de paneles y conexiones electricas certificadas.' },
     { n: '06', t: 'Puesta en marcha y entrega', d: 'Pruebas del sistema, configuracion del monitoreo remoto, capacitacion y entrega de documentacion.' },
   ];
-  etapas.forEach(({ n, t, d }) => {
-    checkY(34);
-    page.drawRectangle({ x: margin + 10, y: y - 24, width: 24, height: 24, color: COLOR_ACCENT });
-    page.drawText(n, { x: margin + 14, y: y - 16, size: 8.5, font: fontBold, color: COLOR_WHITE });
-    page.drawText(t, { x: margin + 42, y: y - 9, size: 9, font: fontBold, color: COLOR_TEXT });
-    page.drawText(d, { x: margin + 42, y: y - 21, size: 7.5, font, color: COLOR_MUTED });
-    y -= 32;
-  });
-  gap(6);
+  {
+    const eColW   = (cW - 14) / 2;
+    const eBadgeS = 24;
+    const eTxtOff = eBadgeS + 16;
+    const eTxtMaxW = eColW - eTxtOff - 8;
+    const eTitleSz = 8.5;
+    const eDescSz  = 7.5;
+    const eLineH   = 11;
 
+    const eItemH = (item) => {
+      const dLines = wrapWords(item.d, eTxtMaxW, eDescSz);
+      return 10 + 14 + dLines.length * eLineH + 8; // top-pad + title + desc-lines + bottom-pad
+    };
 
-  // 10. GARANTIAS
-  gap(6);
+    const colLeft  = etapas.slice(0, 3);
+    const colRight = etapas.slice(3, 6);
+    const rowH = [0, 1, 2].map(i => Math.max(eItemH(colLeft[i]), eItemH(colRight[i])));
+    const totalEH = rowH.reduce((s, h) => s + h + 6, 0);
+    checkY(totalEH + 8);
+    const eStartY = y;
+
+    [colLeft, colRight].forEach((col, ci) => {
+      const cx = margin + ci * (eColW + 14);
+      let cy = eStartY;
+      col.forEach((item, ri) => {
+        const rH = rowH[ri];
+        page.drawRectangle({ x: cx, y: cy - rH, width: eColW, height: rH, color: rgb(0.97, 0.97, 0.97), borderColor: COLOR_BORDER_INNER, borderWidth: 0.75 });
+        // badge centrado verticalmente
+        const badgeY = cy - rH + (rH - eBadgeS) / 2;
+        page.drawRectangle({ x: cx + 7, y: badgeY, width: eBadgeS, height: eBadgeS, color: COLOR_ACCENT });
+        page.drawText(item.n, { x: cx + 12, y: badgeY + 14, size: 8.5, font: fontBold, color: COLOR_WHITE });
+        // título
+        page.drawText(item.t, { x: cx + eTxtOff, y: cy - 16, size: eTitleSz, font: fontBold, color: COLOR_TEXT });
+        // descripción con wrap
+        const dLines = wrapWords(item.d, eTxtMaxW, eDescSz);
+        let ly = cy - 16 - eLineH;
+        dLines.forEach(ln => {
+          page.drawText(ln, { x: cx + eTxtOff, y: ly, size: eDescSz, font, color: COLOR_MUTED });
+          ly -= eLineH;
+        });
+        cy -= rH + 6;
+      });
+    });
+    y -= totalEH + 6;
+    gap(6);
+  }
+
+  // 10. GARANTIAS + PROYECTOS INSTALADOS — nueva página
+  newPage(false);
+  gap(4);
   sectionHeader('GARANTIAS');
   {
     const col1Items = [
@@ -734,27 +789,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     const descMaxW  = colW - textOff - 4;
     const fontSize  = 8.5;
 
-    // word-wrap: split desc into lines that fit descMaxW
-    const wrapText = (text, maxW, sz) => {
-      const words = text.split(' ');
-      const lines = [];
-      let line = '';
-      for (const w of words) {
-        const candidate = line ? `${line} ${w}` : w;
-        if (font.widthOfTextAtSize(candidate, sz) > maxW) {
-          if (line) lines.push(line);
-          line = w;
-        } else {
-          line = candidate;
-        }
-      }
-      if (line) lines.push(line);
-      return lines;
-    };
-
     // measure total height of one column
     const colHeight = (items) => items.reduce((h, [, desc]) => {
-      const lines = wrapText(desc, descMaxW, fontSize);
+      const lines = wrapWords(desc, descMaxW, fontSize);
       return h + itemLineH + lines.length * descLineH + itemGap;
     }, 0);
 
@@ -769,7 +806,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
         page.drawRectangle({ x: cx + dotOff, y: cy - 6, width: 6, height: 6, color: COLOR_ACCENT });
         page.drawText(`${label}:`, { x: cx + textOff, y: cy - 5, size: fontSize, font: fontBold, color: COLOR_ACCENT });
         cy -= itemLineH;
-        const lines = wrapText(desc, descMaxW, fontSize);
+        const lines = wrapWords(desc, descMaxW, fontSize);
         lines.forEach(ln => {
           page.drawText(ln, { x: cx + textOff, y: cy, size: fontSize, font, color: COLOR_TEXT });
           cy -= descLineH;
@@ -781,8 +818,73 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     drawCol(col1Items, colX1);
     drawCol(col2Items, colX2);
     y -= totalH;
-    gap(6);
+    gap(10);
   }
+
+  // PROYECTOS INSTALADOS — misma página que Garantías
+  sectionHeader('PROYECTOS INSTALADOS');
+  {
+    const proyectos = [
+      {
+        banner: bannerImgs.industria || bannerImgs.industria2,
+        tipo: 'Industrial',
+        nombre: 'Industria manufacturera',
+        ciudad: 'Medellin, Antioquia',
+        kwp: '42 kWp  •  72 paneles',
+        desc: 'Reduccion del 100% de la factura energetica con sistema trifasico.',
+      },
+      {
+        banner: bannerImgs.hogar,
+        tipo: 'Residencial',
+        nombre: 'Residencia familiar',
+        ciudad: 'Bogota, Cundinamarca',
+        kwp: '8 kWp  •  14 paneles',
+        desc: 'Autosuficiencia energetica total con monitoreo remoto incluido.',
+      },
+      {
+        banner: bannerImgs.industria2 || bannerImgs.industria3,
+        tipo: 'Comercial',
+        nombre: 'Edificio comercial',
+        ciudad: 'Cali, Valle del Cauca',
+        kwp: '28 kWp  •  48 paneles',
+        desc: 'Ahorro del 80% en areas comunes con retorno en 4 anos.',
+      },
+    ];
+
+    const pColW  = (cW - 12) / 3;
+    const pImgH  = 52;
+    const pCardH = pImgH + 58;
+    checkY(pCardH + 8);
+
+    proyectos.forEach((p, i) => {
+      const px = margin + i * (pColW + 6);
+      const py = y;
+      // Borde de la tarjeta
+      page.drawRectangle({ x: px, y: py - pCardH, width: pColW, height: pCardH, color: COLOR_WHITE, borderColor: COLOR_BORDER, borderWidth: 0.75 });
+      // Imagen o placeholder
+      if (p.banner) {
+        page.drawImage(p.banner, { x: px, y: py - pImgH, width: pColW, height: pImgH });
+      } else {
+        page.drawRectangle({ x: px, y: py - pImgH, width: pColW, height: pImgH, color: COLOR_ACLIGHT });
+      }
+      // Badge de tipo sobre la imagen
+      page.drawRectangle({ x: px + 6, y: py - pImgH + 6, width: 52, height: 15, color: COLOR_ACCENT });
+      page.drawText(p.tipo.toUpperCase(), { x: px + 9, y: py - pImgH + 11, size: 6.5, font: fontBold, color: COLOR_WHITE });
+      // Contenido
+      const cy0 = py - pImgH - 12;
+      page.drawText(p.nombre, { x: px + 8, y: cy0, size: 8.5, font: fontBold, color: COLOR_TEXT });
+      page.drawText(p.ciudad, { x: px + 8, y: cy0 - 13, size: 7.5, font, color: COLOR_MUTED });
+      page.drawText(p.kwp,    { x: px + 8, y: cy0 - 26, size: 7.5, font: fontBold, color: COLOR_ACCENT });
+      const descLines = wrapWords(p.desc, pColW - 16, 7);
+      let dy = cy0 - 39;
+      descLines.slice(0, 2).forEach(ln => {
+        page.drawText(ln, { x: px + 8, y: dy, size: 7, font, color: COLOR_MUTED });
+        dy -= 10;
+      });
+    });
+    y -= pCardH + 8;
+  }
+  gap(6);
 
   // 11. CASOS DE EXITO + MARCAS ALIADAS + CONDICIONES — página sin banner
   newPage(false);
