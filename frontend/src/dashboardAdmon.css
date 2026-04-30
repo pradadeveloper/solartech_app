@@ -187,7 +187,20 @@ color: var(--text);
 cursor: pointer;
 }
 
-.topbar__right{ display: flex; gap: 10px; }
+.topbar__right{ display: flex; gap: 10px; align-items: center; }
+
+.topbar__user{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar__userName{
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
 
 .btn{
 border: 1px solid var(--border);
@@ -272,8 +285,8 @@ grid-template-columns: repeat(2, minmax(0, 1fr));
     font-size: 12px;
     white-space: nowrap;
   }
-  /* "Exportar CSV" se oculta en mobile — acción poco frecuente en campo */
-  .topbar__right .btn:not(.btn--primary) {
+  /* Usuario/rol se oculta en mobile — sin espacio en la barra */
+  .topbar__user {
     display: none;
   }
 }

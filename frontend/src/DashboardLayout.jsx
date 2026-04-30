@@ -161,15 +161,14 @@ export default function DashboardLayout() {
           </div>
 
           <div className="topbar__right">
-            <button className="btn">Exportar CSV</button>
-
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => navigate("/cliente")}
-            >
-              Nuevo Lead
-            </button>
+            <div className="topbar__user">
+              <span className="topbar__userName">
+                {localStorage.getItem('nombreUsuario') || 'Usuario'}
+              </span>
+              <span className={`rolBadge rolBadge--${isAdmin ? 'admin' : 'asesor'}`}>
+                {rol}
+              </span>
+            </div>
           </div>
         </header>
 

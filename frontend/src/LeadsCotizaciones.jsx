@@ -149,7 +149,7 @@ export default function LeadsCotizaciones() {
         <button
           onClick={exportarCSV}
           style={{
-            background: "var(--accent)", color: "#000", border: "none",
+            background: "var(--accent)", color: "#fff", border: "none",
             borderRadius: 8, padding: "8px 18px", fontSize: "0.85rem",
             fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
           }}
