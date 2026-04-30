@@ -291,7 +291,7 @@ export default function LeadsCotizaciones() {
                   { label: "kWp",              hide: true,      adminOnly: false },
                   { label: "Sistema",          hide: true,      adminOnly: false },
                   { label: "Valor",            hide: false,     adminOnly: false },
-                  { label: "Opción principal", hide: true,      adminOnly: false },
+                  { label: "",                 hide: true,      adminOnly: false },
                   { label: "Estado",           hide: false,     adminOnly: false },
                   { label: "Asesor",           hide: true,      adminOnly: true  },
                   { label: "Acciones",         hide: false,     adminOnly: false },
@@ -352,7 +352,7 @@ export default function LeadsCotizaciones() {
                   <input style={inputStyle} type="number" placeholder="Valor mín" value={f.valorMin} onChange={set("valorMin")} min="0" />
                 </td>
 
-                {/* Opción principal — sin filtro */}
+                {/* Espaciador */}
                 <td className="col-hide-mobile" style={{ padding: "6px 8px" }} />
 
                 {/* Estado */}
@@ -410,16 +410,7 @@ export default function LeadsCotizaciones() {
                         {money(lead.costoProyectoMasIva)}
                       </td>
 
-                      <td className="col-hide-mobile" style={{ padding: "10px 8px", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {op ? (
-                          <span title={`${op.label} · ${op.kwp ?? "—"} kWp · ${money(op.costoProyectoMasIva)}`}>
-                            <span style={{ color: "var(--accent)", fontWeight: 700 }}>{op.label}</span>
-                            <span style={{ color: "var(--muted)", fontSize: "0.78rem", marginLeft: 4 }}>{op.kwp ?? "—"} kWp</span>
-                          </span>
-                        ) : (
-                          <span style={{ color: "var(--muted2)" }}>—</span>
-                        )}
-                      </td>
+                      <td className="col-hide-mobile" />
 
                       <td style={{ padding: "10px 12px" }}>
                         <select
