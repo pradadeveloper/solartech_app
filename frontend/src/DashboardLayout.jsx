@@ -161,6 +161,14 @@ export default function DashboardLayout() {
           </div>
 
           <div className="topbar__right">
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => navigate("/cliente")}
+            >
+              Nueva Cotización
+            </button>
+
             <div className="topbar__user">
               <span className="topbar__userName">
                 {localStorage.getItem('nombreUsuario') || 'Usuario'}
