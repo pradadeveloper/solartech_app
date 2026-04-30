@@ -931,7 +931,7 @@ function ChartFinanciero({ r }) {
   if (!ahorroAnual || !inversion) return null;
 
   const data = Array.from({ length: 26 }, (_, i) => ({
-    año: `A${i}`,
+    año: i,
     'Ahorro acum.': ahorroAnual * i,
   }));
 
@@ -949,11 +949,18 @@ function ChartFinanciero({ r }) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-          <XAxis dataKey="año" tick={{ fontSize: 10, fill: '#888' }} />
+          <XAxis
+            dataKey="año"
+            type="number"
+            domain={[0, 25]}
+            ticks={[0, 5, 10, 15, 20, 25]}
+            tickFormatter={(v) => `A${v}`}
+            tick={{ fontSize: 10, fill: '#888' }}
+          />
           <YAxis tickFormatter={fmtM} tick={{ fontSize: 10, fill: '#888' }} width={42} />
           <Tooltip
             formatter={(v) => [`$${Number(v).toLocaleString('es-CO')}`, 'Ahorro acumulado']}
-            labelFormatter={(l) => `Año ${l.replace('A', '')}`}
+            labelFormatter={(l) => `Año ${l}`}
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
           />
           <ReferenceLine y={inversion} stroke={C1} strokeDasharray="5 4"
