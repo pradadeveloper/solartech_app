@@ -89,6 +89,7 @@ export default function PropuestaPublica() {
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [pdfUrlLocal, setPdfUrlLocal]   = useState(null);
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [baseLead, setBaseLead] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -102,6 +103,15 @@ export default function PropuestaPublica() {
     }).catch(() => { setError('No se pudo cargar la propuesta.'); setLoading(false); });
   }, [num]);
 
+  useEffect(() => {
+    if (!String(num).includes('_')) return;
+    const baseNum = String(num).split('_')[0];
+    fetch(`${API}/api/propuesta/${baseNum}`)
+      .then(r => r.json())
+      .then(data => { if (!data.error) setBaseLead(data); })
+      .catch(() => {});
+  }, [num]);
+
   const calc = useMemo(() => {
     if (!lead) return null;
     const storedCostokWp = lead.kwp > 0 && lead.costoProyectoMasIva > 0
@@ -110,9 +120,11 @@ export default function PropuestaPublica() {
     const costoKwh = lead.costoKwh ||
       (lead.ahorroMensual > 0 && lead.consumoKwh > 0
         ? Math.round(lead.ahorroMensual / lead.consumoKwh)
-        : 0);
-    return calcularLocal(lead.kwp, costoKwh, storedCostokWp, { ...cfg, ...lead });
-  }, [lead, cfg]);
+        : 0) ||
+      cfg.costoKwh || 700;
+    const consumoKwhBase = baseLead?.consumoKwh || lead.consumoKwh;
+    return calcularLocal(lead.kwp, costoKwh, storedCostokWp, { ...cfg, ...lead, consumoKwh: consumoKwhBase });
+  }, [lead, cfg, baseLead]);
 
   // Datos unificados: prioriza calc (fresco) sobre lead (almacenado)
   const r = useMemo(() => ({ ...lead, ...calc }), [lead, calc]);

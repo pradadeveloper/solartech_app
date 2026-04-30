@@ -791,7 +791,11 @@ export default function Resultado() {
             {versiones.length > 0 && (
               <Card title="Versiones guardadas">
                 <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                  {versiones.map((ver, vidx) => (
+                  {versiones.map((ver, vidx) => {
+                    const cobVer = resultado?.consumoKwh > 0 && ver.produccionDeEnergia > 0
+                      ? Math.min(100, Number(((ver.produccionDeEnergia / resultado.consumoKwh) * 100).toFixed(1)))
+                      : (ver.coberturaFactura > 0 ? ver.coberturaFactura : null);
+                    return (
                     <div key={vidx} style={{
                       padding: '10px 0',
                       borderBottom: vidx < versiones.length - 1 ? '1px solid #eee' : 'none',
@@ -800,7 +804,7 @@ export default function Resultado() {
                         <b style={{ color: '#b03a22', fontSize: '0.9rem' }}>N-{ver.numeroCotizacion}</b>
                         {ver.label && <span style={{ fontSize: '0.75rem', opacity: 0.6, marginLeft: 6 }}>{ver.label}</span>}
                         <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: 2 }}>
-                          {ver.kwp} kWp · ${Number(ver.costoProyectoMasIva).toLocaleString('es-CO')}
+                          {ver.kwp} kWp · ${Number(ver.costoProyectoMasIva).toLocaleString('es-CO')}{cobVer !== null ? ` · ${cobVer}%` : ''}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -821,7 +825,7 @@ export default function Resultado() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  ); })}
                 </div>
               </Card>
             )}
