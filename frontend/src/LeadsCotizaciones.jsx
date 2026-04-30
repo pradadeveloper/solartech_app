@@ -169,7 +169,7 @@ export default function LeadsCotizaciones() {
   const hayFiltros = Object.entries(f).some(([k, v]) => k !== "fechaOrden" && v !== "");
 
   return (
-    <div style={{ padding: "0 4px" }}>
+    <div style={{ padding: "0 4px", minWidth: 0, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -277,8 +277,8 @@ export default function LeadsCotizaciones() {
         </div>
 
         {/* ── Vista tabla (desktop) ── */}
-        <div className="leads-table-wrap" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.83rem" }}>
+        <div className="leads-table-wrap" style={{ overflowX: "auto", width: "100%" }}>
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: "0.83rem" }}>
             <thead>
               {/* Fila de encabezados */}
               <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>
@@ -410,16 +410,14 @@ export default function LeadsCotizaciones() {
                         {money(lead.costoProyectoMasIva)}
                       </td>
 
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px" }}>
+                      <td className="col-hide-mobile" style={{ padding: "10px 8px", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {op ? (
-                          <div>
+                          <span title={`${op.label} · ${op.kwp ?? "—"} kWp · ${money(op.costoProyectoMasIva)}`}>
                             <span style={{ color: "var(--accent)", fontWeight: 700 }}>{op.label}</span>
-                            <span style={{ color: "var(--muted)", fontSize: "0.78rem", marginLeft: 6 }}>
-                              {op.kwp ?? "—"} kWp · {money(op.costoProyectoMasIva)}
-                            </span>
-                          </div>
+                            <span style={{ color: "var(--muted)", fontSize: "0.78rem", marginLeft: 4 }}>{op.kwp ?? "—"} kWp</span>
+                          </span>
                         ) : (
-                          <span style={{ color: "var(--muted2)" }}>Sin opción marcada</span>
+                          <span style={{ color: "var(--muted2)" }}>—</span>
                         )}
                       </td>
 
