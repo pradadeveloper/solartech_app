@@ -1058,7 +1058,7 @@ app.post('/api/login', (req, res) => {
   const token = jwt.sign(
     { id: user.id, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, usuario: user.usuario, celular: user.celular || '', correo: user.correo || '', rol: user.rol || 'Asesor' },
     JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '30d' }
   );
 
   res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, celular: user.celular || '', correo: user.correo || '', rol: user.rol || 'Asesor' });
@@ -1126,6 +1126,14 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
           correo:   asesorVivo.correo   || decoded.correo  || '',
         };
       } catch (_) {}
+    }
+    // Fallback: si el token no dio nombre, buscar por vendedor en usuarios
+    if (!asesorPDF.nombre && data.vendedor) {
+      const av = usuarios.find(u =>
+        `${u.nombre} ${u.apellido}`.trim() === data.vendedor ||
+        u.usuario === data.vendedor
+      ) || {};
+      if (av.nombre) asesorPDF = { nombre: av.nombre, apellido: av.apellido || '', cargo: av.cargo || '', usuario: av.usuario || '', celular: av.celular || '', correo: av.correo || '' };
     }
 
     const cfg = await leerConfig();
@@ -1479,6 +1487,14 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
           correo:   asesorVivo.correo   || decoded.correo  || '',
         };
       } catch (_) {}
+    }
+    // Fallback: si el token no dio nombre, buscar por vendedor en usuarios
+    if (!asesorPDF.nombre && data.vendedor) {
+      const av = usuarios.find(u =>
+        `${u.nombre} ${u.apellido}`.trim() === data.vendedor ||
+        u.usuario === data.vendedor
+      ) || {};
+      if (av.nombre) asesorPDF = { nombre: av.nombre, apellido: av.apellido || '', cargo: av.cargo || '', usuario: av.usuario || '', celular: av.celular || '', correo: av.correo || '' };
     }
 
     // For versioned proposals, respect the version's costokWp
