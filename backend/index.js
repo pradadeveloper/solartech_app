@@ -420,7 +420,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     }
   }
 
-  // Imagenes de proyectos instalados
+  // Imagenes de proyectos instalados (detecta jpg vs png por magic bytes)
   const proyectosImgs = {};
   for (const [key, file] of [
     ['caribeMotor',     'PROYECTO CARIBE MOTOR PDF.jpg'],
@@ -430,9 +430,12 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     ['naturalHarvest',  'PROYECTO NATURAL HARVEST PDF.jpg'],
   ]) {
     const ip = path.join(assetsPath, file);
-    if (fs.existsSync(ip)) {
-      try { proyectosImgs[key] = await pdfDoc.embedJpg(fs.readFileSync(ip)); } catch (_) {}
-    }
+    if (!fs.existsSync(ip)) continue;
+    try {
+      const buf = fs.readFileSync(ip);
+      const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+      proyectosImgs[key] = isPng ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf);
+    } catch (_) {}
   }
 
   let page;
@@ -884,12 +887,13 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
       },
     ];
 
-    const pCols  = 3;
-    const pGap   = 6;
-    const pColW  = (cW - pGap * (pCols - 1)) / pCols;
-    const pImgH  = 52;
-    const pCardH = pImgH + 65;
-    const pRows  = Math.ceil(proyectos.length / pCols);
+    const pCols   = 3;
+    const pGap    = 6;
+    const pColW   = (cW - pGap * (pCols - 1)) / pCols;
+    const pImgH   = 55;
+    const pCardH  = pImgH + 75;
+    const pRows   = Math.ceil(proyectos.length / pCols);
+    const COLOR_GREEN = rgb(0.055, 0.502, 0.165);
     checkY(pRows * (pCardH + 8));
 
     proyectos.forEach((p, i) => {
@@ -909,17 +913,20 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
         page.drawRectangle({ x: px, y: py - pImgH, width: pColW, height: pImgH, color: COLOR_ACLIGHT });
       }
 
-      const cy0 = py - pImgH - 12;
-      const nameLines = wrapWords(p.nombre, pColW - 16, 8);
-      let ty = cy0;
+      let ty = py - pImgH - 11;
+      const nameLines = wrapWords(p.nombre, pColW - 16, 7.5);
       nameLines.slice(0, 2).forEach(ln => {
-        page.drawText(ln, { x: px + 8, y: ty, size: 8, font: fontBold, color: COLOR_TEXT });
-        ty -= 11;
+        page.drawText(ln, { x: px + 8, y: ty, size: 7.5, font: fontBold, color: COLOR_TEXT });
+        ty -= 10;
       });
-      page.drawText(p.ciudad,           { x: px + 8, y: ty,      size: 7,   font,      color: COLOR_MUTED  });
-      page.drawText(p.kwp,              { x: px + 8, y: ty - 11, size: 8,   font: fontBold, color: COLOR_ACCENT });
-      page.drawText('Ahorro: ' + p.ahorro,   { x: px + 8, y: ty - 23, size: 7,   font,      color: COLOR_TEXT   });
-      page.drawText('Retorno: ' + p.retorno, { x: px + 8, y: ty - 34, size: 7,   font,      color: COLOR_MUTED  });
+      page.drawText(p.ciudad, { x: px + 8, y: ty, size: 6.5, font, color: COLOR_MUTED });
+      ty -= 14;
+      // Ahorro = dato protagonista
+      page.drawText(p.ahorro, { x: px + 8, y: ty, size: 12, font: fontBold, color: COLOR_GREEN });
+      ty -= 13;
+      page.drawText('Ahorro mensual estimado', { x: px + 8, y: ty, size: 6.5, font, color: COLOR_MUTED });
+      ty -= 11;
+      page.drawText(`${p.kwp}  ·  Retorno: ${p.retorno}`, { x: px + 8, y: ty, size: 7, font, color: COLOR_ACCENT });
     });
     y -= pRows * (pCardH + 8);
   }
