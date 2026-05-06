@@ -385,7 +385,6 @@ export default function LeadsCotizaciones() {
                 </tr>
               ) : (
                 filtrados.map((lead) => {
-                  const op = opcionPrincipal(lead);
                   const pdf = pdfPrincipal(lead);
                   const badge = BADGE[lead.estado] ?? BADGE["Nuevo"];
                   return (
