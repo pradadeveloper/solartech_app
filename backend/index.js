@@ -420,6 +420,21 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     }
   }
 
+  // Imagenes de proyectos instalados
+  const proyectosImgs = {};
+  for (const [key, file] of [
+    ['caribeMotor',     'PROYECTO CARIBE MOTOR PDF.jpg'],
+    ['absorbentes',     'PROYECTO ABSORBENTES DE COLOMBIA PDF.jpg'],
+    ['saferAgro',       'PROYECTO SAFER AGROBIOLÓGICOS PDF.jpg'],
+    ['agricolasUnidas', 'PROYECTO AGRICOLAS UNIDAS PDF.jpg'],
+    ['naturalHarvest',  'PROYECTO NATURAL HARVEST PDF.jpg'],
+  ]) {
+    const ip = path.join(assetsPath, file);
+    if (fs.existsSync(ip)) {
+      try { proyectosImgs[key] = await pdfDoc.embedJpg(fs.readFileSync(ip)); } catch (_) {}
+    }
+  }
+
   let page;
   let y;
   let pageCount = 0;
@@ -828,63 +843,85 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   {
     const proyectos = [
       {
-        banner: bannerImgs.industria || bannerImgs.industria2,
-        tipo: 'Industrial',
-        nombre: 'Industria manufacturera',
-        ciudad: 'Medellin, Antioquia',
-        kwp: '42 kWp  •  72 paneles',
-        desc: 'Reduccion del 100% de la factura energetica con sistema trifasico.',
+        img: proyectosImgs.caribeMotor,
+        nombre: 'PROYECTO CARIBE MOTOR',
+        ciudad: 'Medellín, Antioquia',
+        kwp: '135 kWp',
+        ahorro: '$9.500.000/mes',
+        retorno: '3.6 años',
       },
       {
-        banner: bannerImgs.hogar,
-        tipo: 'Residencial',
-        nombre: 'Residencia familiar',
-        ciudad: 'Bogota, Cundinamarca',
-        kwp: '8 kWp  •  14 paneles',
-        desc: 'Autosuficiencia energetica total con monitoreo remoto incluido.',
+        img: proyectosImgs.absorbentes,
+        nombre: 'ABSORBENTES DE COLOMBIA',
+        ciudad: 'Cartagena, Bolívar',
+        kwp: '540 kWp',
+        ahorro: '$55.000.000/mes',
+        retorno: '3.4 años',
       },
       {
-        banner: bannerImgs.industria2 || bannerImgs.industria3,
-        tipo: 'Comercial',
-        nombre: 'Edificio comercial',
-        ciudad: 'Cali, Valle del Cauca',
-        kwp: '28 kWp  •  48 paneles',
-        desc: 'Ahorro del 80% en areas comunes con retorno en 4 anos.',
+        img: proyectosImgs.saferAgro,
+        nombre: 'SAFER AGROBIOLÓGICOS',
+        ciudad: 'San Pedro, Antioquia',
+        kwp: '130 kWp',
+        ahorro: '$13.000.000/mes',
+        retorno: '3.3 años',
+      },
+      {
+        img: proyectosImgs.agricolasUnidas,
+        nombre: 'AGRÍCOLAS UNIDAS',
+        ciudad: 'Támesis, Antioquia',
+        kwp: '136 kWp',
+        ahorro: '$9.500.000/mes',
+        retorno: '3.2 años',
+      },
+      {
+        img: proyectosImgs.naturalHarvest,
+        nombre: 'NATURAL HARVEST',
+        ciudad: 'Pereira, Risaralda',
+        kwp: '130 kWp',
+        ahorro: '$11.500.000/mes',
+        retorno: '3.8 años',
       },
     ];
 
-    const pColW  = (cW - 12) / 3;
+    const pCols  = 3;
+    const pGap   = 6;
+    const pColW  = (cW - pGap * (pCols - 1)) / pCols;
     const pImgH  = 52;
-    const pCardH = pImgH + 58;
-    checkY(pCardH + 8);
+    const pCardH = pImgH + 65;
+    const pRows  = Math.ceil(proyectos.length / pCols);
+    checkY(pRows * (pCardH + 8));
 
     proyectos.forEach((p, i) => {
-      const px = margin + i * (pColW + 6);
-      const py = y;
-      // Borde de la tarjeta
+      const col      = i % pCols;
+      const row      = Math.floor(i / pCols);
+      const rowStart = row * pCols;
+      const rowCount = Math.min(pCols, proyectos.length - rowStart);
+      const rowOffX  = rowCount < pCols ? (cW - rowCount * pColW - (rowCount - 1) * pGap) / 2 : 0;
+      const px = margin + rowOffX + col * (pColW + pGap);
+      const py = y - row * (pCardH + 8);
+
       page.drawRectangle({ x: px, y: py - pCardH, width: pColW, height: pCardH, color: COLOR_WHITE, borderColor: COLOR_BORDER, borderWidth: 0.75 });
-      // Imagen o placeholder
-      if (p.banner) {
-        page.drawImage(p.banner, { x: px, y: py - pImgH, width: pColW, height: pImgH });
+
+      if (p.img) {
+        page.drawImage(p.img, { x: px, y: py - pImgH, width: pColW, height: pImgH });
       } else {
         page.drawRectangle({ x: px, y: py - pImgH, width: pColW, height: pImgH, color: COLOR_ACLIGHT });
       }
-      // Badge de tipo sobre la imagen
-      page.drawRectangle({ x: px + 6, y: py - pImgH + 6, width: 52, height: 15, color: COLOR_ACCENT });
-      page.drawText(p.tipo.toUpperCase(), { x: px + 9, y: py - pImgH + 11, size: 6.5, font: fontBold, color: COLOR_WHITE });
-      // Contenido
+
       const cy0 = py - pImgH - 12;
-      page.drawText(p.nombre, { x: px + 8, y: cy0, size: 8.5, font: fontBold, color: COLOR_TEXT });
-      page.drawText(p.ciudad, { x: px + 8, y: cy0 - 13, size: 7.5, font, color: COLOR_MUTED });
-      page.drawText(p.kwp,    { x: px + 8, y: cy0 - 26, size: 7.5, font: fontBold, color: COLOR_ACCENT });
-      const descLines = wrapWords(p.desc, pColW - 16, 7);
-      let dy = cy0 - 39;
-      descLines.slice(0, 2).forEach(ln => {
-        page.drawText(ln, { x: px + 8, y: dy, size: 7, font, color: COLOR_MUTED });
-        dy -= 10;
+      const nameLines = wrapWords(p.nombre, pColW - 16, 8);
+      let ty = cy0;
+      nameLines.slice(0, 2).forEach(ln => {
+        page.drawText(ln, { x: px + 8, y: ty, size: 8, font: fontBold, color: COLOR_TEXT });
+        ty -= 11;
       });
+      page.drawText(p.ciudad,           { x: px + 8, y: ty,      size: 7,   font,      color: COLOR_MUTED  });
+      page.drawText(p.kwp,              { x: px + 8, y: ty - 11, size: 8,   font: fontBold, color: COLOR_ACCENT });
+      page.drawText('Ahorro: ' + p.ahorro,   { x: px + 8, y: ty - 23, size: 7,   font,      color: COLOR_TEXT   });
+      page.drawText('Retorno: ' + p.retorno, { x: px + 8, y: ty - 34, size: 7,   font,      color: COLOR_MUTED  });
     });
-    y -= pCardH + 8;
+    y -= pRows * (pCardH + 8);
   }
   gap(6);
 
