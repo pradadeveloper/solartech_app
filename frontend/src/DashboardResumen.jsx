@@ -35,13 +35,6 @@ function isSameDay(date, ref) {
   );
 }
 
-function isSameMonth(date, ref) {
-  return (
-    date.getFullYear() === ref.getFullYear() &&
-    date.getMonth() === ref.getMonth()
-  );
-}
-
 // Últimos N días: devuelve array [{ dia: "Lun 31", leads: 0 }, ...]
 function buildLeadsPorDia(leads, dias = 14) {
   const hoy = new Date();
