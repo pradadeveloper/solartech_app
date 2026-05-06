@@ -887,48 +887,45 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
       },
     ];
 
-    const pCols   = 3;
-    const pGap    = 6;
-    const pColW   = (cW - pGap * (pCols - 1)) / pCols;
-    const pImgH   = 55;
-    const pCardH  = pImgH + 75;
-    const pRows   = Math.ceil(proyectos.length / pCols);
+    const pGap     = 8;
+    const pImgH    = 115;
+    const pCardH   = pImgH + 78;
     const COLOR_GREEN = rgb(0.055, 0.502, 0.165);
-    checkY(pRows * (pCardH + 8));
+    // Fila 0: 3 columnas iguales; Fila 1: 2 columnas más anchas (llenan todo el ancho)
+    const pColW3   = (cW - pGap * 2) / 3;
+    const pColW2   = (cW - pGap) / 2;
+    checkY(2 * (pCardH + 8));
 
     proyectos.forEach((p, i) => {
-      const col      = i % pCols;
-      const row      = Math.floor(i / pCols);
-      const rowStart = row * pCols;
-      const rowCount = Math.min(pCols, proyectos.length - rowStart);
-      const rowOffX  = rowCount < pCols ? (cW - rowCount * pColW - (rowCount - 1) * pGap) / 2 : 0;
-      const px = margin + rowOffX + col * (pColW + pGap);
-      const py = y - row * (pCardH + 8);
+      const row  = i < 3 ? 0 : 1;
+      const col  = i < 3 ? i : i - 3;
+      const colW = row === 0 ? pColW3 : pColW2;
+      const px   = margin + col * (colW + pGap);
+      const py   = y - row * (pCardH + 8);
 
-      page.drawRectangle({ x: px, y: py - pCardH, width: pColW, height: pCardH, color: COLOR_WHITE, borderColor: COLOR_BORDER, borderWidth: 0.75 });
+      page.drawRectangle({ x: px, y: py - pCardH, width: colW, height: pCardH, color: COLOR_WHITE, borderColor: COLOR_BORDER, borderWidth: 0.75 });
 
       if (p.img) {
-        page.drawImage(p.img, { x: px, y: py - pImgH, width: pColW, height: pImgH });
+        page.drawImage(p.img, { x: px, y: py - pImgH, width: colW, height: pImgH });
       } else {
-        page.drawRectangle({ x: px, y: py - pImgH, width: pColW, height: pImgH, color: COLOR_ACLIGHT });
+        page.drawRectangle({ x: px, y: py - pImgH, width: colW, height: pImgH, color: COLOR_ACLIGHT });
       }
 
-      let ty = py - pImgH - 11;
-      const nameLines = wrapWords(p.nombre, pColW - 16, 7.5);
+      let ty = py - pImgH - 12;
+      const nameLines = wrapWords(p.nombre, colW - 16, 8);
       nameLines.slice(0, 2).forEach(ln => {
-        page.drawText(ln, { x: px + 8, y: ty, size: 7.5, font: fontBold, color: COLOR_TEXT });
+        page.drawText(ln, { x: px + 10, y: ty, size: 8, font: fontBold, color: COLOR_TEXT });
         ty -= 10;
       });
-      page.drawText(p.ciudad, { x: px + 8, y: ty, size: 6.5, font, color: COLOR_MUTED });
+      page.drawText(p.ciudad, { x: px + 10, y: ty, size: 7, font, color: COLOR_MUTED });
+      ty -= 15;
+      page.drawText(p.ahorro, { x: px + 10, y: ty, size: 13, font: fontBold, color: COLOR_GREEN });
       ty -= 14;
-      // Ahorro = dato protagonista
-      page.drawText(p.ahorro, { x: px + 8, y: ty, size: 12, font: fontBold, color: COLOR_GREEN });
-      ty -= 13;
-      page.drawText('Ahorro mensual estimado', { x: px + 8, y: ty, size: 6.5, font, color: COLOR_MUTED });
-      ty -= 11;
-      page.drawText(`${p.kwp}  ·  Retorno: ${p.retorno}`, { x: px + 8, y: ty, size: 7, font, color: COLOR_ACCENT });
+      page.drawText('Ahorro mensual estimado', { x: px + 10, y: ty, size: 7, font, color: COLOR_MUTED });
+      ty -= 12;
+      page.drawText(`${p.kwp}  ·  Retorno: ${p.retorno}`, { x: px + 10, y: ty, size: 7.5, font, color: COLOR_ACCENT });
     });
-    y -= pRows * (pCardH + 8);
+    y -= 2 * (pCardH + 8);
   }
   gap(6);
 
