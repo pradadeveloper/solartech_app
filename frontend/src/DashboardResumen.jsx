@@ -104,12 +104,12 @@ export default function DashboardResumen() {
 
   const kpis = useMemo(() => {
     const ahora = new Date();
+    const hace30 = new Date(ahora); hace30.setDate(ahora.getDate() - 30);
+    const isUltimos30 = (fecha) => { const d = new Date(fecha); return d >= hace30 && d <= ahora; };
+
     const leadsHoy = leads.filter((l) => isSameDay(new Date(l.fecha), ahora)).length;
-    const leadsMes = leads.filter((l) => isSameMonth(new Date(l.fecha), ahora)).length;
-    const cotizacionesMes = leads.filter((l) => {
-      const d = new Date(l.fecha);
-      return isSameMonth(d, ahora) && l.kwp;
-    }).length;
+    const leadsMes = leads.filter((l) => isUltimos30(l.fecha)).length;
+    const cotizacionesMes = leads.filter((l) => isUltimos30(l.fecha) && l.kwp).length;
     const cerrados = leads.filter((l) => l.estado === "Cerrado").length;
     const tasaCierre = leads.length > 0
       ? Number((cerrados / leads.length * 100).toFixed(1))
@@ -117,11 +117,11 @@ export default function DashboardResumen() {
     const totalValor = leads.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0);
     const ticketPromedio = leads.length > 0 ? Math.round(totalValor / leads.length) : 0;
     const kwpProyectadosMes = leads
-      .filter((l) => isSameMonth(new Date(l.fecha), ahora))
+      .filter((l) => isUltimos30(l.fecha))
       .reduce((s, l) => s + (l.kwp || 0), 0);
 
     const valorCotizadoMes = leads
-      .filter((l) => isSameMonth(new Date(l.fecha), ahora))
+      .filter((l) => isUltimos30(l.fecha))
       .reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0);
 
     // Principal fuente de leads (campo conociste)
@@ -282,16 +282,16 @@ export default function DashboardResumen() {
         <KpiCard
           title="Valor cotizado mes"
           value={loading ? "—" : formatCOP(kpis.valorCotizadoMes)}
-          hint="Suma proyectos del mes"
+          hint="Últimos 30 días"
           highlight
           hero
         />
         <KpiCard title="Leads hoy" value={loading ? "—" : kpis.leadsHoy} hint="Últimas 24h" />
-        <KpiCard title="Leads del mes" value={loading ? "—" : kpis.leadsMes} hint="Mes actual" />
-        <KpiCard title="Cotizaciones" value={loading ? "—" : kpis.cotizacionesMes} hint="Mes actual" />
+        <KpiCard title="Leads" value={loading ? "—" : kpis.leadsMes} hint="Últimos 30 días" />
+        <KpiCard title="Cotizaciones" value={loading ? "—" : kpis.cotizacionesMes} hint="Últimos 30 días" />
         <KpiCard title="Tasa de cierre" value={loading ? "—" : `${kpis.tasaCierre}%`} hint="Sobre total leads" />
         <KpiCard title="Ticket promedio" value={loading ? "—" : formatCOP(kpis.ticketPromedio)} hint="COP" />
-        <KpiCard title="kWp proyectados" value={loading ? "—" : Number(kpis.kwpProyectadosMes.toFixed(1))} hint="Mes actual" />
+        <KpiCard title="kWp proyectados" value={loading ? "—" : Number(kpis.kwpProyectadosMes.toFixed(1))} hint="Últimos 30 días" />
         <KpiCard title="Principal fuente" value={loading ? "—" : kpis.topFuente} hint={loading ? "" : `${kpis.topFuenteCount} lead${kpis.topFuenteCount !== 1 ? "s" : ""}`} />
       </div>
 
