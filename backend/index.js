@@ -1,6 +1,5 @@
-// LOGICA DE CALCULOS
-// backend/index.js actualizado
 require('dotenv').config();
+const { calcularProyecto, toNumber } = require('./formulas');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -165,168 +164,9 @@ async function guardarConfig(cfg) {
 }
 
 // ====== Helpers ======
-function toNumber(v) {
-  const n = Number(String(v ?? "").replace(",", "."));
-  return Number.isFinite(n) ? n : NaN;
-}
-
 function requireFields(data, fields) {
   const missing = fields.filter((k) => String(data?.[k] ?? "").trim() === "");
   return missing;
-}
-
-// ====== Cálculo ======
-function calcularProyecto({
-  nombre,
-  correo,
-  telefono,
-  ubicacion,
-  preferenciaContacto,
-  areaDisponible,
-  tipoSolicitud,
-  tipoTecho,
-  recibeFactura,
-  sistemaInteres,
-  valorMensual,
-  consumoKwh,
-  costoKwh,
-  radiacionSolar: radiacionData,
-  ciudadSolar,
-}, cfg = {}) {
-  const consumo = toNumber(consumoKwh);       // kWh/mes
-  const costoUnidad = toNumber(costoKwh);     // COP/kWh
-  const areaDisp = toNumber(areaDisponible);
-
-  if ([consumo, costoUnidad].some((n) => Number.isNaN(n))) {
-    throw new Error("Valores numéricos inválidos: consumoKwh o costoKwh");
-  }
-
-  // Parámetros desde config (con fallback a defaults)
-  const potenciaPanel    = cfg.potenciaPanel    || 585;
-  const radiacionSolar   = (Number(radiacionData) > 0) ? Number(radiacionData) : (cfg.radiacionSolar || 3.8);
-  const margenCobertura  = cfg.margenCobertura  || 0.8;
-  const capacidadInversor= cfg.capacidadInversor|| 3000;
-  const costokWp         = cfg.costokWp         || 3500000;
-  const longitudRiel     = cfg.longitudRiel     || 4.7;
-  const cableSolar       = cfg.cableSolar       || 10;
-  const ivaPct           = cfg.ivaPct           ?? 5;
-  const descuentoRentaPct= cfg.descuentoRentaPct?? 50;
-  const factorCO2        = cfg.factorCO2        || 0.3612;
-  const factorArboles    = cfg.factorArboles    || 0.02;
-  const factorGalones    = cfg.factorGalones    || 117.6;
-
-  // Derivados
-  const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
-
-  // Wh/día estimado desde kWh/mes
-  const wPromedioDia = Number((((consumo * 1000) * 12) / 365).toFixed(1));
-
-  // kWp
-  const kwpNum = (wPromedioDia / radiacionSolarCobertura) / 1000;
-  const kwp = Number(kwpNum.toFixed(1));
-
-  // Costos
-  // facturaPromedio = lo que el cliente paga mensualmente (consumo × tarifa)
-  const facturaPromedio = Math.round(consumo * costoUnidad);
-  const ahorroMensual   = facturaPromedio; // alias semántico para el PDF/UI
-  const ahorroAnual     = Math.round(facturaPromedio * 12);
-  const ahorro10Anos    = Math.round(ahorroAnual * 10);
-
-  const costoProyecto       = Math.round(kwp * costokWp);
-  const ivaProyecto         = Math.round(costoProyecto * (ivaPct / 100));
-  const costoProyectoMasIva = Math.round(costoProyecto + ivaProyecto);
-
-  const costokwpproyecto     = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
-  const descuentoDeclaracion = Math.round(costoProyecto * (descuentoRentaPct / 100));
-  // Tiempo de retorno = Costo total (con IVA) / Factura promedio mensual / 12 → resultado en AÑOS
-  const tiempoRetorno = facturaPromedio > 0 ? Number((costoProyectoMasIva / facturaPromedio / 12).toFixed(1)) : null;
-  const valorKwp = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
-
-  // Equipos
-  const npaneles = Math.ceil(wPromedioDia / (potenciaPanel * radiacionSolarCobertura));
-  const ninversores = 1;
-
-  const riel47 = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
-  const midCland = Math.ceil((npaneles * 2) - 2);
-  const endCland = Math.ceil(npaneles / 2);
-  const lFoot = Math.ceil(riel47 * 3);
-  const groundingLoop = Math.round(riel47 / 2) * 2;
-
-  // Producción mensual estimada (kWh/mes)
-  const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
-
-  // Área mínima estimada
-  const areaMinima = Math.round(kwp * 5.8);
-
-  // Cobertura por área (si aplica)
-  let porcentajeCoberturaProyecto = 0;
-  if (!Number.isNaN(areaDisp) && areaDisp > 0 && areaMinima > 0) {
-    const p = (areaDisp / areaMinima) * 100;
-    porcentajeCoberturaProyecto = p >= 100 ? 100 : Number(p.toFixed(1));
-  }
-
-  // Ambiental
-  const co2EvitadoToneladas = Number((kwp * factorCO2).toFixed(2));
-  const arbolesEquivalentes = Math.round(co2EvitadoToneladas / factorArboles);
-  const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * factorGalones);
-
-  const equipos = ["Paneles solares", "Inversor", "Estructuras", "Cableado"];
-
-  return {
-    nombre,
-    correo,
-    telefono,
-    ubicacion,
-    preferenciaContacto,
-    tipoSolicitud,
-    tipoTecho,
-    recibeFactura,
-    sistemaInteres,
-
-    consumoKwh: consumo,
-    costoKwh: costoUnidad,
-    valorMensual: facturaPromedio,
-    areaDisponible: Number.isNaN(areaDisp) ? null : areaDisp,
-
-    wPromedioDia,
-    potenciaPanel,
-    capacidadInversor,
-    kwp,
-
-    costoProyecto,
-    ivaProyecto,
-    costoProyectoMasIva,
-    costokwpproyecto,
-    descuentoDeclaracion,
-    tiempoRetorno,
-    valorKwp,
-
-    npaneles,
-    ninversores,
-    riel47,
-    midCland,
-    endCland,
-    lFoot,
-    groundingLoop,
-    cableSolar,
-
-    produccionDeEnergia,
-    porcentajeCoberturaProyecto,
-    margenCobertura,
-    radiacionSolar,
-    radiacionSolarCobertura,
-
-    ahorroAnual,
-    ahorroMensual,
-    ahorro10Anos,
-
-    equipos,
-    areaMinima,
-
-    arbolesEquivalentes,
-    galonesGasolinaEvitados,
-    co2EvitadoToneladas,
-  };
 }
 
 // ====== PDF ======
@@ -343,8 +183,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   const fontBytes     = fs.readFileSync(montserratPath);
   const fontBoldBytes = fs.readFileSync(montserratBoldPath);
-  const font     = await pdfDoc.embedFont(fontBytes);
+  await pdfDoc.embedFont(fontBytes); // cargado pero no usado — todo el PDF usa Bold
   const fontBold = await pdfDoc.embedFont(fontBoldBytes);
+  const font     = fontBold; // usar Bold como fuente base para mayor legibilidad
 
   const W = 595, H = 842;
   const margin = 42;
@@ -676,8 +517,6 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   const formasPago = [
     { t: '1. Pago de contado', d: 'Pago total antes de iniciar la instalacion. Garantiza disponibilidad inmediata de equipos y posible descuento por pronto pago.' },
     { t: '2. Credito bancario', d: 'Financiacion directa con su entidad bancaria. Solartech entrega la documentacion tecnica requerida para la solicitud.' },
-    { t: '3. Financiacion interna', d: 'Plan de cuotas mensuales acordado directamente con Solartech Energy Systems. Solicite condiciones personalizadas.' },
-    { t: '4. Leasing solar', d: 'Arrendamiento financiero del sistema fotovoltaico con opcion de compra al finalizar el contrato pactado.' },
   ];
   formasPago.forEach(({ t, d }) => {
     checkY(42);

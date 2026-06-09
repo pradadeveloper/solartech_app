@@ -317,6 +317,7 @@ export default function CotizadorSolar() {
                         <option>Google</option>
                         <option>Referido</option>
                         <option>Referido Mercadeo</option>
+                        <option>Gestión comercial</option>
                         <option>Bancolombia</option>
                         <option>Banco de Bogotá</option>
                         <option>Otro</option>
