@@ -713,9 +713,8 @@ export default function Resultado() {
             {/* MARCAS */}
             <Card title="Marcas aliadas">
               <div className="marcasAliadas" style={{ marginTop: 10 }}>
-                <img src="/logos/logo_longi.png" alt="Longi" style={{ width: 110, height: "auto" }} />
-                <img src="/logos/logo_ja_solar.jpg" alt="JA Solar" style={{ width: 110, height: "auto" }} />
-                <img src="/logos/huawei.jpeg" alt="Huawei" style={{ width: 110, height: "auto" }} />
+                <img src="/logos/logo_longi.png" alt="Longi"  style={{ width: 110, height: "auto" }} />
+                <img src="/logos/huawei.jpeg"    alt="Huawei" style={{ width: 110, height: "auto" }} />
                 <img src="/logos/growatt.png" alt="Growatt" style={{ width: 110, height: "auto" }} />
                 <img src="/logos/goodwe.jpeg" alt="Goodwe" style={{ width: 110, height: "auto" }} />
               </div>
