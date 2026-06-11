@@ -468,7 +468,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   sectionHeader('DATOS DEL CLIENTE');
   infoRow2('Nombre completo', safe(data.nombre), 'Identificacion', safe(data.identificacion));
   infoRow2('Correo electronico', safe(data.correo), 'Telefono', safe(data.telefono));
-  infoRow2('Municipio / Ubicacion', safe(data.ubicacion), 'Preferencia contacto', safe(data.preferenciaContacto));
+  infoRow2('Municipio / Ubicacion', safe(data.ubicacion), 'Ciudad solar', safe(data.ciudadSolar));
   infoRow2('Tipo de solicitud', safe(data.tipoSolicitud), 'Tipo de techo', safe(data.tipoTecho));
   infoRow2('Recibe factura', safe(data.recibeFactura), 'Sistema de interes', safe(data.sistemaInteres));
   gap(6);
@@ -937,7 +937,6 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       "costoKwh",
       "valorMensual",
       "areaDisponible",
-      "preferenciaContacto",
       "tipoSolicitud",
     ];
 
