@@ -78,11 +78,6 @@ function calcularProyecto({
   // HSP ajustada por el Performance Ratio (margenCobertura)
   const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
 
-  // ── 2. Consumo diario ────────────────────────────────────
-  // Convertir kWh/mes a Wh/día usando promedio anual de 365 días
-  const wPromedioDia = Number((((consumo * 1000) * 12) / 365).toFixed(1));
-
-
   // ── 3. Tamaño del sistema (kWp) ──────────────────────────
   // kWp necesario para cubrir el consumo anual del cliente
   const kWpPorConsumo = (consumo * 12) / radiacionSolar;
@@ -93,6 +88,9 @@ function calcularProyecto({
   // Redondear al número entero de paneles hacia arriba → kWp real instalado
   const kWpPorPanel = potenciaPanel / 1000;
   const kwp = Math.ceil(kwp1 / kWpPorPanel) * kWpPorPanel;
+
+  // ── 2. Wh/día del sistema instalado (derivado del kWp real, no del consumo) ──
+  const wPromedioDia = Math.round(kwp * radiacionSolarCobertura * 1000);
 
   // ── 4. Financiero ────────────────────────────────────────
   // Factura mensual = consumo × tarifa (lo que el cliente paga actualmente)
