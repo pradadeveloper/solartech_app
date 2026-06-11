@@ -168,12 +168,10 @@ function calcularProyecto({
   // ── 7. Área ──────────────────────────────────────────────
   const areaMinima = Math.round(kwp * factorAreaM2PorKwp);
 
-  // Porcentaje del área disponible que cubre el proyecto
-  let porcentajeCoberturaProyecto = 0;
-  if (!Number.isNaN(areaDisp) && areaDisp > 0 && areaMinima > 0) {
-    const p = (areaDisp / areaMinima) * 100;
-    porcentajeCoberturaProyecto = p >= 100 ? 100 : Number(p.toFixed(1));
-  }
+  // Cobertura de factura = % del consumo mensual cubierto por la generación del sistema
+  const porcentajeCoberturaProyecto = consumo > 0
+    ? Math.min(100, Number(((generacionMes / consumo) * 100).toFixed(1)))
+    : 0;
 
   // ── 8. Impacto ambiental ─────────────────────────────────
   // CO2 evitado = kWp × factor de emisión de la red (tonCO2/kWp·año)
