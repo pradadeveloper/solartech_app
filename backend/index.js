@@ -99,6 +99,15 @@ async function saveLeadStorage(lead) {
   fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
 }
 
+function generarCodigoPublico(leadsExistentes = []) {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sin 0,1,I,O,L para evitar confusión
+  let code;
+  do {
+    code = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  } while (leadsExistentes.some(l => l.codigoPublico === code));
+  return code;
+}
+
 async function updateLeadField(numeroCotizacion, fields) {
   if (USE_GOOGLE) return gAdapter.updateLead(numeroCotizacion, fields);
   const leads = await getAllLeads();
@@ -130,7 +139,7 @@ async function savePDFStorage(fileName, pdfBytes) {
 const CONFIG_DEFAULT = {
   costokWp: 3500000, potenciaPanel: 585, capacidadInversor: 3000,
   radiacionSolar: 3.8, margenCobertura: 0.8, longitudRiel: 4.7, cableSolar: 10,
-  ivaPct: 5, descuentoRentaPct: 50,
+  ivaPct: 5, descuentoRentaPct: 50, costoGeneracion: 330, costoComercializacion: 115, factorAreaM2PorKwp: 5.8,
   factorCO2: 0.3612, factorArboles: 0.02, factorGalones: 117.6,
   empresa: { nombre: 'Solartech Energy Systems', telefono: '+57 300 000 0000',
     email: 'info@solartech.com.co', web: 'www.solartechenergysystems.com',
@@ -225,8 +234,6 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     ['growatt', 'growatt.png',       'png'],
     ['huawei',  'huawei.jpeg',       'jpg'],
     ['goodwe',  'goodwe.jpeg',       'jpg'],
-    // ja_solar: usar el PNG de assets (colormap, sin canal alpha) — el de frontend es RGBA y falla en pdf-lib
-    ['jasolar', 'ja_solar.png',      'png', assetsPath],
   ]) {
     const lp = path.join(altDir || frontendLogos, file);
     if (fs.existsSync(lp)) {
@@ -500,7 +507,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   page.drawText('Componentes e items incluidos en el proyecto:', { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_TITLE });
   y -= 14;
   const componentes = [
-    `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi / JA Solar)`,
+    `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi Solar)`,
     `1 inversor capacidad aprox. ${resultados.kwp} kW (Huawei / Growatt / GoodWe)`,
     'Estructura de montaje (rieles, clamps, L-Foot y puesta a tierra)',
     'Cableado solar AC/DC, protecciones electricas y fusibles',
@@ -788,7 +795,6 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 18;
   const marcas = [
     { key: 'longi',   nombre: 'LONGi Solar',   desc: 'Paneles - N1 mundial'          },
-    { key: 'jasolar', nombre: 'JA Solar',       desc: 'Paneles - Top 3 mundial'       },
     { key: 'huawei',  nombre: 'Huawei Solar',   desc: 'Inversores inteligentes'       },
     { key: 'growatt', nombre: 'Growatt',        desc: 'Inversores residencial/com.'   },
     { key: 'goodwe',  nombre: 'GoodWe',         desc: 'Soluciones hibridas'           },
@@ -825,13 +831,22 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(4);
   sectionHeader('CONDICIONES COMERCIALES');
   const condiciones = [
-    'Esta cotizacion tiene validez de 30 dias calendario desde la fecha de emision.',
-    'Los precios incluyen IVA del 5% segun Ley 1715 de 2014 sobre energias renovables.',
-    'Valores en COP sujetos a variacion por tasa de cambio USD/COP para equipos importados.',
-    'El inicio de obra requiere un anticipo del 50% del valor total del proyecto aprobado.',
-    'El plazo estimado de instalacion es de 15 a 30 dias habiles tras aprobacion y anticipo.',
-    'No se incluyen adecuaciones electricas previas, obras civiles adicionales ni tramites notariales.',
-    'Solartech se reserva el derecho de ajustar la propuesta si la visita tecnica evidencia condiciones distintas a las declaradas.',
+    'La cantidad de paneles solares e inversores podra ajustarse de acuerdo con la potencia finalmente disponible y las condiciones tecnicas definitivas del proyecto.',
+    'Con la aceptacion de la presente cotizacion, el cliente declara conocer y aceptar las politicas de servicio posventa y condiciones de garantia establecidas por la empresa.',
+    'La cotizacion incluye los costos asociados a viaticos de instalacion y desplazamiento del personal tecnico hasta el sitio del proyecto.',
+    'El plazo estimado de entrega es de ciento veinte (120) dias calendario, contados a partir de la fecha de recepcion del primer pago, y estara sujeto a la obtencion del certificado RETIE.',
+    'Los equipos que sean objeto de reparacion o reemplazo durante el periodo de garantia conservaran exclusivamente el tiempo restante de la garantia original.',
+    'La presente propuesta podra generar costos adicionales derivados de condiciones que se identifiquen durante la visita tecnica en sitio.',
+    'El sistema fotovoltaico no esta disenado para operar en ausencia del suministro de la red electrica (sistema on-grid), por lo cual su funcionamiento depende de la presencia activa de dicha red.',
+    'Las cubiertas tipo losa de concreto deberan soportar una carga minima de 50 kg/m2, mientras que las cubiertas en teja deberan soportar una carga minima de 17 kg/m2.',
+    'La presente cotizacion contempla la instalacion del cableado en tuberia expuesta. Cualquier requerimiento de canalizacion oculta o soluciones esteticas adicionales podra generar costos adicionales.',
+    'Condiciones de garantia del sistema: Paneles solares: 15 anos. Inversores: 5 anos. Instalacion: 5 anos. La validez de las garantias estara sujeta a la ejecucion de mantenimientos preventivos anuales con Solartech.',
+    'En caso de que el comprador sea monousuario (con transformador propio) y desee realizar la legalizacion del sistema con entrega de excedentes al operador de red, debera cumplir con la Resolucion CREG 174 de 2021 (Cap. 4, Art. 19), la CREG 038 de 2014, la CREG 015 de 2018 y las normas del operador de red RA8-028 / RA8-030.',
+    'Los valores de ahorro proyectados son estimativos y dependen de variables externas como la radiacion solar, el costo del kWh y la remuneracion definida por el operador de red para los excedentes de energia.',
+    'El valor del contrato de respaldo es referencial y se ha calculado bajo el supuesto de un respaldo del 20% de la capacidad instalada. El cliente podra elegir respaldar desde 1 kW hasta el 100% de la capacidad instalada.',
+    'El proyecto no incluye la adecuacion de la frontera comercial. Este costo sera definido posteriormente por el operador de red durante el proceso de visita y legalizacion.',
+    'El proyecto no incluye el suministro del medidor bidireccional. Este podra ser adquirido directamente por el cliente con el operador de red o, si la normativa lo permite, podra ser suministrado por la empresa como un item adicional.',
+    'Validez de la oferta: quince (15) dias calendario a partir de su emision.',
   ];
   condiciones.forEach((c, i) => {
     checkY(30);
@@ -949,6 +964,8 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
     }
 
     const numeroCotizacion = await getNextContador();
+    const todosLeads       = await getAllLeads();
+    const codigoPublico    = generarCodigoPublico(todosLeads);
 
     // Extraer vendedor del token JWT (si viene)
     let vendedor = 'Sin asignar';
@@ -987,6 +1004,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
     await saveLeadStorage({
       id: uuidv4(),
       numeroCotizacion,
+      codigoPublico,
       vendedor,
       estado: 'Nuevo',
       fecha: new Date().toISOString(),
@@ -1021,7 +1039,7 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       opciones: [],
     });
 
-    res.json({ ...resultados, numeroCotizacion, pdfUrl });
+    res.json({ ...resultados, numeroCotizacion, codigoPublico, pdfUrl });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || "Error interno" });
@@ -1066,7 +1084,9 @@ app.put('/api/config', express.json(), async (req, res) => {
 app.get('/api/propuesta/:num', async (req, res) => {
   try {
     const [leads, asesores] = await Promise.all([getAllLeads(), gAdapter.getAsesores()]);
-    const lead = leads.find(l => String(l.numeroCotizacion) === String(req.params.num));
+    const param = String(req.params.num);
+    const lead  = leads.find(l => l.codigoPublico === param)
+               || leads.find(l => String(l.numeroCotizacion) === param); // fallback propuestas antiguas
     if (!lead) return res.status(404).json({ error: 'Propuesta no encontrada' });
     const { id, estado, ...pub } = lead;
     const asesor = asesores.find(a =>

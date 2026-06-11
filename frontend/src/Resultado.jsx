@@ -100,7 +100,8 @@ export default function Resultado() {
   const [generandoPdfVersion, setGenerandoPdfVersion] = useState(null);
 
   const compartirLink = () => {
-    const url = `${window.location.origin}/propuesta/${resultado.numeroCotizacion}`;
+    const codigo = resultado.codigoPublico || resultado.numeroCotizacion;
+    const url = `${window.location.origin}/propuesta/${codigo}`;
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopiado(true);
       setTimeout(() => setLinkCopiado(false), 2500);

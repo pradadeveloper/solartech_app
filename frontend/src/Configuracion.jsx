@@ -9,9 +9,10 @@ const SECTIONS = [
     title: "Parametros Tecnicos",
     hint: "Valores que determinan el dimensionamiento del sistema solar.",
     fields: [
-      { key: "costokWp",        label: "Costo por kWp instalado",         unit: "COP/kWp", type: "number", hint: "Precio de mercado por kilovatio-pico instalado." },
-      { key: "potenciaPanel",   label: "Potencia por panel",              unit: "W",       type: "number", hint: "Wattios de cada panel solar (ej: 585 W)." },
-      { key: "margenCobertura", label: "Margen de cobertura del sistema", unit: "%",       type: "number", step: "0.01", hint: "Eficiencia real del sistema (ej: 0.8 = 80%)." },
+      { key: "costokWp",          label: "Costo por kWp instalado",         unit: "COP/kWp", type: "number", hint: "Precio de mercado por kilovatio-pico instalado." },
+      { key: "potenciaPanel",     label: "Potencia por panel",              unit: "W",       type: "number", hint: "Wattios de cada panel solar (ej: 610 W)." },
+      { key: "margenCobertura",   label: "Margen de cobertura del sistema", unit: "%",       type: "number", step: "0.01", hint: "Eficiencia real del sistema (ej: 0.9 = 90%)." },
+      { key: "factorAreaM2PorKwp",label: "Factor de area por kWp",         unit: "m²/kWp",  type: "number", step: "0.1",  hint: "Metros cuadrados de techo requeridos por kWp instalado (ej: 5.8)." },
     ],
   },
   {
@@ -19,8 +20,10 @@ const SECTIONS = [
     title: "Parametros Financieros",
     hint: "Tasas e impuestos que afectan la propuesta economica.",
     fields: [
-      { key: "ivaPct",             label: "IVA aplicable",                 unit: "%",  type: "number", step: "0.1", hint: "Segun Ley 1715/2014 actualmente es 5% para FNCE." },
-      { key: "descuentoRentaPct",  label: "Descuento declaracion de renta",unit: "%",  type: "number", step: "1",   hint: "Porcentaje del costo del sistema deducible de renta." },
+      { key: "ivaPct",               label: "IVA aplicable",                  unit: "%",       type: "number", step: "0.1", hint: "Segun Ley 1715/2014 actualmente es 5% para FNCE." },
+      { key: "descuentoRentaPct",    label: "Descuento declaracion de renta", unit: "%",       type: "number", step: "1",    hint: "Porcentaje del costo del sistema deducible de renta." },
+      { key: "costoGeneracion",      label: "Tarifa de generacion (CREG)",    unit: "COP/kWh", type: "number", step: "1",    hint: "Precio de venta de excedentes para grandes autogeneradores (>136 kWp)." },
+      { key: "costoComercializacion",label: "Cargo de comercializacion (CREG)",unit: "COP/kWh",type: "number", step: "1",    hint: "Cargo que se descuenta a la tarifa neta de excedentes." },
     ],
   },
   {
@@ -123,8 +126,9 @@ export default function Configuracion() {
       const token = localStorage.getItem("token");
       const payload = { ...config };
       // Convertir strings numericos a Number
-      const numKeys = ["costokWp","potenciaPanel","margenCobertura",
-        "ivaPct","descuentoRentaPct","factorCO2","factorArboles","factorGalones"];
+      const numKeys = ["costokWp","potenciaPanel","margenCobertura","factorAreaM2PorKwp",
+        "ivaPct","descuentoRentaPct","costoGeneracion","costoComercializacion",
+        "factorCO2","factorArboles","factorGalones"];
       numKeys.forEach((k) => { if (payload[k] !== undefined) payload[k] = Number(payload[k]); });
 
       const res = await fetch(`${API}/api/config`, {

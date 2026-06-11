@@ -13,7 +13,7 @@ export default function CotizadorSolar() {
     correo: "",
     telefono: "",
     ubicacion: "",
-    preferenciaContacto: "",
+
     tipoSolicitud: "",
     tipoTecho: "",
     sistemaInteres: "Interconectado",
@@ -70,7 +70,7 @@ export default function CotizadorSolar() {
     const requiredStep1 = [
       "nombre", "correo", "telefono", "ciudadSolar",
       "consumoKwh", "costoKwh", "areaDisponible",
-      "preferenciaContacto", "tipoSolicitud",
+      "tipoSolicitud",
     ];
     return requiredStep1.every((k) => String(formData[k] ?? "").trim().length > 0);
   }, [formData]);
@@ -220,14 +220,6 @@ export default function CotizadorSolar() {
                           Radiación: {formData.radiacionSolar} kWh/m²/día
                         </span>
                       )}
-                    </Field>
-
-                    <Field label="Preferencia de contacto">
-                      <select name="preferenciaContacto" value={formData.preferenciaContacto} onChange={handleChange} required>
-                        <option value="">Selecciona</option>
-                        <option value="Llamada">Llamada</option>
-                        <option value="WhatsApp">WhatsApp</option>
-                      </select>
                     </Field>
 
                     <Field label="Tipo de proyecto">
@@ -384,7 +376,6 @@ export default function CotizadorSolar() {
               <SummaryRow label="Área (m²)" value={formData.areaDisponible ? `${Number(formData.areaDisponible).toLocaleString("es-CO")} m²` : "—"} />
               <div className="cotDivider" />
               <SummaryRow label="Canal" value={formData.conociste || "—"} />
-              <SummaryRow label="Contacto" value={formData.preferenciaContacto || "—"} />
               <SummaryRow label="Tipo" value={formData.tipoSolicitud || "—"} />
 
               {clienteExistente && (
