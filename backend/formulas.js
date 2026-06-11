@@ -96,8 +96,9 @@ function calcularProyecto({
   // Factura mensual = consumo × tarifa (lo que el cliente paga actualmente)
   const facturaPromedio      = Math.round(consumo * costoUnidad);
 
-  // kWh generados por mes = kWp instalado × radiación anual / 12
-  const generacionMes = (kwp * radiacionSolar) / 12;
+  // kWh generados por mes = kWp instalado × HSP diario × 30 días
+  // radiacionSolar es valor diario (HSP), no anual — debe multiplicarse por 30, no dividirse por 12
+  const generacionMes = Math.round(kwp * radiacionSolarCobertura * 30);
 
   // Si el cliente tiene contribución de solidaridad, su tarifa efectiva es 20% mayor
   const costoKwhAjustado = contribucion ? costoUnidad * 1.2 : costoUnidad;
