@@ -80,7 +80,7 @@ function calcularProyecto({
 
   // ── 2. Consumo diario ────────────────────────────────────
   // Convertir kWh/mes a Wh/día usando promedio anual de 365 días
-  // const wPromedioDia = Number((((consumo * 1000) * 12) / 365).toFixed(1));
+  const wPromedioDia = Number((((consumo * 1000) * 12) / 365).toFixed(1));
 
 
   // ── 3. Tamaño del sistema (kWp) ──────────────────────────
