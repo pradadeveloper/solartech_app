@@ -83,27 +83,28 @@ function calcularProyecto({
     throw new Error('Valores numéricos inválidos: consumoKwh o costoKwh');
   }
 
-  // Parámetros de configuración (config de BD con fallback a DEFAULTS)
-  const potenciaPanel      = cfg.potenciaPanel      || DEFAULTS.potenciaPanel;
-  const radiacionSolar     = Number(radiacionData) > 0 ? Number(radiacionData) : (cfg.radiacionSolar || DEFAULTS.radiacionSolar);
-  const margenCobertura    = cfg.margenCobertura    || DEFAULTS.margenCobertura;
-  const capacidadInversor  = cfg.capacidadInversor  || DEFAULTS.capacidadInversor;
-  const costokWp           = cfg.costokWp           || DEFAULTS.costokWp;
-  const longitudRiel       = cfg.longitudRiel       || DEFAULTS.longitudRiel;
-  const cableSolar         = cfg.cableSolar         || DEFAULTS.cableSolar;
-  const ivaPct             = cfg.ivaPct             ?? DEFAULTS.ivaPct;
-  const descuentoRentaPct  = cfg.descuentoRentaPct  ?? DEFAULTS.descuentoRentaPct;
-  const factorCO2          = cfg.factorCO2          || DEFAULTS.factorCO2;
-  const factorAreaM2PorKwp = cfg.factorAreaM2PorKwp || DEFAULTS.factorAreaM2PorKwp;
-  const factorArboles      = cfg.factorArboles      || DEFAULTS.factorArboles;
-  const factorGalones      = cfg.factorGalones      || DEFAULTS.factorGalones;
-  const sobredimension     = cfg.sobredimension     ?? DEFAULTS.sobredimension;
-  const maxAC100kWp        = cfg.maxAC100kWp        || DEFAULTS.maxAC100kWp;
-  const mantenimientoKwp   = cfg.mantenimientoKwp   || DEFAULTS.mantenimientoKwp;
-  const inflacion          = cfg.inflacion          ?? DEFAULTS.inflacion;
-  const anticipo1Pct       = cfg.anticipo1Pct       ?? DEFAULTS.anticipo1Pct;
-  const anticipo2Pct       = cfg.anticipo2Pct       ?? DEFAULTS.anticipo2Pct;
-  const anticipo3Pct       = cfg.anticipo3Pct       ?? DEFAULTS.anticipo3Pct;
+  // Parámetros de configuración — Number() garantiza que strings del config no produzcan NaN
+  const n = (v, fb) => { const x = Number(v); return Number.isFinite(x) && x !== 0 ? x : fb; };
+  const potenciaPanel      = n(cfg.potenciaPanel,      DEFAULTS.potenciaPanel);
+  const radiacionSolar     = Number(radiacionData) > 0 ? Number(radiacionData) : n(cfg.radiacionSolar, DEFAULTS.radiacionSolar);
+  const margenCobertura    = n(cfg.margenCobertura,    DEFAULTS.margenCobertura);
+  const capacidadInversor  = n(cfg.capacidadInversor,  DEFAULTS.capacidadInversor);
+  const costokWp           = n(cfg.costokWp,           DEFAULTS.costokWp);
+  const longitudRiel       = n(cfg.longitudRiel,       DEFAULTS.longitudRiel);
+  const cableSolar         = n(cfg.cableSolar,         DEFAULTS.cableSolar);
+  const ivaPct             = Number.isFinite(Number(cfg.ivaPct))            ? Number(cfg.ivaPct)            : DEFAULTS.ivaPct;
+  const descuentoRentaPct  = Number.isFinite(Number(cfg.descuentoRentaPct)) ? Number(cfg.descuentoRentaPct) : DEFAULTS.descuentoRentaPct;
+  const factorCO2          = n(cfg.factorCO2,          DEFAULTS.factorCO2);
+  const factorAreaM2PorKwp = n(cfg.factorAreaM2PorKwp, DEFAULTS.factorAreaM2PorKwp);
+  const factorArboles      = n(cfg.factorArboles,      DEFAULTS.factorArboles);
+  const factorGalones      = n(cfg.factorGalones,      DEFAULTS.factorGalones);
+  const sobredimension     = Number.isFinite(Number(cfg.sobredimension))    ? Number(cfg.sobredimension)    : DEFAULTS.sobredimension;
+  const maxAC100kWp        = n(cfg.maxAC100kWp,        DEFAULTS.maxAC100kWp);
+  const mantenimientoKwp   = n(cfg.mantenimientoKwp,   DEFAULTS.mantenimientoKwp);
+  const inflacion          = Number.isFinite(Number(cfg.inflacion))         ? Number(cfg.inflacion)         : DEFAULTS.inflacion;
+  const anticipo1Pct       = Number.isFinite(Number(cfg.anticipo1Pct))      ? Number(cfg.anticipo1Pct)      : DEFAULTS.anticipo1Pct;
+  const anticipo2Pct       = Number.isFinite(Number(cfg.anticipo2Pct))      ? Number(cfg.anticipo2Pct)      : DEFAULTS.anticipo2Pct;
+  const anticipo3Pct       = Number.isFinite(Number(cfg.anticipo3Pct))      ? Number(cfg.anticipo3Pct)      : DEFAULTS.anticipo3Pct;
 
   // ── 1. Radiación ────────────────────────────────────────
   // radiacionSolar = HSP diario; radiacion_anual = HSP * 365 (igual que Excel 1387)
@@ -113,9 +114,10 @@ function calcularProyecto({
 
   // ── 2. Tamaño del sistema (kWp) — E6 ────────────────────
   const kWpPorConsumo    = (consumo * 12) / (radiacionSolar * 365);
-  const kWpMaximoPorArea = (!Number.isNaN(areaDisp) && areaDisp > 0)
+  const _areaLimit = (!Number.isNaN(areaDisp) && areaDisp > 0 && factorAreaM2PorKwp > 0)
     ? areaDisp / factorAreaM2PorKwp
     : Infinity;
+  const kWpMaximoPorArea = Number.isFinite(_areaLimit) ? _areaLimit : Infinity;
   const kwp1 = Math.min(kWpMaximoPorArea, kWpPorConsumo);
 
   
