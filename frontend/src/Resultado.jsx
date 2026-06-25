@@ -7,76 +7,143 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from "recharts";
 
-// ── Replica las fórmulas del backend para calcular en el frontend ──
+// ── Replica las fórmulas del backend (formulas.js) para el comparador ──
+// Las mismas fórmulas que el servidor: sin PR en generación, excedentes CREG, FLOOR en paneles.
 function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const kwp = Number(kwpInput);
-  const costoUnidad = Number(costoKwh);
-  const costokWp = Number(costokWpInput) > 0 ? Number(costokWpInput) : 3500000;
+  const costoUnidad = Number(costoKwh) || Number(base.costoKwh) || 0;
+  const costokWp = Number(costokWpInput) > 0 ? Number(costokWpInput) : 4500000;
   if (!kwp || !costoUnidad) return null;
 
-  // Consumo real del cliente (factura original) — capturado antes de derivar el propio consumo
-  const consumoRealFactura = Number(base.consumoKwh) || 0;
+  const consumo              = Number(base.consumoKwh) || 0;
+  const potenciaPanel        = Number(base.potenciaPanel) || 610;
+  const radiacionSolar       = Number(base.radiacionSolar) || 3.8;
+  const margenCobertura      = Number(base.margenCobertura) || 0.9;
+  const sobredimension       = Number(base.sobredimension) || 0.30;
+  const maxAC100kWp          = Number(base.maxAC100kWp) || 135;
+  const longitudRiel         = Number(base.longitudRiel) || 4.7;
+  const cableSolar           = Number(base.cableSolar) || 10;
+  const contribucion         = base.contribucion || false;
+  const ivaPct               = Number(base.ivaPct) || 5;
+  const descuentoRentaPct    = Number(base.descuentoRentaPct) || 50;
+  const costoGeneracion      = Number(base.costoGeneracion) || 330;
+  const costoComercializacion= Number(base.costoComercializacion) || 120;
+  const factorAreaM2PorKwp   = Number(base.factorAreaM2PorKwp) || 5.5;
+  const factorCO2            = Number(base.factorCO2) || 0.3612;
+  const factorArboles        = Number(base.factorArboles) || 0.02;
+  const factorGalones        = Number(base.factorGalones) || 117.6;
+  const inflacion            = Number(base.inflacion) || 0.08;
 
-  const potenciaPanel = Number(base.potenciaPanel) || 585;
-  const radiacionSolar = Number(base.radiacionSolar) || 3.8;
-  const margenCobertura = Number(base.margenCobertura) || 0.8;
-  const capacidadInversor = kwp; // 1 inversor dimensionado al sistema
-  const longitudRiel = Number(base.longitudRiel) || 4.7;
-  const cableSolar = Number(base.cableSolar) || 10;
+  // Misma fórmula que E7: FLOOR al panel entero
+  const kWpPorPanel  = potenciaPanel / 1000;
+  const npaneles     = Math.round(kwp / kWpPorPanel);
 
-  const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
-  const wPromedioDia = Number((kwp * radiacionSolarCobertura * 1000).toFixed(1));
-  const consumo = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
+  // E8 — Potencia AC
+  const potenciaAC   = Number((kwp / (1 + sobredimension)).toFixed(2));
+  const ninversores  = potenciaAC <= 50 ? 1 : Math.ceil(potenciaAC / 50);        // E21
 
-  const npaneles = Math.ceil((kwp * 1000) / potenciaPanel);
-  const ninversores = 1;
-  const riel47 = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
-  const midCland = Math.ceil((npaneles * 2) - 2);
-  const endCland = Math.ceil(npaneles / 2);
-  const lFoot = Math.ceil(riel47 * 3);
-  const groundingLoop = Math.round(riel47 / 2) * 2;
-  const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
-  const areaMinima = Math.round(kwp * 5.8);
+  const riel47       = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
+  const midCland     = Math.ceil((npaneles * 2) - 2);
+  const endCland     = Math.ceil(npaneles / 2);
+  const lFoot        = Math.ceil(riel47 * 3);
+  const groundingLoop= Math.round(riel47 / 2) * 2;
 
-  // Cobertura de la factura energética: qué % del consumo real cubre el sistema
-  const coberturaFactura = consumoRealFactura > 0
-    ? Math.min(100, Number(((produccionDeEnergia / consumoRealFactura) * 100).toFixed(1)))
+  // E10 — Generación mensual sin PR (igual que formulas.js)
+  const generacionMes      = Math.round(kwp * radiacionSolar * 365 / 12);
+  const produccionDeEnergia= generacionMes;
+  const areaMinima         = Math.round(kwp * factorAreaM2PorKwp);
+  const wPromedioDia       = Math.round(kwp * radiacionSolar * 1000);
+  const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(2));
+
+  // Cobertura = generación / consumo real (misma métrica que backend)
+  const porcentajeCoberturaProyecto = consumo > 0
+    ? Math.min(100, Number(((generacionMes / consumo) * 100).toFixed(1)))
     : 0;
 
-  // Cobertura por área disponible vs área mínima requerida
-  const areaDisp = Number(base.areaDisponible ?? 0);
-  let porcentajeCoberturaProyecto = 0;
-  if (areaDisp > 0 && areaMinima > 0) {
-    const p = (areaDisp / areaMinima) * 100;
-    porcentajeCoberturaProyecto = p >= 100 ? 100 : Number(p.toFixed(1));
+  // E25 — tarifa ajustada por contribución
+  const costoKwhAjustado = contribucion ? costoUnidad * 1.2 : costoUnidad;
+  // E11 — ratio gen/consumo
+  const ratioGenConsumo  = consumo > 0 ? generacionMes / consumo : 0;
+
+  // E12 — excedentes (igual que formulas.js)
+  let excedentes;
+  if (ratioGenConsumo <= 0.33) {
+    excedentes = 0;
+  } else if (ratioGenConsumo <= 1) {
+    excedentes = (5 / 7) * ratioGenConsumo - (15 / 67);
+  } else {
+    excedentes = (0.5 * consumo + generacionMes - consumo) / generacionMes;
   }
 
-  const costoProyecto       = Math.round(kwp * costokWp);
-  const ivaProyecto         = Math.round(costoProyecto * 0.05);
-  const costoProyectoMasIva = Math.round(costoProyecto + ivaProyecto);
-  const costokwpproyecto    = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
-  const descuentoDeclaracion = Math.round(costoProyecto / 2);
-  // facturaPromedio = consumo × tarifa (lo que el cliente paga al mes)
-  const facturaPromedio = Math.round(consumo * costoUnidad);
-  const ahorroMensual   = facturaPromedio;
-  const ahorroAnual     = facturaPromedio * 12;
-  const consumoKwh      = consumo;
-  const ahorro10Anos    = Math.round(ahorroAnual * 10);
-  // Tiempo de retorno = Costo total (con IVA) / Factura mensual / 12 → AÑOS
-  const tiempoRetorno = facturaPromedio > 0 ? Number((costoProyectoMasIva / facturaPromedio / 12).toFixed(1)) : null;
+  // E26 — precio venta excedentes
+  const costoExcedentes = kwp > maxAC100kWp
+    ? costoGeneracion
+    : costoKwhAjustado - costoComercializacion;
 
-  // Ambiental
-  const co2EvitadoToneladas = Number((kwp * 1.2 * 0.7 * 0.43).toFixed(2));
-  const arbolesEquivalentes = Math.round(co2EvitadoToneladas / 0.02);
-  const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
+  const ahorroMensual = Math.round(
+    generacionMes * costoKwhAjustado * (1 - excedentes) +
+    generacionMes * costoExcedentes  * excedentes
+  );
+  const ahorroAnual   = Math.round(ahorroMensual * 12);
+  const ahorro10Anos  = Math.round(ahorroAnual * 10);
+
+  const costoProyecto        = Math.round(kwp * costokWp);
+  const ivaProyecto          = Math.round(costoProyecto * (ivaPct / 100));
+  const costoProyectoMasIva  = Math.round(costoProyecto + ivaProyecto);
+  const costokwpproyecto     = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
+  const descuentoDeclaracion = Math.round(costoProyecto * (descuentoRentaPct / 100));
+  const valorKwp             = kwp > 0 ? Math.round(costoProyecto / kwp) : 0;
+
+  const tiempoRetorno = ahorroMensual > 0
+    ? Number((costoProyectoMasIva / ahorroMensual / 12).toFixed(1))
+    : null;
+
+  const valorKwhAhorro = costoKwhAjustado;
+  const valorKwhVenta  = costoExcedentes;
+  const porcentajeAhorro = Number(((1 - excedentes) * 100).toFixed(1));
+  const porcentajeVenta  = Number((excedentes * 100).toFixed(1));
+
+  // TIR perspectiva cliente
+  let tir5Anos = null, tir10Anos = null, tir15Anos = null;
+  if (ahorroAnual > 0 && costoProyectoMasIva > 0) {
+    const fl = [-costoProyectoMasIva];
+    for (let i = 1; i <= 15; i++) fl.push(Math.round(ahorroAnual * Math.pow(1 + inflacion, i - 1)));
+    const tir = (flujos) => {
+      let tasa = 0.1;
+      for (let it = 0; it < 1000; it++) {
+        let vpn = 0, dvpn = 0;
+        for (let t = 0; t < flujos.length; t++) {
+          vpn  += flujos[t] / Math.pow(1 + tasa, t);
+          dvpn -= t * flujos[t] / Math.pow(1 + tasa, t + 1);
+        }
+        if (!dvpn) break;
+        const n = tasa - vpn / dvpn;
+        if (Math.abs(n - tasa) < 1e-7) return n;
+        tasa = n;
+      }
+      return tasa;
+    };
+    try { tir5Anos  = Number((tir(fl.slice(0, 6))  * 100).toFixed(1)); } catch(e) {}
+    try { tir10Anos = Number((tir(fl.slice(0, 11)) * 100).toFixed(1)); } catch(e) {}
+    try { tir15Anos = Number((tir(fl.slice(0, 16)) * 100).toFixed(1)); } catch(e) {}
+  }
+
+  const co2EvitadoToneladas     = Number((kwp * factorCO2).toFixed(2));
+  const arbolesEquivalentes     = Math.round(co2EvitadoToneladas / factorArboles);
+  const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * factorGalones);
 
   return {
-    consumoKwh, costoKwh: costoUnidad, wPromedioDia,
-    kwp, potenciaPanel, capacidadInversor, radiacionSolar, radiacionSolarCobertura, margenCobertura,
+    consumoKwh: consumo, costoKwh: costoUnidad, wPromedioDia,
+    kwp, potenciaPanel, potenciaAC, sobredimension,
+    radiacionSolar, radiacionSolarCobertura, margenCobertura,
     npaneles, ninversores, riel47, midCland, endCland, lFoot, groundingLoop, cableSolar,
-    produccionDeEnergia, areaMinima, porcentajeCoberturaProyecto, coberturaFactura,
+    produccionDeEnergia, generacionMes, areaMinima, porcentajeCoberturaProyecto,
     costoProyecto, ivaProyecto, costoProyectoMasIva, costokwpproyecto,
-    descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
+    descuentoDeclaracion, valorKwp,
+    ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
+    valorKwhAhorro, valorKwhVenta, porcentajeAhorro, porcentajeVenta,
+    excedentes, ratioGenConsumo, costoExcedentes,
+    tir5Anos, tir10Anos, tir15Anos,
     co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
   };
 }
@@ -109,9 +176,9 @@ export default function Resultado() {
   };
 
   const [opciones, setOpciones] = useState(() => resultado ? [
-    { label: "Opción A", kwp: String(resultado.kwp ?? ""), costokWp: "3500000" },
-    { label: "Opción B", kwp: "", costokWp: "3500000" },
-    { label: "Opción C", kwp: "", costokWp: "3500000" },
+    { label: "Opción A", kwp: String(resultado.kwp ?? ""), costokWp: "4200000" },
+    { label: "Opción B", kwp: "", costokWp: "4200000" },
+    { label: "Opción C", kwp: "", costokWp: "4200000" },
   ] : []);
 
   useEffect(() => {
@@ -481,12 +548,12 @@ export default function Resultado() {
 
                     {calculos[idx] ? (
                       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <OpRow label="Consumo kWh/mes" value={`${calculos[idx].consumoKwh} kWh/mes`} accent />
+                        <OpRow label="Consumo real" value={`${calculos[idx].consumoKwh} kWh/mes`} />
+                        <OpRow label="Producción" value={`${calculos[idx].generacionMes} kWh/mes`} accent />
+                        <OpRow label="Cobertura factura" value={`${calculos[idx].porcentajeCoberturaProyecto}%`} accent />
                         <OpRow label="Paneles" value={calculos[idx].npaneles} />
                         <OpRow label="Inversores" value={calculos[idx].ninversores} />
-                        <OpRow label="Producción" value={`${calculos[idx].produccionDeEnergia} kWh/mes`} />
                         <OpRow label="Área mínima" value={`${calculos[idx].areaMinima} m²`} />
-                        <OpRow label="Cobertura factura" value={`${calculos[idx].coberturaFactura}%`} accent />
                         <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                         <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
                         <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
@@ -554,7 +621,7 @@ export default function Resultado() {
                 <SummaryRow label="Correo" value={resultado.correo} />
                 <SummaryRow label="Teléfono" value={resultado.telefono} />
                 <SummaryRow label="Ubicación" value={resultado.ubicacion} />
-                <SummaryRow label="Preferencia de contacto" value={resultado.preferenciaContacto} />
+                <SummaryRow label="Ciudad solar" value={resultado.ciudadSolar ?? resultado.ubicacion} />
                 <SummaryRow label="Tipo de solicitud" value={resultado.tipoSolicitud} />
                 <SummaryRow label="Tipo de techo" value={resultado.tipoTecho} />
                 <SummaryRow label="Sistema de interés" value={resultado.sistemaInteres} />
@@ -564,13 +631,17 @@ export default function Resultado() {
             {/* TU SISTEMA SOLAR */}
             <Card title="Tu sistema solar">
               <div className="cotTwoCol">
-                <Metric label="Potencia del sistema" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
-                <Metric label="Consumo mensual" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
-                <Metric label="Producción mensual" value={`${money(resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
-                <Metric label="Consumo promedio día" value={`${money(resultadoActivo?.wPromedioDia)} W/día`} />
-                <Metric label="Radiación promedio" value={`${resultadoActivo?.radiacionSolar ?? "—"}`} />
+                <Metric label="Potencia instalada (kWp DC)" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
+                <Metric label="Potencia AC del inversor" value={`${resultadoActivo?.potenciaAC ?? "—"} kW`} />
+                <Metric label="N° paneles" value={`${resultadoActivo?.npaneles ?? "—"} und`} />
+                <Metric label="N° inversores" value={`${resultadoActivo?.ninversores ?? "—"} und`} />
+                <Metric label="Generación mensual" value={`${money(resultadoActivo?.generacionMes ?? resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
+                <Metric label="Consumo mensual cliente" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
+                <Metric label="Cobertura de factura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
+                <Metric label="Radiación solar (HSP/día)" value={`${resultadoActivo?.radiacionSolar ?? "—"} h/día`} />
+                <Metric label="Radiación anual equiv." value={`${resultadoActivo?.radiacionAnual ?? "—"} kWh/kWp`} />
+                <Metric label="Producción promedio/día" value={`${money(resultadoActivo?.wPromedioDia)} Wh/día`} />
                 <Metric label="Área disponible" value={`${money(resultadoActivo?.areaDisponible)} m²`} />
-                <Metric label="Cobertura de factura" value={`${resultadoActivo?.coberturaFactura ?? resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
                 <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
@@ -581,13 +652,22 @@ export default function Resultado() {
             <Card title="Análisis financiero">
               <div className="cotTwoCol">
                 <Metric label="Inversión estimada (con IVA)" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
-                <Metric label="Ahorro anual estimado" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
+                <Metric label="$/kWp instalado" value={`$ ${money(resultadoActivo?.valorKwp ?? resultadoActivo?.costokwpproyecto)}`} />
                 <Metric label="Ahorro mensual estimado" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
-                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
-                <Metric label="Vida útil estimada" value={`25 años`} />
-                <Metric label="Descuento declaración de renta" value={`$ ${money(resultadoActivo?.descuentoDeclaracion)}`} />
+                <Metric label="Ahorro anual estimado" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
                 <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultadoActivo?.ahorro10Anos)}`} />
-                <Metric label="Valorización aproximada" value={`4–10%`} />
+                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+                <Metric label="TIR a 5 años" value={`${resultadoActivo?.tir5Anos ?? "—"}%`} />
+                <Metric label="TIR a 10 años" value={`${resultadoActivo?.tir10Anos ?? "—"}%`} />
+                <Metric label="TIR a 15 años" value={`${resultadoActivo?.tir15Anos ?? "—"}%`} />
+                <Metric label="Precio kWh ahorro (E25)" value={`$ ${money(resultadoActivo?.valorKwhAhorro)}/kWh`} />
+                <Metric label="Precio kWh venta excedentes (E26)" value={`$ ${money(resultadoActivo?.valorKwhVenta)}/kWh`} />
+                <Metric label="% Autoconsumo" value={`${resultadoActivo?.porcentajeAhorro ?? "—"}%`} />
+                <Metric label="% Excedentes a la red" value={`${resultadoActivo?.porcentajeVenta ?? "—"}%`} />
+                <Metric label="Mantenimiento anual estimado" value={`$ ${money(resultadoActivo?.mantenimientoAnual)}`} />
+                <Metric label="Indexación IPC anual" value={`${resultadoActivo?.indexacionIPC != null ? (resultadoActivo.indexacionIPC * 100).toFixed(0) + '%' : "—"}`} />
+                <Metric label="Descuento declaración de renta" value={`$ ${money(resultadoActivo?.descuentoDeclaracion)}`} />
+                <Metric label="Vida útil estimada" value={`25 años`} />
               </div>
               <div className="cotDivider" style={{ margin: '16px 0 0' }} />
               <ChartFinanciero r={chartData} />
@@ -615,13 +695,20 @@ export default function Resultado() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Capacidad aprox. Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.cantidadPaneles ?? resultadoActivo.npaneles}</td></tr>
+                    <tr><td>Inversor {resultadoActivo.potenciaAC != null ? `${resultadoActivo.potenciaAC} kW` : ""}</td><td className="num">{resultadoActivo.cantidadInversores ?? resultadoActivo.ninversores}</td></tr>
                     <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1</td></tr>
                     <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1</td></tr>
-                    <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
-                    <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
-                    <tr><td>Servicio de instalación y puesta en marcha</td><td className="num">1</td></tr>
+                    <tr><td>Diseño e ingeniería</td><td className="num">{resultadoActivo.cantidadDisenoIngenieria ?? 1}</td></tr>
+                    <tr><td>Certificado RETIE</td><td className="num">{resultadoActivo.cantidadCertificadoRetie ?? 1}</td></tr>
+                    {(resultadoActivo.cantidadEstudioConexion ?? 0) > 0 && (
+                      <tr><td>Estudio de conexión</td><td className="num">{resultadoActivo.cantidadEstudioConexion}</td></tr>
+                    )}
+                    <tr><td>Trámites ante operador de red</td><td className="num">{resultadoActivo.cantidadTramitesOperador ?? 1}</td></tr>
+                    <tr><td>Sistema de monitoreo</td><td className="num">{resultadoActivo.cantidadSistemaMonitoreo ?? 1}</td></tr>
+                    <tr><td>Pólizas</td><td className="num">{resultadoActivo.cantidadPolizas ?? 1}</td></tr>
+                    <tr><td>Servicio de instalación y puesta en marcha</td><td className="num">{resultadoActivo.cantidadServicioInstalacion ?? 1}</td></tr>
+                    <tr><td>Beneficios tributarios (gestión)</td><td className="num">{resultadoActivo.cantidadBeneficiosTributarios ?? 1}</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -659,9 +746,9 @@ export default function Resultado() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>Anticipo</td><td className="num">50%</td></tr>
-                    <tr><td>Entrega de materiales</td><td className="num">40%</td></tr>
-                    <tr><td>RETIE</td><td className="num">10%</td></tr>
+                    <tr><td>Anticipo</td><td className="num">{resultadoActivo?.porcentajeAnticipo ?? 50}%</td></tr>
+                    <tr><td>Entrega de materiales</td><td className="num">{resultadoActivo?.porcentajeEntregaMateriales ?? 40}%</td></tr>
+                    <tr><td>RETIE</td><td className="num">{resultadoActivo?.porcentajeRetie ?? 10}%</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -672,9 +759,9 @@ export default function Resultado() {
             {/* IMPACTO AMBIENTAL */}
             <Card title="Impacto ambiental">
               <div className="cotTwoCol">
-                <Metric label="CO₂ evitado al año" value={`${money(resultadoActivo?.arbolesEquivalentes)} toneladas`} isGreen />
-                <Metric label="Equivalente en árboles sembrados" value={`${money(resultadoActivo?.galonesGasolinaEvitados)} árboles`} isGreen />
-                <Metric label="Gasolina no consumida" value={`${resultadoActivo?.co2EvitadoToneladas ?? "—"} galones`} isGreen />
+                <Metric label="CO₂ evitado al año" value={`${resultadoActivo?.co2EvitadoToneladas ?? "—"} toneladas`} isGreen />
+                <Metric label="Equivalente en árboles sembrados" value={`${money(resultadoActivo?.arbolesEquivalentes)} árboles`} isGreen />
+                <Metric label="Gasolina no consumida" value={`${money(resultadoActivo?.galonesGasolinaEvitados)} galones`} isGreen />
               </div>
             </Card>
 
@@ -794,22 +881,33 @@ export default function Resultado() {
               <SummaryRow label="Cliente" value={resultado.nombre} />
               <SummaryRow label="Ciudad" value={resultado.ubicacion} />
               <div className="cotDivider" />
-              <SummaryRow label="Potencia" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
-              <SummaryRow label="Producción" value={`${money(resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
-              <SummaryRow label="Cobertura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
+              <SummaryRow label="Potencia DC" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
+              <SummaryRow label="Potencia AC" value={`${resultadoActivo?.potenciaAC ?? "—"} kW`} />
+              <SummaryRow label="N° paneles" value={`${resultadoActivo?.npaneles ?? "—"} und`} />
+              <SummaryRow label="N° inversores" value={`${resultadoActivo?.ninversores ?? "—"} und`} />
               <div className="cotDivider" />
-              <SummaryRow label="Total inversión" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
-              <SummaryRow label="Retorno" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+              <SummaryRow label="Generación mensual" value={`${money(resultadoActivo?.generacionMes ?? resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
+              <SummaryRow label="Consumo cliente" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
+              <SummaryRow label="Cobertura factura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
+              <SummaryRow label="Autoconsumo / Excedentes" value={`${resultadoActivo?.porcentajeAhorro ?? "—"}% / ${resultadoActivo?.porcentajeVenta ?? "—"}%`} />
+              <div className="cotDivider" />
+              <SummaryRow label="Inversión total" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
+              <SummaryRow label="$/kWp" value={`$ ${money(resultadoActivo?.valorKwp ?? resultadoActivo?.costokwpproyecto)}`} />
+              <SummaryRow label="Ahorro mensual" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
               <SummaryRow label="Ahorro anual" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
+              <SummaryRow label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+              <SummaryRow label="TIR 10 años" value={`${resultadoActivo?.tir10Anos ?? "—"}%`} />
             </Card>
 
             {versiones.length > 0 && (
               <Card title="Versiones guardadas">
                 <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                   {versiones.map((ver, vidx) => {
-                    const cobVer = resultado?.consumoKwh > 0 && ver.produccionDeEnergia > 0
-                      ? Math.min(100, Number(((ver.produccionDeEnergia / resultado.consumoKwh) * 100).toFixed(1)))
-                      : (ver.coberturaFactura > 0 ? ver.coberturaFactura : null);
+                    const cobVer = ver.porcentajeCoberturaProyecto > 0
+                      ? ver.porcentajeCoberturaProyecto
+                      : (resultado?.consumoKwh > 0 && ver.produccionDeEnergia > 0
+                          ? Math.min(100, Number(((ver.produccionDeEnergia / resultado.consumoKwh) * 100).toFixed(1)))
+                          : null);
                     return (
                     <div key={vidx} style={{
                       padding: '10px 0',
@@ -877,7 +975,7 @@ export default function Resultado() {
                   </thead>
                   <tbody>
                     <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Capacidad aprox. Inversor {resultadoActivo.kwp} kW</td><td className="num">1</td></tr>
+                    <tr><td>Inversor {resultadoActivo.potenciaAC != null ? `${resultadoActivo.potenciaAC} kW` : ""}</td><td className="num">{resultadoActivo.ninversores ?? 1}</td></tr>
                     <tr><td>Riel 47</td><td className="num">{resultadoActivo.riel47}</td></tr>
                     <tr><td>Mid Clamp</td><td className="num">{resultadoActivo.midCland}</td></tr>
                     <tr><td>End Clamp</td><td className="num">{resultadoActivo.endCland}</td></tr>
@@ -912,10 +1010,10 @@ const CGRAY = '#e8e8e8';
 
 /* 1 ─── Sistema Solar: donut de cobertura + stats clave */
 function ChartSistemaSolar({ r }) {
-  const cobertura = Number(r?.coberturaFactura) || 0;
+  const cobertura = Number(r?.porcentajeCoberturaProyecto) || 0;
   const kwp       = Number(r?.kwp) || 0;
   const paneles   = Number(r?.npaneles) || 0;
-  const produccion= Number(r?.produccionDeEnergia) || 0;
+  const produccion= Number(r?.generacionMes ?? r?.produccionDeEnergia) || 0;
 
   const donutData = [
     { name: 'Cobertura', value: cobertura > 0 ? cobertura : 100 },
@@ -1049,9 +1147,9 @@ function ChartBreakItem({ color, label, pct, value }) {
 function ChartFormasPago({ r }) {
   const total = Number(r?.costoProyectoMasIva) || 0;
   const hitos = [
-    { label: 'Anticipo',           pct: 50, color: C1 },
-    { label: 'Entrega materiales', pct: 40, color: C2 },
-    { label: 'RETIE',              pct: 10, color: C3 },
+    { label: 'Anticipo',           pct: Number(r?.porcentajeAnticipo)          || 50, color: C1 },
+    { label: 'Entrega materiales', pct: Number(r?.porcentajeEntregaMateriales) || 40, color: C2 },
+    { label: 'RETIE',              pct: Number(r?.porcentajeRetie)             || 10, color: C3 },
   ];
 
   return (
