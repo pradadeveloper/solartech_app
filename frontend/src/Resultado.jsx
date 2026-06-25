@@ -590,8 +590,9 @@ export default function Resultado() {
                     </thead>
                     <tbody>
                       {[
-                        { label: 'kWp', key: 'kwp' },
-                        { label: 'Consumo kWh/mes (calc.)', key: 'consumoKwh' },
+                        { label: 'kWp instalado', key: 'kwp' },
+                        { label: 'Consumo real', key: 'consumoKwh' },
+                        { label: 'Generación mensual', key: 'generacionMes' },
                         { label: 'N° Paneles', key: 'npaneles' },
                         { label: 'Inversión + IVA', key: 'costoProyectoMasIva', fmt: true },
                         { label: 'Ahorro mensual', key: 'ahorroMensual', fmt: true },

@@ -2,7 +2,6 @@
 //  FÓRMULAS Y CÁLCULOS — Solartech Energy Systems
 //  Modificar este archivo para ajustar cualquier cálculo del
 //  sistema sin tocar la lógica del servidor (index.js).
-//  Referencias Excel: formulasJuan.js (24/06/2026)
 // ============================================================
 
 // ── Utilidad numérica ────────────────────────────────────────
@@ -236,9 +235,8 @@ function calcularProyecto({
   const indexacionIPC      = inflacion;
 
   // ── 12. Producción y área ────────────────────────────────
-  const produccionDeEnergia = Math.round(
-    (potenciaPanel * npaneles * radiacionSolar * 365 / 12) / 1000
-  );
+  // produccionDeEnergia = generacionMes (alias para compatibilidad con PDF y datos guardados)
+  const produccionDeEnergia = generacionMes;
   const areaMinima                  = Math.round(kwp * factorAreaM2PorKwp);
   const porcentajeCoberturaProyecto = consumo > 0
     ? Math.min(100, Number(((generacionMes / consumo) * 100).toFixed(1)))
@@ -272,7 +270,7 @@ function calcularProyecto({
   console.log({
     potenciaInstalada : kwp,
     capacidadInstalada: Math.round(kwp * 1000),
-    generacionMensual : generacionMes,
+    generacionMes     : generacionMes,
     radiacionAnual    : radiacionAnual,
     areaNecesaria     : areaMinima,
     co2EvitadoAnual   : co2EvitadoToneladas,

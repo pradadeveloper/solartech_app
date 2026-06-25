@@ -477,7 +477,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   sectionHeader('TU SISTEMA SOLAR');
   infoRow2('Potencia del sistema', `${safe(resultados.kwp)} kWp`, 'Numero de paneles', `${safe(resultados.npaneles)} paneles`);
   infoRow2('Numero de inversores', `${safe(resultados.ninversores)} und`, 'Potencia por panel', `${safe(resultados.potenciaPanel)} W`);
-  infoRow2('Produccion estimada', `${safe(resultados.produccionDeEnergia)} kWh/mes`, 'Cobertura del sistema', `${safe(resultados.porcentajeCoberturaProyecto)}%`);
+  infoRow2('Generacion mensual', `${safe(resultados.generacionMes ?? resultados.produccionDeEnergia)} kWh/mes`, 'Cobertura del sistema', `${safe(resultados.porcentajeCoberturaProyecto)}%`);
   infoRow2('Consumo del cliente', `${safe(resultados.consumoKwh)} kWh/mes`, 'Area minima requerida', `${safe(resultados.areaMinima)} m2`);
   infoRow2('Area disponible declarada', `${safe(data.areaDisponible)} m2`, 'Radiacion solar local', `${safe(resultados.radiacionSolar)} kWh/m2/dia`);
   gap(6);
