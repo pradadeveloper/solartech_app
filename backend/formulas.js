@@ -83,8 +83,8 @@ function calcularProyecto({
     throw new Error('Valores numéricos inválidos: consumoKwh o costoKwh');
   }
 
-  // Parámetros de configuración — Number() garantiza que strings del config no produzcan NaN
-  const n = (v, fb) => { const x = Number(v); return Number.isFinite(x) && x !== 0 ? x : fb; };
+  // Parámetros de configuración — toNumber() convierte "3,8" → 3.8 (locale Google Sheets español)
+  const n = (v, fb) => { const x = toNumber(v); return Number.isFinite(x) && x !== 0 ? x : fb; };
   const potenciaPanel      = n(cfg.potenciaPanel,      DEFAULTS.potenciaPanel);
   const radiacionSolar     = Number(radiacionData) > 0 ? Number(radiacionData) : n(cfg.radiacionSolar, DEFAULTS.radiacionSolar);
   const margenCobertura    = n(cfg.margenCobertura,    DEFAULTS.margenCobertura);
@@ -92,19 +92,20 @@ function calcularProyecto({
   const costokWp           = n(cfg.costokWp,           DEFAULTS.costokWp);
   const longitudRiel       = n(cfg.longitudRiel,       DEFAULTS.longitudRiel);
   const cableSolar         = n(cfg.cableSolar,         DEFAULTS.cableSolar);
-  const ivaPct             = Number.isFinite(Number(cfg.ivaPct))            ? Number(cfg.ivaPct)            : DEFAULTS.ivaPct;
-  const descuentoRentaPct  = Number.isFinite(Number(cfg.descuentoRentaPct)) ? Number(cfg.descuentoRentaPct) : DEFAULTS.descuentoRentaPct;
+  const tn = (v, fb) => { const x = toNumber(v); return Number.isFinite(x) ? x : fb; };   // permite 0
+  const ivaPct             = tn(cfg.ivaPct,            DEFAULTS.ivaPct);
+  const descuentoRentaPct  = tn(cfg.descuentoRentaPct, DEFAULTS.descuentoRentaPct);
   const factorCO2          = n(cfg.factorCO2,          DEFAULTS.factorCO2);
   const factorAreaM2PorKwp = n(cfg.factorAreaM2PorKwp, DEFAULTS.factorAreaM2PorKwp);
   const factorArboles      = n(cfg.factorArboles,      DEFAULTS.factorArboles);
   const factorGalones      = n(cfg.factorGalones,      DEFAULTS.factorGalones);
-  const sobredimension     = Number.isFinite(Number(cfg.sobredimension))    ? Number(cfg.sobredimension)    : DEFAULTS.sobredimension;
+  const sobredimension     = tn(cfg.sobredimension,    DEFAULTS.sobredimension);
   const maxAC100kWp        = n(cfg.maxAC100kWp,        DEFAULTS.maxAC100kWp);
   const mantenimientoKwp   = n(cfg.mantenimientoKwp,   DEFAULTS.mantenimientoKwp);
-  const inflacion          = Number.isFinite(Number(cfg.inflacion))         ? Number(cfg.inflacion)         : DEFAULTS.inflacion;
-  const anticipo1Pct       = Number.isFinite(Number(cfg.anticipo1Pct))      ? Number(cfg.anticipo1Pct)      : DEFAULTS.anticipo1Pct;
-  const anticipo2Pct       = Number.isFinite(Number(cfg.anticipo2Pct))      ? Number(cfg.anticipo2Pct)      : DEFAULTS.anticipo2Pct;
-  const anticipo3Pct       = Number.isFinite(Number(cfg.anticipo3Pct))      ? Number(cfg.anticipo3Pct)      : DEFAULTS.anticipo3Pct;
+  const inflacion          = tn(cfg.inflacion,         DEFAULTS.inflacion);
+  const anticipo1Pct       = tn(cfg.anticipo1Pct,      DEFAULTS.anticipo1Pct);
+  const anticipo2Pct       = tn(cfg.anticipo2Pct,      DEFAULTS.anticipo2Pct);
+  const anticipo3Pct       = tn(cfg.anticipo3Pct,      DEFAULTS.anticipo3Pct);
 
   // ── 1. Radiación ────────────────────────────────────────
   // radiacionSolar = HSP diario; radiacion_anual = HSP * 365 (igual que Excel 1387)
