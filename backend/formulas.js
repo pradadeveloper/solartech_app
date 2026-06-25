@@ -269,12 +269,19 @@ function calcularProyecto({
   });
   console.log('\n[sistemaSolar]');
   console.log({
-    potenciaInstalada : kwp,
-    capacidadInstalada: Math.round(kwp * 1000),
-    generacionMes     : generacionMes,
-    radiacionAnual    : radiacionAnual,
-    areaNecesaria     : areaMinima,
-    co2EvitadoAnual   : co2EvitadoToneladas,
+    potenciaInstalada   : kwp,
+    capacidadInstalada  : Math.round(kwp * 1000),
+    generacionMes       : generacionMes,
+    radiacionAnual      : radiacionAnual,
+    areaNecesaria       : areaMinima,
+    co2EvitadoAnual     : co2EvitadoToneladas,
+    // diagnóstico
+    _consumo            : consumo,
+    _radiacion          : radiacionSolar,
+    _kWpPorConsumo      : Number(kWpPorConsumo.toFixed(4)),
+    _kWpMaximoPorArea   : Number.isFinite(kWpMaximoPorArea) ? Number(kWpMaximoPorArea.toFixed(4)) : 'Inf',
+    _kwp1               : Number(kwp1.toFixed(4)),
+    _kwpLimitado        : Number(kwpLimitado.toFixed(4)),
   });
   console.log('\n[indicadores]');
   console.log({
