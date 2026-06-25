@@ -118,6 +118,7 @@ function calcularProyecto({
     : Infinity;
   const kwp1 = Math.min(kWpMaximoPorArea, kWpPorConsumo);
 
+  
   // G3 — límite gran autogenerador CREG
   const maxGrandeCalc = kWpPorConsumo * 0.52;
 
