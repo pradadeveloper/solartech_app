@@ -1,0 +1,735 @@
+/* =========================================================
+   PROPUESTA PUBLICA — Premium redesign
+   Scoped to .pp-page — does not affect the dark cotizador form
+   Import AFTER cotizadorSolar.css
+   ========================================================= */
+
+/* ── 1. Page shell ──────────────────────────────────────── */
+.pp-page {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background: #F2F2F2;
+}
+
+.pp-page .cotizadorShell {
+  max-width: 1280px;
+  padding: 24px 24px 64px;
+}
+
+/* ── 2. Header ──────────────────────────────────────────── */
+.pp-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-top: 3px solid #B03A22;
+  border-bottom: 1px solid #DEDEDE;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+}
+
+.pp-header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pp-logo {
+  width: 110px;
+  height: auto;
+  display: block;
+}
+
+.pp-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.pp-quote-num {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A1A;
+  letter-spacing: -0.01em;
+}
+
+.pp-quote-date {
+  font-size: 12px;
+  color: #5A5A5A;
+}
+
+/* ── 3. Hero metrics ────────────────────────────────────── */
+.pp-hero {
+  background: #ffffff;
+  border: 1px solid #DEDEDE;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 20px;
+  gap: 0;
+}
+
+.pp-hero-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  padding: 20px 16px;
+  background: #ffffff;
+  border-right: 1px solid #EBEBEB;
+}
+
+.pp-hero-metric:last-child {
+  border-right: none;
+}
+
+.pp-hero-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1A1A1A;
+  line-height: 1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.pp-hero-value--accent {
+  color: #B03A22;
+}
+
+.pp-hero-label {
+  font-size: 11px;
+  color: #5A5A5A;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ── 4. Grid ────────────────────────────────────────────── */
+.pp-side {
+  top: 72px !important;
+}
+
+/* ── 5. Cards ───────────────────────────────────────────── */
+.pp-page .cotCard {
+  background: #ffffff;
+  border: 1px solid #DEDEDE;
+  border-radius: 16px;
+  overflow: hidden;
+  backdrop-filter: none;
+}
+
+.pp-page .cotCardHead {
+  background: #ffffff;
+  border-bottom: 1px solid #EBEBEB;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pp-page .cotCardHead h2 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #5A5A5A;
+  margin: 0;
+  padding-left: 10px;
+  border-left: 3px solid #B03A22;
+  line-height: 1.3;
+}
+
+.pp-page .cotCardBody {
+  padding: 20px;
+  color: #1A1A1A;
+}
+
+/* ── 6. Metrics grid ────────────────────────────────────── */
+.pp-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 40px;
+  padding: 4px 0;
+}
+
+.pp-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pp-metric-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1A1A1A;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-metric-value--green {
+  color: #16a34a;
+}
+
+.pp-metric-label {
+  font-size: 11px;
+  color: #5A5A5A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+/* ── 7. Mini blocks ─────────────────────────────────────── */
+.pp-blocks-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pp-block {
+  background: #FAFAFA;
+  border: 1px solid #EBEBEB;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-block-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin: 0 0 8px;
+}
+
+.pp-block-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pp-block-lines li {
+  font-size: 13px;
+  color: #5A5A5A;
+  line-height: 1.5;
+}
+
+.pp-block-foot {
+  margin-top: 12px;
+  display: inline-block;
+  background: rgba(176, 58, 34, 0.08);
+  color: #B03A22;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 3px 10px;
+  align-self: flex-start;
+}
+
+/* ── 8. Buttons ─────────────────────────────────────────── */
+.pp-page .cotActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #B03A22;
+  color: #ffffff !important;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.12s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.pp-btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.pp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pp-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #1A1A1A;
+  border: 1px solid #DEDEDE;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+  white-space: nowrap;
+}
+
+.pp-btn-ghost:hover {
+  border-color: #B03A22;
+  color: #B03A22;
+  transform: translateY(-1px);
+}
+
+/* ── 9. Summary rows (sidebar) ──────────────────────────── */
+.pp-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid #EBEBEB;
+}
+
+.pp-summary-row:last-child {
+  border-bottom: none;
+}
+
+.pp-summary-label {
+  font-size: 12px;
+  color: #5A5A5A;
+  flex-shrink: 0;
+}
+
+.pp-summary-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1A1A;
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 10. Tables ─────────────────────────────────────────── */
+.pp-page .tableWrap {
+  border: 1px solid #DEDEDE;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.pp-page .table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: unset;
+}
+
+.pp-page .table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5A5A5A;
+  background: #FAFAFA;
+  padding: 10px 16px;
+  text-align: left;
+  border-bottom: 1px solid #DEDEDE;
+  position: static;
+}
+
+.pp-page .table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #1A1A1A;
+  border-bottom: 1px solid #F0F0F0;
+  text-align: left;
+}
+
+.pp-page .table tr:last-child td {
+  border-bottom: none;
+}
+
+.pp-page .table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-page .pp-table-total td {
+  font-weight: 800;
+  background: #FFF8F7;
+}
+
+/* ── 11. Divider ────────────────────────────────────────── */
+.pp-divider {
+  height: 1px;
+  background: #EBEBEB;
+  margin: 20px 0;
+}
+
+/* ── 12. Welcome block ──────────────────────────────────── */
+.pp-welcome-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin: 0 0 8px;
+  line-height: 1.35;
+}
+
+.pp-accent {
+  color: #B03A22;
+}
+
+.pp-welcome-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5A5A5A;
+  margin: 0 0 20px;
+}
+
+/* ── 13. Environmental card ─────────────────────────────── */
+.pp-env-wrap {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.pp-env-wrap .pp-metric-value {
+  color: #16a34a;
+}
+
+/* ── 14. Advisor ────────────────────────────────────────── */
+.pp-advisor {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pp-advisor-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #B03A22;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(176, 58, 34, 0.25);
+}
+
+.pp-advisor-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-advisor-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1A1A1A;
+  margin: 0 0 2px;
+}
+
+.pp-advisor-role {
+  font-size: 12px;
+  color: #5A5A5A;
+  margin: 0 0 10px;
+}
+
+/* Override .cotizador--light p specificity (0-1-1) for muted advisor role */
+.pp-page p.pp-advisor-role {
+  color: #5A5A5A;
+}
+
+.pp-advisor-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.pp-advisor-link {
+  font-size: 13px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.pp-advisor-link:hover {
+  opacity: 0.72;
+}
+
+.pp-advisor-link--wa {
+  color: #16a34a;
+}
+
+.pp-advisor-link--email {
+  color: #B03A22;
+}
+
+/* ── 15. Chart stat icons ───────────────────────────────── */
+.pp-page .chartStatIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #B03A22;
+}
+
+.pp-page .chartStatIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.pp-page .chartStatValue {
+  color: #B03A22;
+}
+
+/* ── 16. Brands ─────────────────────────────────────────── */
+.pp-brands {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.pp-brands img {
+  width: 90px;
+  height: 48px;
+  object-fit: contain;
+  filter: grayscale(15%);
+  transition: filter 0.2s;
+}
+
+.pp-brands img:hover {
+  filter: grayscale(0%);
+}
+
+/* ── 17. Modal ──────────────────────────────────────────── */
+.pp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 16px;
+}
+
+.pp-modal-body {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 860px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+}
+
+.pp-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin: 0 0 20px;
+}
+
+/* ── 18. Conditions list ────────────────────────────────── */
+.pp-page .condicionesComerciales {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #5A5A5A;
+  padding-left: 18px;
+  margin: 0;
+}
+
+.pp-page .condicionesComerciales li {
+  margin-bottom: 4px;
+}
+
+/* ── 19. Chart notes / titles ───────────────────────────── */
+.pp-page p.chartNote {
+  color: #888;
+}
+
+.pp-page p.chartTitle {
+  color: #5A5A5A;
+}
+
+/* ── 20. Closing section ────────────────────────────────── */
+.pp-closing-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5A5A5A;
+  margin: 0 0 20px;
+}
+
+/* ── 21. Responsive — tablet ────────────────────────────── */
+@media (max-width: 1050px) {
+  .pp-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pp-hero-value {
+    font-size: 20px;
+  }
+}
+
+/* ── 22. Responsive — mobile ────────────────────────────── */
+@media (max-width: 600px) {
+  .pp-page .cotizadorShell {
+    padding: 14px 12px 48px;
+  }
+
+  .pp-header-inner {
+    padding: 12px 14px;
+  }
+
+  .pp-logo {
+    width: 86px;
+  }
+
+  .pp-quote-num {
+    font-size: 13px;
+  }
+
+  .pp-quote-date {
+    font-size: 11px;
+  }
+
+  /* Hero: 2×2 grid */
+  .pp-hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pp-hero-metric {
+    border-right: none;
+    border-bottom: 1px solid #EBEBEB;
+    padding: 16px 10px;
+  }
+
+  .pp-hero-metric:nth-child(odd) {
+    border-right: 1px solid #EBEBEB;
+  }
+
+  .pp-hero-metric:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+
+  .pp-hero-value {
+    font-size: 18px;
+  }
+
+  .pp-hero-label {
+    font-size: 10px;
+  }
+
+  .pp-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .pp-blocks-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pp-btn-primary,
+  .pp-btn-ghost {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pp-page .cotActions {
+    flex-direction: column;
+  }
+
+  .pp-page .cotCardBody {
+    padding: 16px;
+  }
+
+  .pp-page .cotCardHead {
+    padding: 12px 16px;
+  }
+
+  .pp-brands {
+    gap: 20px;
+  }
+
+  .pp-brands img {
+    width: 70px;
+    height: 36px;
+  }
+
+  .pp-modal-body {
+    padding: 20px 16px;
+    border-radius: 16px;
+  }
+
+  .pp-advisor {
+    gap: 12px;
+  }
+}
+
+/* ── 23. Print ──────────────────────────────────────────── */
+@media print {
+  .pp-header {
+    position: static;
+    box-shadow: none;
+  }
+
+  .pp-page .cotizadorShell {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .pp-page .cotGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pp-side {
+    display: none !important;
+  }
+
+  .pp-btn-primary,
+  .pp-btn-ghost {
+    display: none !important;
+  }
+
+  .pp-page .cotCard {
+    break-inside: avoid;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .pp-hero {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+}
