@@ -502,10 +502,13 @@ export default function Resultado() {
         {/* ── Acciones: vista interna del asesor. Descargar PDF y Compartir link
              viven SOLO después de guardar una opción (modal + /propuesta/:id) ── */}
         <div className="cotActionsBar">
-          <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} />
+          <div className="cotActionsGroup">
+            <span className="cotActionsLabel">Estado</span>
+            <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} />
+          </div>
 
           <button className="cotBtn cotBtnGhost" onClick={() => navigate("/cliente")}>
-            Nueva cotización
+            + Nueva cotización
           </button>
         </div>
 
@@ -1408,6 +1411,7 @@ function EstadoSelect({ value, onChange, disabled, compact }) {
   const badge = ESTADO_BADGE[value] ?? ESTADO_BADGE["Nuevo"];
   return (
     <select
+      className="estadoSelect"
       aria-label="Cambiar estado"
       value={value}
       disabled={disabled}

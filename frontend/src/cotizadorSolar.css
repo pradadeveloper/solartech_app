@@ -634,11 +634,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   margin-bottom: 18px;
   backdrop-filter: blur(10px);
 }
@@ -646,6 +647,27 @@
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.1);
   backdrop-filter: none;
+}
+
+/* Grupo izquierdo: etiqueta + selector de estado */
+.cotActionsGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cotActionsLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #8a8a8a;
+}
+
+/* El selector de estado NO debe estirarse a todo el ancho (regla global) */
+.cotizador .cotActionsBar .estadoSelect {
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
 }
 
 /* Barra de acciones fija en la parte inferior — solo mobile (< 768px) */
@@ -659,6 +681,14 @@
     align-items: stretch;
   }
   .cotActionsBar > * {
+    width: 100%;
+  }
+  .cotActionsGroup {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .cotizador .cotActionsBar .estadoSelect {
     width: 100%;
   }
 
@@ -1037,34 +1067,41 @@
    ========================================================= */
 .mobileHero {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  gap: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #fdfaf9 100%);
+  border: 1px solid #ecdcd7;
+  border-radius: 18px;
+  padding: 22px 20px;
+  margin-bottom: 20px;
+  gap: 10px;
   flex-wrap: wrap;
+  box-shadow: 0 6px 20px rgba(176, 58, 34, 0.06);
 }
 .mobileHeroItem {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   flex: 1;
-  min-width: 78px;
+  min-width: 96px;
+  gap: 6px;
 }
 .mobileHeroLabel {
   font-size: 11px;
-  color: #5a5a5a;
-  margin-bottom: 2px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #8a8a8a;
   text-align: center;
 }
 .mobileHeroValue {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: clamp(18px, 2vw, 26px);
+  font-weight: 800;
+  line-height: 1.1;
   color: #b03a22;
   text-align: center;
+  letter-spacing: -0.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1072,24 +1109,26 @@
 }
 .mobileHeroDivider {
   width: 1px;
-  height: 28px;
-  background: #e0e0e0;
+  align-self: center;
+  height: 44px;
+  background: #ecdcd7;
   flex-shrink: 0;
 }
 
 @media (max-width: 600px) {
   .mobileHero {
-    padding: 12px 10px;
-    gap: 4px;
+    padding: 16px 12px;
+    gap: 8px;
+    row-gap: 16px;
   }
   .mobileHeroItem {
-    min-width: 0;
-  }
-  .mobileHeroLabel {
-    font-size: 10px;
+    min-width: 30%;
   }
   .mobileHeroValue {
-    font-size: 12px;
+    font-size: clamp(15px, 4.5vw, 20px);
+  }
+  .mobileHeroDivider {
+    display: none;
   }
 }
 
@@ -1167,8 +1206,15 @@
 }
 
 .cotizador--light .cotBtnGhost {
-  color: #1a1a1a;
-  border-color: #dedede;
+  color: #b03a22;
+  border-color: #e6c3ba;
+  background: #fdf3f0;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cotizador--light .cotBtnGhost:hover {
+  background: #f8e4de;
+  border-color: #d99e8f;
 }
 
 .cotizador--light .tableWrap {
