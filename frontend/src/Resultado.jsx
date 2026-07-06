@@ -7,6 +7,16 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from "recharts";
 
+const ESTADOS = ["Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado", "Perdido"];
+const ESTADO_BADGE = {
+  "Nuevo":          { bg: "rgba(52,152,219,.18)", color: "#3498db" },
+  "En negociación": { bg: "rgba(243,156,18,.18)",  color: "#f39c12" },
+  "Cotizado":       { bg: "rgba(155,89,182,.18)",  color: "#9b59b6" },
+  "Enviado":        { bg: "rgba(26,188,156,.18)",  color: "#1abc9c" },
+  "Cerrado":        { bg: "rgba(46,204,113,.18)",  color: "#2ecc71" },
+  "Perdido":        { bg: "rgba(231,76,60,.18)",   color: "#e74c3c" },
+};
+
 // ── Replica las fórmulas del backend (formulas.js) para el comparador ──
 // Las mismas fórmulas que el servidor: sin PR en generación, excedentes CREG, FLOOR en paneles.
 function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
@@ -165,6 +175,27 @@ export default function Resultado() {
   const [guardandoVersion, setGuardandoVersion] = useState(null);
   const [linkVersionCopiado, setLinkVersionCopiado] = useState(null);
   const [generandoPdfVersion, setGenerandoPdfVersion] = useState(null);
+  const [estadoActual, setEstadoActual] = useState(() => resultado?.estado ?? "Nuevo");
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
+
+  const cambiarEstado = async (nuevoEstado) => {
+    const anterior = estadoActual;
+    setEstadoActual(nuevoEstado);
+    if (!resultado?.numeroCotizacion) return;
+    setCambiandoEstado(true);
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${resultado.numeroCotizacion}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+    } catch (e) {
+      setEstadoActual(anterior);
+      alert("No se pudo actualizar el estado");
+    } finally {
+      setCambiandoEstado(false);
+    }
+  };
 
   const compartirLink = () => {
     const codigo = resultado.codigoPublico || resultado.numeroCotizacion;
@@ -407,16 +438,33 @@ export default function Resultado() {
           </div>
         </header>
 
-        {/* Hero mobile: métricas clave visibles solo en pantallas pequeñas */}
+        {/* ── Acciones: siempre visible, arriba de cualquier dato del proyecto ── */}
+        <div className="cotActionsBar">
+          <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
+            {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} PDF`}
+          </button>
+
+          <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} />
+
+          <button className="cotBtn cotBtnGhost" onClick={compartirLink}>
+            {linkCopiado ? '¡Link copiado! ✓' : 'Compartir Link'}
+          </button>
+
+          <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
+            Nueva cotización
+          </button>
+        </div>
+
+        {/* KPIs clave: visibles en todos los tamaños de pantalla */}
         <div className="mobileHero">
-          <div className="mobileHeroItem">
-            <span className="mobileHeroLabel">Potencia</span>
-            <span className="mobileHeroValue">{resultadoActivo?.kwp ?? '—'} kWp</span>
-          </div>
-          <div className="mobileHeroDivider" />
           <div className="mobileHeroItem">
             <span className="mobileHeroLabel">Inversión</span>
             <span className="mobileHeroValue">${money(resultadoActivo?.costoProyectoMasIva)}</span>
+          </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">Ahorro/mes</span>
+            <span className="mobileHeroValue">${money(resultadoActivo?.ahorroMensual)}</span>
           </div>
           <div className="mobileHeroDivider" />
           <div className="mobileHeroItem">
@@ -425,9 +473,22 @@ export default function Resultado() {
           </div>
           <div className="mobileHeroDivider" />
           <div className="mobileHeroItem">
-            <span className="mobileHeroLabel">Ahorro/mes</span>
-            <span className="mobileHeroValue">${money(resultadoActivo?.ahorroMensual)}</span>
+            <span className="mobileHeroLabel">Potencia</span>
+            <span className="mobileHeroValue">{resultadoActivo?.kwp ?? '—'} kWp</span>
           </div>
+          <div className="mobileHeroDivider" />
+          <div className="mobileHeroItem">
+            <span className="mobileHeroLabel">N° paneles</span>
+            <span className="mobileHeroValue">{resultadoActivo?.npaneles ?? '—'}</span>
+          </div>
+        </div>
+
+        {/* Barra de acciones fija — solo mobile (< 768px) */}
+        <div className="cotStickyMobileBar">
+          <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
+            {generandoPdf ? 'Generando...' : 'Descargar PDF'}
+          </button>
+          <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} compact />
         </div>
 
         {/* Intro */}
@@ -448,20 +509,67 @@ export default function Resultado() {
                   ser considerados como una cotización formal. <b>¡Ten en cuenta!</b> Si requieres más información,
                   ponte en contacto con un asesor.
                 </p>
-
-                <div className="cotActions" style={{ marginTop: 14 }}>
-                  <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
-                    {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} en PDF`}
-                  </button>
-                  <button className="cotBtn cotBtnGhost" onClick={compartirLink}>
-                    {linkCopiado ? '¡Link copiado! ✓' : 'Compartir Link'}
-                  </button>
-                  <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
-                    Volver al formulario
-                  </button>
-                </div>
               </div>
             </div>
+
+            {/* INFO INICIAL — datos del cliente */}
+            <Card title="Información inicial">
+              <div className="cotTwoCol">
+                <SummaryRow label="Nombre" value={resultado.nombre} />
+                <SummaryRow label="Correo" value={resultado.correo} />
+                <SummaryRow label="Teléfono" value={resultado.telefono} />
+                <SummaryRow label="Ubicación" value={resultado.ubicacion} />
+                <SummaryRow label="Ciudad solar" value={resultado.ciudadSolar ?? resultado.ubicacion} />
+                <SummaryRow label="Tipo de solicitud" value={resultado.tipoSolicitud} />
+                <SummaryRow label="Tipo de techo" value={resultado.tipoTecho} />
+                <SummaryRow label="Sistema de interés" value={resultado.sistemaInteres} />
+              </div>
+            </Card>
+
+            {/* TU SISTEMA SOLAR — detalles técnicos */}
+            <Card title="Tu sistema solar">
+              <div className="cotTwoCol">
+                <Metric label="Potencia instalada (kWp DC)" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
+                <Metric label="Potencia AC del inversor" value={`${resultadoActivo?.potenciaAC ?? "—"} kW`} />
+                <Metric label="N° paneles" value={`${resultadoActivo?.npaneles ?? "—"} und`} />
+                <Metric label="N° inversores" value={`${resultadoActivo?.ninversores ?? "—"} und`} />
+                <Metric label="Generación mensual" value={`${money(resultadoActivo?.generacionMes ?? resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
+                <Metric label="Consumo mensual cliente" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
+                <Metric label="Cobertura de factura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
+                <Metric label="Radiación solar (HSP/día)" value={`${resultadoActivo?.radiacionSolar ?? "—"} h/día`} />
+                <Metric label="Radiación anual equiv." value={`${resultadoActivo?.radiacionAnual ?? "—"} kWh/kWp`} />
+                <Metric label="Producción promedio/día" value={`${money(resultadoActivo?.wPromedioDia)} Wh/día`} />
+                <Metric label="Área disponible" value={`${money(resultadoActivo?.areaDisponible)} m²`} />
+                <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
+              </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartSistemaSolar r={chartData} />
+            </Card>
+
+            {/* FINANCIERO */}
+            <Card title="Análisis financiero">
+              <div className="cotTwoCol">
+                <Metric label="Inversión estimada (con IVA)" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
+                <Metric label="$/kWp instalado" value={`$ ${money(resultadoActivo?.valorKwp ?? resultadoActivo?.costokwpproyecto)}`} />
+                <Metric label="Ahorro mensual estimado" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
+                <Metric label="Ahorro anual estimado" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
+                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultadoActivo?.ahorro10Anos)}`} />
+                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
+                <Metric label="TIR a 5 años" value={`${resultadoActivo?.tir5Anos ?? "—"}%`} />
+                <Metric label="TIR a 10 años" value={`${resultadoActivo?.tir10Anos ?? "—"}%`} />
+                <Metric label="TIR a 15 años" value={`${resultadoActivo?.tir15Anos ?? "—"}%`} />
+                <Metric label="Precio kWh ahorro (E25)" value={`$ ${money(resultadoActivo?.valorKwhAhorro)}/kWh`} />
+                <Metric label="Precio kWh venta excedentes (E26)" value={`$ ${money(resultadoActivo?.valorKwhVenta)}/kWh`} />
+                <Metric label="% Autoconsumo" value={`${resultadoActivo?.porcentajeAhorro ?? "—"}%`} />
+                <Metric label="% Excedentes a la red" value={`${resultadoActivo?.porcentajeVenta ?? "—"}%`} />
+                <Metric label="Mantenimiento anual estimado" value={`$ ${money(resultadoActivo?.mantenimientoAnual)}`} />
+                <Metric label="Indexación IPC anual" value={`${resultadoActivo?.indexacionIPC != null ? (resultadoActivo.indexacionIPC * 100).toFixed(0) + '%' : "—"}`} />
+                <Metric label="Descuento declaración de renta" value={`$ ${money(resultadoActivo?.descuentoDeclaracion)}`} />
+                <Metric label="Vida útil estimada" value={`25 años`} />
+              </div>
+              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
+              <ChartFinanciero r={chartData} />
+            </Card>
 
             {/* ── COMPARADOR DE OPCIONES ── */}
             <Card
@@ -612,66 +720,6 @@ export default function Resultado() {
                   </table>
                 </div>
               )}
-            </Card>
-
-
-            {/* INFO INICIAL */}
-            <Card title="Información inicial">
-              <div className="cotTwoCol">
-                <SummaryRow label="Nombre" value={resultado.nombre} />
-                <SummaryRow label="Correo" value={resultado.correo} />
-                <SummaryRow label="Teléfono" value={resultado.telefono} />
-                <SummaryRow label="Ubicación" value={resultado.ubicacion} />
-                <SummaryRow label="Ciudad solar" value={resultado.ciudadSolar ?? resultado.ubicacion} />
-                <SummaryRow label="Tipo de solicitud" value={resultado.tipoSolicitud} />
-                <SummaryRow label="Tipo de techo" value={resultado.tipoTecho} />
-                <SummaryRow label="Sistema de interés" value={resultado.sistemaInteres} />
-              </div>
-            </Card>
-
-            {/* TU SISTEMA SOLAR */}
-            <Card title="Tu sistema solar">
-              <div className="cotTwoCol">
-                <Metric label="Potencia instalada (kWp DC)" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
-                <Metric label="Potencia AC del inversor" value={`${resultadoActivo?.potenciaAC ?? "—"} kW`} />
-                <Metric label="N° paneles" value={`${resultadoActivo?.npaneles ?? "—"} und`} />
-                <Metric label="N° inversores" value={`${resultadoActivo?.ninversores ?? "—"} und`} />
-                <Metric label="Generación mensual" value={`${money(resultadoActivo?.generacionMes ?? resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
-                <Metric label="Consumo mensual cliente" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
-                <Metric label="Cobertura de factura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
-                <Metric label="Radiación solar (HSP/día)" value={`${resultadoActivo?.radiacionSolar ?? "—"} h/día`} />
-                <Metric label="Radiación anual equiv." value={`${resultadoActivo?.radiacionAnual ?? "—"} kWh/kWp`} />
-                <Metric label="Producción promedio/día" value={`${money(resultadoActivo?.wPromedioDia)} Wh/día`} />
-                <Metric label="Área disponible" value={`${money(resultadoActivo?.areaDisponible)} m²`} />
-                <Metric label="Área mínima requerida" value={`${resultadoActivo?.areaMinima ?? "—"} m²`} />
-              </div>
-              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
-              <ChartSistemaSolar r={chartData} />
-            </Card>
-
-            {/* FINANCIERO */}
-            <Card title="Análisis financiero">
-              <div className="cotTwoCol">
-                <Metric label="Inversión estimada (con IVA)" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
-                <Metric label="$/kWp instalado" value={`$ ${money(resultadoActivo?.valorKwp ?? resultadoActivo?.costokwpproyecto)}`} />
-                <Metric label="Ahorro mensual estimado" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
-                <Metric label="Ahorro anual estimado" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
-                <Metric label="Ahorro proyectado a 10 años" value={`$ ${money(resultadoActivo?.ahorro10Anos)}`} />
-                <Metric label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
-                <Metric label="TIR a 5 años" value={`${resultadoActivo?.tir5Anos ?? "—"}%`} />
-                <Metric label="TIR a 10 años" value={`${resultadoActivo?.tir10Anos ?? "—"}%`} />
-                <Metric label="TIR a 15 años" value={`${resultadoActivo?.tir15Anos ?? "—"}%`} />
-                <Metric label="Precio kWh ahorro (E25)" value={`$ ${money(resultadoActivo?.valorKwhAhorro)}/kWh`} />
-                <Metric label="Precio kWh venta excedentes (E26)" value={`$ ${money(resultadoActivo?.valorKwhVenta)}/kWh`} />
-                <Metric label="% Autoconsumo" value={`${resultadoActivo?.porcentajeAhorro ?? "—"}%`} />
-                <Metric label="% Excedentes a la red" value={`${resultadoActivo?.porcentajeVenta ?? "—"}%`} />
-                <Metric label="Mantenimiento anual estimado" value={`$ ${money(resultadoActivo?.mantenimientoAnual)}`} />
-                <Metric label="Indexación IPC anual" value={`${resultadoActivo?.indexacionIPC != null ? (resultadoActivo.indexacionIPC * 100).toFixed(0) + '%' : "—"}`} />
-                <Metric label="Descuento declaración de renta" value={`$ ${money(resultadoActivo?.descuentoDeclaracion)}`} />
-                <Metric label="Vida útil estimada" value={`25 años`} />
-              </div>
-              <div className="cotDivider" style={{ margin: '16px 0 0' }} />
-              <ChartFinanciero r={chartData} />
             </Card>
 
             {/* PROPUESTA ECONÓMICA */}
@@ -863,15 +911,6 @@ export default function Resultado() {
               <p style={{ marginTop: 0, lineHeight: 1.6 }}>
                 ¡Muchas gracias! Estamos para atender tus dudas e inquietudes.
               </p>
-
-              <div className="cotActions" style={{ marginTop: 14 }}>
-                <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
-                  {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} en PDF`}
-                </button>
-                <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
-                  Volver al formulario
-                </button>
-              </div>
             </Card>
           </section>
 
@@ -944,19 +983,6 @@ export default function Resultado() {
               </Card>
             )}
 
-            <Card title="Acciones">
-              <div className="cotActions" style={{ marginTop: 0 }}>
-                <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf} style={{ width: '100%' }}>
-                  {generandoPdf ? 'Generando...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? ''} PDF`}
-                </button>
-                <button className="cotBtn cotBtnGhost" onClick={compartirLink} style={{ width: '100%' }}>
-                  {linkCopiado ? '¡Copiado! ✓' : 'Compartir Link'}
-                </button>
-                <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
-                  Nueva cotización
-                </button>
-              </div>
-            </Card>
           </aside>
         </div>
 
@@ -1227,6 +1253,30 @@ function ChartStat({ icon, label, value }) {
 }
 
 /* ---------- mini componentes UI (mismo estilo del cotizador) ---------- */
+
+function EstadoSelect({ value, onChange, disabled, compact }) {
+  const badge = ESTADO_BADGE[value] ?? ESTADO_BADGE["Nuevo"];
+  return (
+    <select
+      aria-label="Cambiar estado"
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        background: badge.bg,
+        color: badge.color,
+        border: `1px solid ${badge.color}`,
+        borderRadius: 20,
+        padding: compact ? "6px 10px" : "8px 16px",
+        fontSize: compact ? "0.8rem" : "0.85rem",
+        fontWeight: 700,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+    </select>
+  );
+}
 
 function Card({ title, right, children }) {
   return (
