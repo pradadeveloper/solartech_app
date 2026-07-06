@@ -1215,6 +1215,147 @@
 }
 
 /* =========================================================
+   VARIABLES DEL PROYECTO — panel editable en vivo (Resultado.jsx)
+   ========================================================= */
+.varBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(243, 156, 18, 0.15);
+  color: #f39c12;
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.varSectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #b03a22;
+  margin: 14px 0 6px;
+}
+.varSectionTitle:first-child {
+  margin-top: 0;
+}
+
+/* Toggle "Variables del proyecto ⚡ Editar" — visible solo en mobile */
+.varPanelToggle {
+  display: none;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  background: #f7f7f7;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.varPanelBody {
+  display: block;
+}
+
+/* Campo editable con lápiz ✏️ */
+.editable-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e0e0e0;
+}
+.editable-field .field-label {
+  font-size: 12px;
+  color: #5a5a5a;
+}
+.editable-field .field-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.editable-field .field-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.editable-field .field-value--changed {
+  color: #f39c12;
+}
+.editable-field .edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.4;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.2s;
+  line-height: 1;
+}
+.editable-field .edit-btn:hover {
+  opacity: 1;
+  background: rgba(176, 58, 34, 0.08);
+}
+.editable-field .field-input {
+  width: 90px;
+  background: #fff;
+  border: 1px solid #b03a22;
+  border-radius: 4px;
+  color: #1a1a1a;
+  font-size: 13px;
+  padding: 3px 6px;
+  text-align: right;
+  box-sizing: border-box;
+}
+.editable-field select.field-input {
+  width: auto;
+  max-width: 150px;
+  text-align: left;
+}
+.editable-field .field-unit {
+  font-size: 11px;
+  color: #5a5a5a;
+  white-space: nowrap;
+}
+.editable-field .save-btn {
+  background: #b03a22;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .varPanelToggle {
+    display: block;
+  }
+  .varPanelBody {
+    display: none;
+  }
+  .varPanelBody.isOpen {
+    display: block;
+  }
+  .editable-field .field-input,
+  .editable-field select.field-input,
+  .editable-field .save-btn {
+    min-height: 44px;
+  }
+}
+
+/* =========================================================
    GRÁFICOS VISUALES — Resultado.jsx
    ========================================================= */
 

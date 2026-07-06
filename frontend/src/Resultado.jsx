@@ -1,11 +1,16 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import logo from "./assets/logo_solartech.webp";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import "./cotizadorSolar.css"; // usa tu misma hoja
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from "recharts";
+import { useCalculadora, CALC_DEFAULTS } from "./hooks/useCalculadora";
+
+const TIPOS_TECHO = ["Standing Seam", "Termoacústica", "Teja de barro", "Manto Asfáltico", "Teja Eternit", "Madera", "Zinc", "Suelo", "Losa"];
+const TIPOS_SISTEMA = ["Interconectado", "Aislado", "Híbrido"];
+const CAMPOS_VARIABLES_EDITABLES = ["consumoKwh", "costoKwh", "areaM2", "radiacion", "costoKwp", "tipoSistema", "tipoTecho", "ivaPct", "anticipo1Pct", "descuentoRenta"];
 
 const ESTADOS = ["Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado", "Perdido"];
 const ESTADO_BADGE = {
@@ -176,6 +181,56 @@ export default function Resultado() {
   const [guardandoPropuesta, setGuardandoPropuesta] = useState(null); // idx de la opción en progreso
   const [propuestaGuardada, setPropuestaGuardada] = useState(null);   // { propuestaId, pdfUrl, shareUrl }
 
+  // ── Panel "Variables del proyecto" — editable en vivo, recalcula con useCalculadora ──
+  const [variables, setVariables] = useState(() => ({
+    consumoKwh: resultado?.consumoKwh ?? "",
+    costoKwh: resultado?.costoKwh ?? "",
+    areaM2: resultado?.areaDisponible ?? "",
+    radiacion: resultado?.radiacionSolar ?? CALC_DEFAULTS.radiacionSolar,
+    costoKwp: resultado?.costokwpproyecto ?? CALC_DEFAULTS.costokWp,
+    tipoSistema: resultado?.sistemaInteres ?? "Interconectado",
+    tipoTecho: resultado?.tipoTecho ?? "",
+    ivaPct: CALC_DEFAULTS.ivaPct,
+    descuentoRenta: CALC_DEFAULTS.descuentoRentaPct,
+    anticipo1Pct: resultado?.porcentajeAnticipo ?? CALC_DEFAULTS.anticipo1Pct,
+    anticipo2Pct: resultado?.porcentajeEntregaMateriales ?? CALC_DEFAULTS.anticipo2Pct,
+    anticipo3Pct: resultado?.porcentajeRetie ?? CALC_DEFAULTS.anticipo3Pct,
+    potenciaPanel: CALC_DEFAULTS.potenciaPanel,
+    margenCobertura: CALC_DEFAULTS.margenCobertura,
+    capacidadInversor: CALC_DEFAULTS.capacidadInversor,
+    longitudRiel: CALC_DEFAULTS.longitudRiel,
+    cableSolar: CALC_DEFAULTS.cableSolar,
+    sobredimension: CALC_DEFAULTS.sobredimension,
+    maxAC100kWp: CALC_DEFAULTS.maxAC100kWp,
+    mantenimientoKwp: CALC_DEFAULTS.mantenimientoKwp,
+    inflacion: CALC_DEFAULTS.inflacion,
+    factorCO2: CALC_DEFAULTS.factorCO2,
+    factorArboles: CALC_DEFAULTS.factorArboles,
+    factorGalones: CALC_DEFAULTS.factorGalones,
+    factorAreaM2PorKwp: CALC_DEFAULTS.factorAreaM2PorKwp,
+    costoGeneracion: CALC_DEFAULTS.costoGeneracion,
+    costoComercializacion: CALC_DEFAULTS.costoComercializacion,
+    contribucion: resultado?.contribucion ?? false,
+  }));
+  const variablesOriginales = useRef(variables);
+  const cfgAplicadoRef = useRef(false);
+  const [variablesPanelOpen, setVariablesPanelOpen] = useState(false);
+
+  const resultadosLive = useCalculadora(variables);
+
+  const variablesModificadas = useMemo(
+    () => CAMPOS_VARIABLES_EDITABLES.filter(
+      (k) => String(variables[k]) !== String(variablesOriginales.current[k])
+    ),
+    [variables]
+  );
+
+  const handleVariableChange = (campo, nuevoValor) => {
+    setVariables((prev) => ({ ...prev, [campo]: nuevoValor }));
+  };
+
+  const restaurarVariables = () => setVariables(variablesOriginales.current);
+
   const cambiarEstado = async (nuevoEstado) => {
     const anterior = estadoActual;
     setEstadoActual(nuevoEstado);
@@ -210,6 +265,37 @@ export default function Resultado() {
           setOpciones((prev) =>
             prev.map((op) => ({ ...op, costokWp: String(data.costokWp) }))
           );
+        }
+
+        // Completa las variables editables con los valores de configuración (una sola vez).
+        // Después de esto queda fijada la línea base para "variable modificada".
+        if (!cfgAplicadoRef.current) {
+          cfgAplicadoRef.current = true;
+          setVariables((prev) => {
+            const next = {
+              ...prev,
+              ivaPct: data.ivaPct ?? prev.ivaPct,
+              descuentoRenta: data.descuentoRentaPct ?? prev.descuentoRenta,
+              potenciaPanel: data.potenciaPanel ?? prev.potenciaPanel,
+              margenCobertura: data.margenCobertura ?? prev.margenCobertura,
+              capacidadInversor: data.capacidadInversor ?? prev.capacidadInversor,
+              longitudRiel: data.longitudRiel ?? prev.longitudRiel,
+              cableSolar: data.cableSolar ?? prev.cableSolar,
+              sobredimension: data.sobredimension ?? prev.sobredimension,
+              maxAC100kWp: data.maxAC100kWp ?? prev.maxAC100kWp,
+              mantenimientoKwp: data.mantenimientoKwp ?? prev.mantenimientoKwp,
+              inflacion: data.inflacion ?? prev.inflacion,
+              factorCO2: data.factorCO2 ?? prev.factorCO2,
+              factorArboles: data.factorArboles ?? prev.factorArboles,
+              factorGalones: data.factorGalones ?? prev.factorGalones,
+              factorAreaM2PorKwp: data.factorAreaM2PorKwp ?? prev.factorAreaM2PorKwp,
+              costoGeneracion: data.costoGeneracion ?? prev.costoGeneracion,
+              costoComercializacion: data.costoComercializacion ?? prev.costoComercializacion,
+              costoKwp: prev.costoKwp || data.costokWp || CALC_DEFAULTS.costokWp,
+            };
+            variablesOriginales.current = next;
+            return next;
+          });
         }
       })
       .catch(() => {});
@@ -305,8 +391,15 @@ export default function Resultado() {
     }
   };
 
+  // Las opciones A/B/C también reflejan las variables editadas en el panel
+  // "Variables del proyecto" (consumo, costo kWh, radiación, área).
   const calculos = opciones.map((op) =>
-    op.kwp ? calcularLocal(op.kwp, resultado?.costoKwh, op.costokWp, { ...cfg, ...resultado }) : null
+    op.kwp ? calcularLocal(op.kwp, variables.costoKwh, op.costokWp, {
+      ...cfg, ...resultado, ...variables,
+      consumoKwh: variables.consumoKwh,
+      radiacionSolar: variables.radiacion,
+      areaDisponible: variables.areaM2,
+    }) : null
   );
 
   // Datos live para los gráficos: opción activa seleccionada (kWp + costokWp en tiempo real)
@@ -874,27 +967,117 @@ export default function Resultado() {
 
           {/* Right: Side summary */}
           <aside className="cotSide">
-            <Card title="Resumen rápido">
-              <SummaryRow label="Cotización" value={`N-${resultado.numeroCotizacion}`} />
-              <SummaryRow label="Cliente" value={resultado.nombre} />
-              <SummaryRow label="Ciudad" value={resultado.ubicacion} />
-              <div className="cotDivider" />
-              <SummaryRow label="Potencia DC" value={`${resultadoActivo?.kwp ?? "—"} kWp`} />
-              <SummaryRow label="Potencia AC" value={`${resultadoActivo?.potenciaAC ?? "—"} kW`} />
-              <SummaryRow label="N° paneles" value={`${resultadoActivo?.npaneles ?? "—"} und`} />
-              <SummaryRow label="N° inversores" value={`${resultadoActivo?.ninversores ?? "—"} und`} />
-              <div className="cotDivider" />
-              <SummaryRow label="Generación mensual" value={`${money(resultadoActivo?.generacionMes ?? resultadoActivo?.produccionDeEnergia)} kWh/mes`} />
-              <SummaryRow label="Consumo cliente" value={`${money(resultadoActivo?.consumoKwh)} kWh/mes`} />
-              <SummaryRow label="Cobertura factura" value={`${resultadoActivo?.porcentajeCoberturaProyecto ?? "—"}%`} />
-              <SummaryRow label="Autoconsumo / Excedentes" value={`${resultadoActivo?.porcentajeAhorro ?? "—"}% / ${resultadoActivo?.porcentajeVenta ?? "—"}%`} />
-              <div className="cotDivider" />
-              <SummaryRow label="Inversión total" value={`$ ${money(resultadoActivo?.costoProyectoMasIva)}`} />
-              <SummaryRow label="$/kWp" value={`$ ${money(resultadoActivo?.valorKwp ?? resultadoActivo?.costokwpproyecto)}`} />
-              <SummaryRow label="Ahorro mensual" value={`$ ${money(resultadoActivo?.ahorroMensual)}`} />
-              <SummaryRow label="Ahorro anual" value={`$ ${money(resultadoActivo?.ahorroAnual)}`} />
-              <SummaryRow label="Retorno de inversión" value={`${resultadoActivo?.tiempoRetorno ?? "—"} años`} />
-              <SummaryRow label="TIR 10 años" value={`${resultadoActivo?.tir10Anos ?? "—"}%`} />
+            <Card
+              title="Variables del proyecto"
+              right={variablesModificadas.length > 0 && (
+                <span className="varBadge">
+                  ⚡ {variablesModificadas.length} variable{variablesModificadas.length !== 1 ? "s" : ""} modificada{variablesModificadas.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            >
+              <button
+                type="button"
+                className="varPanelToggle"
+                onClick={() => setVariablesPanelOpen((o) => !o)}
+                aria-expanded={variablesPanelOpen}
+              >
+                Variables del proyecto ⚡ {variablesPanelOpen ? "Cerrar" : "Editar"}
+              </button>
+
+              <div className={`varPanelBody${variablesPanelOpen ? " isOpen" : ""}`}>
+                {/* Sección 1 — datos del cliente (readonly) */}
+                <div className="varSectionTitle">Datos del cliente</div>
+                <SummaryRow label="Cotización" value={`N-${resultado.numeroCotizacion}`} />
+                <SummaryRow label="Cliente" value={resultado.nombre} />
+                <SummaryRow label="Ciudad" value={resultado.ubicacion} />
+                <SummaryRow
+                  label="Asesor"
+                  value={resultado.vendedor || [localStorage.getItem("nombreUsuario"), localStorage.getItem("apellidoUsuario")].filter(Boolean).join(" ") || "—"}
+                />
+
+                <div className="cotDivider" />
+
+                {/* Sección 2 — variables editables */}
+                <div className="varSectionTitle">Consumo</div>
+                <EditableField
+                  label="Consumo kWh/mes" unit="kWh/mes" value={variables.consumoKwh}
+                  changed={variablesModificadas.includes("consumoKwh")}
+                  onChange={(v) => handleVariableChange("consumoKwh", v)}
+                />
+                <EditableField
+                  label="Costo kWh (COP)" prefix="$" value={variables.costoKwh}
+                  changed={variablesModificadas.includes("costoKwh")}
+                  onChange={(v) => handleVariableChange("costoKwh", v)}
+                />
+                <EditableField
+                  label="Área disponible" unit="m²" value={variables.areaM2}
+                  changed={variablesModificadas.includes("areaM2")}
+                  onChange={(v) => handleVariableChange("areaM2", v)}
+                />
+
+                <div className="varSectionTitle">Sistema</div>
+                <EditableField
+                  label="Radiación solar" unit="kWh/m²/día" step="0.1" value={variables.radiacion}
+                  changed={variablesModificadas.includes("radiacion")}
+                  onChange={(v) => handleVariableChange("radiacion", v)}
+                />
+                <EditableField
+                  label="Costo x kWp ($)" prefix="$" value={variables.costoKwp}
+                  changed={variablesModificadas.includes("costoKwp")}
+                  onChange={(v) => handleVariableChange("costoKwp", v)}
+                />
+                <EditableField
+                  label="Tipo de sistema" type="select" options={TIPOS_SISTEMA} value={variables.tipoSistema}
+                  changed={variablesModificadas.includes("tipoSistema")}
+                  onChange={(v) => handleVariableChange("tipoSistema", v)}
+                />
+                <EditableField
+                  label="Tipo de techo" type="select" options={TIPOS_TECHO} value={variables.tipoTecho}
+                  changed={variablesModificadas.includes("tipoTecho")}
+                  onChange={(v) => handleVariableChange("tipoTecho", v)}
+                />
+
+                <div className="varSectionTitle">Financiero</div>
+                <EditableField
+                  label="IVA (%)" unit="%" value={variables.ivaPct}
+                  changed={variablesModificadas.includes("ivaPct")}
+                  onChange={(v) => handleVariableChange("ivaPct", v)}
+                />
+                <EditableField
+                  label="Anticipo 1 (%)" unit="%" value={variables.anticipo1Pct}
+                  changed={variablesModificadas.includes("anticipo1Pct")}
+                  onChange={(v) => handleVariableChange("anticipo1Pct", v)}
+                />
+                <EditableField
+                  label="Descuento renta (%)" unit="%" value={variables.descuentoRenta}
+                  changed={variablesModificadas.includes("descuentoRenta")}
+                  onChange={(v) => handleVariableChange("descuentoRenta", v)}
+                />
+
+                {variablesModificadas.length > 0 && (
+                  <button type="button" className="cotBtn cotBtnGhost" style={{ width: "100%", marginTop: 10 }} onClick={restaurarVariables}>
+                    Restaurar valores originales
+                  </button>
+                )}
+
+                <div className="cotDivider" />
+
+                {/* Sección 3 — resultados calculados (readonly, en vivo) */}
+                <div className="varSectionTitle">Resultados calculados</div>
+                <SummaryRow label="Potencia DC" value={`${resultadosLive?.kwp ?? "—"} kWp`} />
+                <SummaryRow label="Potencia AC" value={`${resultadosLive?.potenciaAC ?? "—"} kW`} />
+                <SummaryRow label="N° paneles" value={`${resultadosLive?.npaneles ?? "—"} und`} />
+                <SummaryRow label="N° inversores" value={`${resultadosLive?.ninversores ?? "—"} und`} />
+                <SummaryRow label="Generación mensual" value={`${money(resultadosLive?.generacionMes)} kWh/mes`} />
+                <SummaryRow label="Cobertura factura" value={`${resultadosLive?.porcentajeCoberturaProyecto ?? "—"}%`} />
+                <SummaryRow label="Autoconsumo / Excedentes" value={`${resultadosLive?.porcentajeAhorro ?? "—"}% / ${resultadosLive?.porcentajeVenta ?? "—"}%`} />
+                <SummaryRow label="Inversión total" value={`$ ${money(resultadosLive?.costoProyectoMasIva)}`} />
+                <SummaryRow label="$/kWp" value={`$ ${money(resultadosLive?.valorKwp)}`} />
+                <SummaryRow label="Ahorro mensual" value={`$ ${money(resultadosLive?.ahorroMensual)}`} />
+                <SummaryRow label="Ahorro anual" value={`$ ${money(resultadosLive?.ahorroAnual)}`} />
+                <SummaryRow label="Retorno de inversión" value={`${resultadosLive?.tiempoRetorno ?? "—"} años`} />
+                <SummaryRow label="TIR 10 años" value={`${resultadosLive?.tir10Anos ?? "—"}%`} />
+              </div>
             </Card>
 
             {versiones.length > 0 && (
@@ -1333,6 +1516,66 @@ function SummaryRow({ label, value }) {
     <div className="cotSummaryRow">
       <span className="cotSummaryLabel">{label}</span>
       <span className="cotSummaryValue">{String(value ?? "—")}</span>
+    </div>
+  );
+}
+
+// ── Campo editable en línea (lápiz ✏️) del panel "Variables del proyecto" ──
+function EditableField({ label, value, unit, prefix, type = "number", options, step, changed, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const empezarEdicion = () => { setDraft(value); setEditing(true); };
+
+  const guardar = (nuevoValor) => {
+    onChange(nuevoValor ?? draft);
+    setEditing(false);
+  };
+
+  const unitDisplay = unit === "%" ? "%" : unit ? ` ${unit}` : "";
+  const displayValue = type === "select"
+    ? (value || "—")
+    : `${prefix ?? ""}${Number.isFinite(Number(value)) ? Number(value).toLocaleString("es-CO") : (value ?? "—")}${unitDisplay}`;
+
+  return (
+    <div className={`editable-field${editing ? " editing" : ""}`}>
+      <span className="field-label">{label}</span>
+      <div className="field-value-row">
+        {editing ? (
+          type === "select" ? (
+            <select
+              autoFocus
+              className="field-input"
+              value={draft}
+              onChange={(e) => { setDraft(e.target.value); guardar(e.target.value); }}
+              onBlur={() => guardar()}
+            >
+              {options.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <>
+              <input
+                type="number"
+                step={step}
+                autoFocus
+                className="field-input"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => guardar()}
+                onKeyDown={(e) => { if (e.key === "Enter") guardar(); }}
+              />
+              {unit && <span className="field-unit">{unit}</span>}
+              <button type="button" className="save-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => guardar()} title="Guardar">✓</button>
+            </>
+          )
+        ) : (
+          <>
+            <span className={`field-value${changed ? " field-value--changed" : ""}`}>{displayValue}</span>
+            <button type="button" className="edit-btn" onClick={empezarEdicion} title="Editar">✏️</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
