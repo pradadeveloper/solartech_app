@@ -6,9 +6,32 @@ import "./propuestaPublica.css";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
+  BarChart, Bar, LineChart, Line, Legend,
 } from "recharts";
 
 const API = process.env.REACT_APP_API_URL;
+
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const FACTORES_MES = [0.85, 0.88, 0.92, 0.95, 0.97, 1.0, 1.02, 1.0, 0.97, 0.93, 0.88, 0.85];
+
+const formatCOP = (v) => `$ ${Math.round(Number(v) || 0).toLocaleString('es-CO')} COP`;
+
+// TIR (Newton-Raphson) — helper propio del simulador what-if (BLOQUE 2), no toca calcularLocal.
+function calcularTIRSimulador(flujos, guess = 0.1) {
+  let tasa = guess;
+  for (let i = 0; i < 1000; i++) {
+    let vpn = 0, dvpn = 0;
+    for (let t = 0; t < flujos.length; t++) {
+      vpn += flujos[t] / Math.pow(1 + tasa, t);
+      dvpn -= (t * flujos[t]) / Math.pow(1 + tasa, t + 1);
+    }
+    if (dvpn === 0) break;
+    const nueva = tasa - vpn / dvpn;
+    if (Math.abs(nueva - tasa) < 1e-7) return nueva;
+    tasa = nueva;
+  }
+  return tasa;
+}
 
 /* ── Inline SVG icons — no deps ── */
 const IconDownload = () => (
@@ -144,6 +167,13 @@ export default function PropuestaPublica() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [baseLead, setBaseLead] = useState(null);
 
+  // ── BLOQUE 2 — Simulador financiero what-if ──
+  const [simTarifa, setSimTarifa] = useState(null);       // se seed una vez cargue la propuesta
+  const [simHorizonte, setSimHorizonte] = useState(25);
+  const [simInflacion, setSimInflacion] = useState(8);
+  const [simDeduccionRenta, setSimDeduccionRenta] = useState(false);
+  const [simDepreciacion, setSimDepreciacion] = useState(false);
+
   useEffect(() => {
     // Primero busca en la pestaña "propuestas" (flujo nuevo: guardado explícito
     // desde /resultado). Si no existe, cae al endpoint viejo por compatibilidad
@@ -190,6 +220,11 @@ export default function PropuestaPublica() {
 
   const r = useMemo(() => ({ ...lead, ...calc }), [lead, calc]);
 
+  // Seed la tarifa del simulador con el costo kWh real de la propuesta (una sola vez).
+  useEffect(() => {
+    if (simTarifa === null && r?.costoKwh > 0) setSimTarifa(Number(r.costoKwh));
+  }, [simTarifa, r?.costoKwh]);
+
   const money = (v) => typeof v === 'number' ? v.toLocaleString('es-CO') : (v ?? '—');
 
   const ahorroMensual        = r?.ahorroMensual  || 0;
@@ -198,6 +233,51 @@ export default function PropuestaPublica() {
   const ahorro10Anos         = r?.ahorro10Anos   ?? (ahorroAnual > 0 ? ahorroAnual * 10 : null);
   const descuentoDeclaracion = r?.descuentoDeclaracion ??
     (lead?.costoProyectoMasIva > 0 ? Math.round((lead.costoProyectoMasIva / 1.05) * 0.5) : null);
+
+  // ── BLOQUE 2 — Simulador financiero what-if: recalcula todo en vivo con los sliders/toggles ──
+  const simulador = useMemo(() => {
+    const consumoKwh = Number(r?.consumoKwh) || 0;
+    const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
+    const inversionSinIva = Number(r?.costoProyecto) || 0;
+    const tarifa = Number(simTarifa) || 0;
+    const inflacion = Number(simInflacion) / 100;
+    const horizonte = Number(simHorizonte) || 25;
+
+    if (!consumoKwh || !inversionTotal || !tarifa) return null;
+
+    const ahorroAnualBase = consumoKwh * 12 * tarifa;
+    const beneficioRenta = simDeduccionRenta ? inversionSinIva * 0.25 * 0.35 : 0;
+    const beneficioDepreciacion = simDepreciacion ? inversionSinIva * 0.20 * 5 : 0;
+    const inversionNeta = Math.max(0, inversionTotal - beneficioRenta - beneficioDepreciacion);
+
+    const payback = ahorroAnualBase > 0 ? Number((inversionNeta / ahorroAnualBase).toFixed(1)) : null;
+
+    // Flujos para TIR/VPN: año 0 = -inversión neta, años 1..horizonte = ahorro indexado por inflación
+    const flujos = [-inversionNeta];
+    for (let i = 1; i <= horizonte; i++) {
+      flujos.push(ahorroAnualBase * Math.pow(1 + inflacion, i - 1));
+    }
+
+    let tir = null;
+    try { tir = Number((calcularTIRSimulador(flujos) * 100).toFixed(1)); } catch (e) {}
+
+    const tasaDescuento = 0.10;
+    const vpn = Math.round(flujos.reduce((acc, flujo, t) => acc + flujo / Math.pow(1 + tasaDescuento, t), 0));
+
+    const ahorroTotalNominal = flujos.slice(1).reduce((a, b) => a + b, 0);
+    const roi = inversionNeta > 0 ? Number((((ahorroTotalNominal - inversionNeta) / inversionNeta) * 100).toFixed(1)) : null;
+
+    // Serie del gráfico de flujo de caja acumulado (fórmulas tal como se especificaron)
+    const cashflow = Array.from({ length: horizonte + 1 }, (_, N) => ({
+      year: N,
+      'Con solar': Math.round(-inversionTotal + ahorroAnualBase * N * Math.pow(1 + inflacion, N)),
+      'Sin solar': Math.round(-(consumoKwh * 12 * tarifa * N * Math.pow(1 + inflacion, N))),
+    }));
+
+    return {
+      inversionTotal, ahorroAnualBase, payback, tir, vpn, roi, cashflow,
+    };
+  }, [r?.consumoKwh, r?.costoProyectoMasIva, r?.costoProyecto, simTarifa, simInflacion, simHorizonte, simDeduccionRenta, simDepreciacion]);
 
   const descargarPdf = async () => {
     const url = pdfUrlLocal || lead?.pdfUrl;
@@ -362,6 +442,9 @@ export default function PropuestaPublica() {
               <ChartSistemaSolar r={r} />
             </Card>
 
+            {/* BLOQUE 1 — Generación vs Consumo mensual */}
+            <ChartGeneracionConsumo r={r} ciudad={lead.ubicacion} />
+
             {/* Análisis financiero */}
             <Card title="Análisis financiero">
               <div className="pp-metrics-grid">
@@ -377,6 +460,19 @@ export default function PropuestaPublica() {
               <div className="pp-divider" />
               <ChartFinanciero r={r} />
             </Card>
+
+            {/* BLOQUE 2 — Simulador financiero what-if */}
+            <SimuladorFinanciero
+              simTarifa={simTarifa} setSimTarifa={setSimTarifa}
+              simHorizonte={simHorizonte} setSimHorizonte={setSimHorizonte}
+              simInflacion={simInflacion} setSimInflacion={setSimInflacion}
+              simDeduccionRenta={simDeduccionRenta} setSimDeduccionRenta={setSimDeduccionRenta}
+              simDepreciacion={simDepreciacion} setSimDepreciacion={setSimDepreciacion}
+              simulador={simulador}
+            />
+
+            {/* BLOQUE 3 — El costo de no hacer nada */}
+            <CostoNoHacerNada r={r} />
 
             {/* Propuesta económica */}
             <Card
@@ -446,18 +542,18 @@ export default function PropuestaPublica() {
               </div>
             </Card>
 
-            {/* Etapas del proyecto */}
+            {/* BLOQUE 4 — Timeline del proyecto */}
             <Card title="Etapas del proyecto">
               <div className="pp-blocks-grid">
-                <MiniBlock title="Etapa 1 — Planeación y diseño"
-                  lines={['Diagnóstico técnico', 'Diseño de la solución', 'Gestión de trámites']}
+                <MiniBlock title="Etapa 1 — Planificación y diseño"
+                  lines={['Visita técnica', 'Diseño de la solución', 'Firma del contrato']}
                   foot="30 días hábiles" />
                 <MiniBlock title="Etapa 2 — Construcción"
-                  lines={['Instalación del sistema', 'Puesta en marcha']}
+                  lines={['Fabricación y entrega de equipos', 'Instalación fotovoltaica', 'Puesta en marcha']}
                   foot="90 días hábiles" />
                 <MiniBlock title="Etapa 3 — Operación"
-                  lines={['Conexión a la red', 'Monitoreo y mantenimiento']}
-                  foot="30 días hábiles" />
+                  lines={['Conexión a la red', 'Capacitación y acompañamiento']}
+                  foot="Continua" />
               </div>
               <div className="pp-divider" />
               <ChartEtapas />
@@ -501,53 +597,42 @@ export default function PropuestaPublica() {
               </ol>
             </Card>
 
-            {/* Asesor comercial */}
+            {/* BLOQUE 5 — Firma del asesor */}
             {lead.vendedor && (() => {
               const ai = lead.asesorInfo;
               const nombreCompleto = ai ? `${ai.nombre} ${ai.apellido}`.trim() : lead.vendedor;
-              const cargo = ai?.cargo || 'Asesor Comercial';
               const initials = nombreCompleto.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+              const empTelefono = cfg?.empresa?.telefono;
+              const empEmail = cfg?.empresa?.email;
               return (
                 <Card title="Tu asesor comercial">
-                  <div className="pp-advisor">
+                  <div className="pp-advisor pp-advisor--signature">
                     <div className="pp-advisor-avatar">{initials}</div>
                     <div className="pp-advisor-info">
                       <p className="pp-advisor-name">{nombreCompleto}</p>
-                      <p className="pp-advisor-role">{cargo} · Solartech Energy Systems</p>
+                      <p className="pp-advisor-role">Asesor Comercial — Solartech Energy S.A.S</p>
                       <div className="pp-advisor-contacts">
-                        {ai?.celular && (
-                          <a href={`https://wa.me/57${ai.celular.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                        {empTelefono && (
+                          <a href={`https://wa.me/57${empTelefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
                             className="pp-advisor-link pp-advisor-link--wa">
-                            <IconWhatsApp />{ai.celular}
+                            <IconWhatsApp />{empTelefono}
                           </a>
                         )}
-                        {ai?.correo && (
-                          <a href={`mailto:${ai.correo}`} className="pp-advisor-link pp-advisor-link--email">
-                            <IconMail />{ai.correo}
+                        {empEmail && (
+                          <a href={`mailto:${empEmail}`} className="pp-advisor-link pp-advisor-link--email">
+                            <IconMail />{empEmail}
                           </a>
                         )}
                       </div>
+                      <p className="pp-closing-text" style={{ margin: '12px 0 0' }}>
+                        En Solartech Energy Systems estamos comprometidos con brindarte la mejor solución solar.
+                        No dudes en contactarme si tienes alguna inquietud.
+                      </p>
                     </div>
                   </div>
                 </Card>
               );
             })()}
-
-            {/* Cierre */}
-            <Card title="Gracias por tu confianza">
-              <div className="pp-closing-text">
-                En Solartech Energy Systems estamos comprometidos con brindarte la mejor solución solar.
-                No dudes en contactar a tu asesor para resolver cualquier duda.
-              </div>
-              <div className="cotActions">
-                <button className="pp-btn-primary" onClick={descargarPdf} disabled={generandoPdf}>
-                  <IconDownload />{generandoPdf ? 'Generando…' : 'Descargar PDF'}
-                </button>
-                <button className="pp-btn-ghost" onClick={compartir}>
-                  <IconShare />{copiado ? 'Link copiado ✓' : 'Compartir link'}
-                </button>
-              </div>
-            </Card>
 
           </section>
 
@@ -565,6 +650,11 @@ export default function PropuestaPublica() {
               <SummaryRow label="Total inversión" value={`$ ${money(r?.costoProyectoMasIva)}`} />
               <SummaryRow label="Retorno"         value={`${tiempoRetorno ?? '—'} años`} />
               <SummaryRow label="Ahorro anual"    value={`$ ${money(ahorroAnual)}`} />
+              <div className="pp-divider" style={{ margin: '4px 0' }} />
+              <SummaryRow label="Valorización propiedad" value="4% - 10% estimado" />
+              <SummaryRow label="CO₂ evitado/año"        value={`${r?.co2EvitadoToneladas ?? '—'} ton`} />
+              <SummaryRow label="Árboles equivalentes"   value={`${money(r?.arbolesEquivalentes)} árboles/año`} />
+              <SummaryRow label="Vida útil sistema"      value="25 años garantizados" />
             </Card>
 
             <Card title="Acciones">
@@ -608,6 +698,27 @@ export default function PropuestaPublica() {
         )}
 
       </div>
+
+      {/* BLOQUE 6 — CTA final "¿Listo para avanzar?" */}
+      <section className="pp-cta-final">
+        <div className="pp-cta-inner">
+          <h2 className="pp-cta-title">¿Listo para avanzar?</h2>
+          <p className="pp-cta-subtitle">Descarga el PDF, compártelo con tu equipo o confirma con tu asesor.</p>
+          <div className="pp-cta-actions">
+            <button className="pp-btn-primary" onClick={descargarPdf} disabled={generandoPdf}>
+              <IconDownload />{generandoPdf ? 'Generando…' : 'Descargar PDF'}
+            </button>
+            <a
+              className="pp-btn-outline-white"
+              href={`https://wa.me/57${(cfg?.empresa?.telefono || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, quiero avanzar con mi propuesta solar N-${lead.numeroCotizacion}`)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <IconWhatsApp /> Contactar asesor
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -717,6 +828,164 @@ function ChartFinanciero({ r }) {
   );
 }
 
+/* BLOQUE 1 ─── Generación vs Consumo mensual */
+function ChartGeneracionConsumo({ r, ciudad }) {
+  const consumo = Number(r?.consumoKwh) || 0;
+  const generacionBase = Number(r?.produccionDeEnergia) || 0;
+  if (!consumo || !generacionBase) return null;
+
+  const data = MESES.map((mes, i) => ({
+    mes,
+    Consumo: consumo,
+    Generación: Math.round(generacionBase * FACTORES_MES[i]),
+  }));
+
+  return (
+    <Card title="Generación mensual estimada vs Consumo">
+      <p className="pp-chart-subtitle">Basado en radiación solar promedio de {ciudad || 'tu ciudad'}</p>
+      <div className="pp-chart-responsive">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+            <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#888' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={38} />
+            <Tooltip formatter={(v) => `${Number(v).toLocaleString('es-CO')} kWh`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="Consumo" fill={C1} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Generación" fill="#2ecc71" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+}
+
+/* BLOQUE 2 ─── Simulador financiero what-if */
+function SimuladorFinanciero({
+  simTarifa, setSimTarifa, simHorizonte, setSimHorizonte, simInflacion, setSimInflacion,
+  simDeduccionRenta, setSimDeduccionRenta, simDepreciacion, setSimDepreciacion, simulador,
+}) {
+  if (simTarifa === null) return null;
+
+  return (
+    <Card title="Simulador financiero — ¿Qué pasa si...?">
+      <div className="pp-sim-grid">
+        <div className="pp-sim-controls">
+          <div className="pp-slider-group">
+            <div className="pp-slider-head">
+              <span className="pp-slider-label">Tarifa energía (COP/kWh)</span>
+              <span className="pp-slider-badge">${Number(simTarifa).toLocaleString('es-CO')} COP/kWh</span>
+            </div>
+            <input type="range" min={400} max={1500} step={50} value={simTarifa}
+              onChange={(e) => setSimTarifa(Number(e.target.value))} className="pp-slider" />
+          </div>
+
+          <div className="pp-slider-group">
+            <div className="pp-slider-head">
+              <span className="pp-slider-label">Horizonte de evaluación</span>
+              <span className="pp-slider-badge">{simHorizonte} años</span>
+            </div>
+            <input type="range" min={5} max={35} step={5} value={simHorizonte}
+              onChange={(e) => setSimHorizonte(Number(e.target.value))} className="pp-slider" />
+          </div>
+
+          <div className="pp-slider-group">
+            <div className="pp-slider-head">
+              <span className="pp-slider-label">Inflación anual estimada</span>
+              <span className="pp-slider-badge">{simInflacion}%</span>
+            </div>
+            <input type="range" min={0} max={15} step={0.5} value={simInflacion}
+              onChange={(e) => setSimInflacion(Number(e.target.value))} className="pp-slider" />
+          </div>
+
+          <label className="pp-toggle-row">
+            <div>
+              <span className="pp-toggle-label">Deducción de renta</span>
+              <span className="pp-toggle-sublabel">25% del valor sin IVA deducible de renta (Ley 1715, Art. 11) — ahorro ~11.5%</span>
+            </div>
+            <input type="checkbox" checked={simDeduccionRenta} onChange={(e) => setSimDeduccionRenta(e.target.checked)} />
+          </label>
+
+          <label className="pp-toggle-row">
+            <div>
+              <span className="pp-toggle-label">Depreciación acelerada</span>
+              <span className="pp-toggle-sublabel">Deprecia en 5 años (Ley 1715, Art. 14) en vez de 20 años</span>
+            </div>
+            <input type="checkbox" checked={simDepreciacion} onChange={(e) => setSimDepreciacion(e.target.checked)} />
+          </label>
+
+          {simulador && (
+            <div className="pp-sim-results-grid">
+              <Metric label="Inversión total" value={formatCOP(simulador.inversionTotal)} />
+              <Metric label="Ahorro anual" value={formatCOP(simulador.ahorroAnualBase)} isGreen />
+              <Metric label="Payback" value={`${simulador.payback ?? '—'} años`} />
+              <Metric label="TIR" value={`${simulador.tir ?? '—'}%`} />
+              <Metric label="VPN" value={formatCOP(simulador.vpn)} />
+              <Metric label="ROI" value={`${simulador.roi ?? '—'}%`} />
+            </div>
+          )}
+        </div>
+
+        <div className="pp-sim-chart">
+          {simulador && (
+            <div className="pp-chart-responsive">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={simulador.cashflow} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="year" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `A${v}`} />
+                  <YAxis tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `$${(v / 1_000_000).toFixed(0)}M`} width={44} />
+                  <Tooltip formatter={(v) => `$${Number(v).toLocaleString('es-CO')}`} labelFormatter={(l) => `Año ${l}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <ReferenceLine y={0} stroke="#888" strokeDasharray="4 4" label={{ value: 'Punto de equilibrio', position: 'insideBottomRight', fontSize: 10, fill: '#888' }} />
+                  <Line type="monotone" dataKey="Con solar" stroke="#2ecc71" strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="Sin solar" stroke={C1} strokeWidth={2.5} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* BLOQUE 3 ─── El costo de no hacer nada */
+function CostoNoHacerNada({ r }) {
+  const consumo = Number(r?.consumoKwh) || 0;
+  const costoKwh = Number(r?.costoKwh) || 0;
+  const ahorroAnual = Number(r?.ahorroAnual) || 0;
+  const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
+  if (!consumo || !costoKwh || !inversionTotal) return null;
+
+  const inflacion = 0.08;
+  const horizonte = 25;
+  let factorAcumulado = 0;
+  for (let t = 0; t < horizonte; t++) factorAcumulado += Math.pow(1 + inflacion, t);
+
+  const sinSolar25 = Math.round(consumo * 12 * costoKwh * factorAcumulado);
+  const conSolar25 = Math.round(ahorroAnual * horizonte - inversionTotal);
+
+  return (
+    <Card title="El costo de no hacer nada">
+      <p className="pp-chart-subtitle">Comparación del gasto acumulado en energía a 25 años: sin solar vs con solar</p>
+      <div className="pp-cost-grid">
+        <div className="pp-cost-card pp-cost-card--red">
+          <span className="pp-cost-icon">📈</span>
+          <span className="pp-cost-label">Sin solar (25 años)</span>
+          <span className="pp-cost-value pp-cost-value--red">~ {formatCOP(sinSolar25)}</span>
+          <span className="pp-cost-sublabel">Pagados en facturas de energía</span>
+        </div>
+        <div className="pp-cost-card pp-cost-card--green">
+          <span className="pp-cost-icon">☀️</span>
+          <span className="pp-cost-label">Con solar (25 años)</span>
+          <span className="pp-cost-value pp-cost-value--green">+ {formatCOP(conSolar25)}</span>
+          <span className="pp-cost-sublabel">Ganancia neta acumulada después de inversión</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /* 3 ─── Propuesta económica */
 function ChartPropuesta({ r }) {
   const base  = Number(r?.costoProyecto) || 0;
@@ -794,9 +1063,9 @@ function ChartFormasPago({ r }) {
 /* 5 ─── Etapas del proyecto */
 function ChartEtapas() {
   const etapas = [
-    { num: '1', title: 'Planeación',   sub: 'Diagnóstico · Diseño · Trámites', dias: '30 días', color: C1 },
-    { num: '2', title: 'Construcción', sub: 'Instalación · Puesta en marcha',   dias: '90 días', color: C2 },
-    { num: '3', title: 'Operación',    sub: 'Conexión a red · Monitoreo',        dias: '30 días', color: C3 },
+    { num: '1', title: 'Planificación', sub: 'Visita técnica · Diseño · Contrato',        dias: '30 días', color: C1 },
+    { num: '2', title: 'Construcción',  sub: 'Fabricación · Instalación · Puesta en marcha', dias: '90 días', color: C2 },
+    { num: '3', title: 'Operación',     sub: 'Conexión a red · Acompañamiento',            dias: 'Continua', color: C3 },
   ];
 
   return (
@@ -821,7 +1090,7 @@ function ChartEtapas() {
         ))}
       </div>
       <div className="chartTimelineTotal">
-        Total estimado: <b>150 días hábiles</b>
+        Total estimado: <b>120 días hábiles</b>
       </div>
     </div>
   );

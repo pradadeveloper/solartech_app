@@ -697,6 +697,271 @@
   }
 }
 
+/* ── 23b. Chart subtitle / responsive chart wrapper ─────── */
+.pp-chart-subtitle {
+  font-size: 12px;
+  color: #5A5A5A;
+  margin: -6px 0 14px;
+}
+
+.pp-chart-responsive {
+  height: 280px;
+}
+
+@media (max-width: 600px) {
+  .pp-chart-responsive {
+    height: 200px;
+  }
+}
+
+/* ── 23c. Simulador financiero what-if (BLOQUE 2) ───────── */
+.pp-sim-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.pp-sim-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pp-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pp-slider-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.pp-slider-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #B03A22;
+  background: rgba(176, 58, 34, 0.08);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.pp-slider {
+  width: 100%;
+  accent-color: #B03A22;
+  cursor: pointer;
+}
+
+.pp-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: #FAFAFA;
+  border: 1px solid #EBEBEB;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.pp-toggle-row input[type="checkbox"] {
+  width: 40px;
+  height: 22px;
+  accent-color: #B03A22;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pp-toggle-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.pp-toggle-sublabel {
+  display: block;
+  font-size: 11px;
+  color: #5A5A5A;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.pp-sim-results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+  padding: 14px;
+  background: #FAFAFA;
+  border: 1px solid #EBEBEB;
+  border-radius: 12px;
+}
+
+.pp-sim-chart {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 23d. Costo de no hacer nada (BLOQUE 3) ─────────────── */
+.pp-cost-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.pp-cost-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  border-radius: 14px;
+  padding: 24px 16px;
+  border: 1.5px solid;
+}
+
+.pp-cost-card--red {
+  background: #FEF2F2;
+  border-color: #FCA5A5;
+}
+
+.pp-cost-card--green {
+  background: #F0FDF4;
+  border-color: #BBF7D0;
+}
+
+.pp-cost-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+}
+
+.pp-cost-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5A5A5A;
+}
+
+.pp-cost-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.pp-cost-value--red {
+  color: #DC2626;
+}
+
+.pp-cost-value--green {
+  color: #16A34A;
+}
+
+.pp-cost-sublabel {
+  font-size: 12px;
+  color: #5A5A5A;
+}
+
+/* ── 23e. CTA final (BLOQUE 6) ───────────────────────────── */
+.pp-cta-final {
+  background: #1a1a2e;
+  padding: 56px 24px;
+  margin-top: 8px;
+}
+
+.pp-cta-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.pp-cta-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 10px;
+}
+
+.pp-cta-subtitle {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0 0 28px;
+  line-height: 1.6;
+}
+
+.pp-cta-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pp-btn-outline-white {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  padding: 11px 22px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+
+.pp-btn-outline-white:hover {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+/* ── 23f. Responsive — sim/costo grids en mobile ────────── */
+@media (max-width: 768px) {
+  .pp-sim-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .pp-sim-results-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+  }
+  .pp-cost-grid {
+    grid-template-columns: 1fr;
+  }
+  .pp-cta-final {
+    padding: 40px 16px;
+  }
+  .pp-cta-title {
+    font-size: 22px;
+  }
+  .pp-cta-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pp-cta-actions .pp-btn-primary,
+  .pp-cta-actions .pp-btn-outline-white {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ── 23. Print ──────────────────────────────────────────── */
 @media print {
   .pp-header {
@@ -731,5 +996,13 @@
   .pp-hero {
     border: 1px solid #ccc;
     border-radius: 8px;
+  }
+
+  .pp-cta-final {
+    display: none !important;
+  }
+
+  .pp-sim-grid {
+    grid-template-columns: 1fr;
   }
 }
