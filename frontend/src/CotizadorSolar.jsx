@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import "./cotizadorSolar.css";
 import logo from "./assets/logo_solartech.webp";
 import { useNavigate } from "react-router-dom";
+import departamentos from "./data/colombiaMunicipios";
 
 export default function CotizadorSolar() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function CotizadorSolar() {
     consumoKwh: "",
     costoKwh: "",
     conociste: "",
+    departamentoSolar: "",
     ciudadSolar: "",
     radiacionSolar: "",
     facturaAdjunta: null,
@@ -29,14 +31,11 @@ export default function CotizadorSolar() {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [ciudades, setCiudades] = useState([]);
 
-  useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/api/ciudades`)
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setCiudades(data); })
-      .catch(() => {});
-  }, []);
+  const municipiosDisponibles = useMemo(() => {
+    const depto = departamentos.find((d) => d.nombre === formData.departamentoSolar);
+    return depto ? depto.municipios : [];
+  }, [formData.departamentoSolar]);
 
   const handleChange = (e) => {
     const { name, value, files, type } = e.target;
@@ -68,7 +67,7 @@ export default function CotizadorSolar() {
 
   const canGoNext = useMemo(() => {
     const requiredStep1 = [
-      "nombre", "correo", "telefono", "ciudadSolar",
+      "nombre", "correo", "telefono", "departamentoSolar", "ciudadSolar",
       "consumoKwh", "costoKwh", "areaDisponible",
       "tipoSolicitud",
     ];
@@ -194,25 +193,47 @@ export default function CotizadorSolar() {
                       <input name="telefono" type="tel" value={formData.telefono} onChange={handleChange} required />
                     </Field>
 
+                    <Field label="Departamento">
+                      <select
+                        name="departamentoSolar"
+                        value={formData.departamentoSolar}
+                        onChange={(e) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            departamentoSolar: e.target.value,
+                            ciudadSolar: "",
+                            ubicacion: "",
+                            radiacionSolar: "",
+                          }));
+                        }}
+                      >
+                        <option value="">Selecciona departamento</option>
+                        {departamentos.map((d) => (
+                          <option key={d.nombre} value={d.nombre}>{d.nombre}</option>
+                        ))}
+                      </select>
+                    </Field>
+
                     <Field label="Ciudad / Municipio">
                       <select
                         name="ciudadSolar"
                         value={formData.ciudadSolar}
+                        disabled={!formData.departamentoSolar}
                         onChange={(e) => {
-                          const ciudad = ciudades.find(c => c.ciudad === e.target.value);
+                          const depto = departamentos.find((d) => d.nombre === formData.departamentoSolar);
+                          const municipio = municipiosDisponibles.find((m) => m.nombre === e.target.value);
+                          const radiacion = municipio?.radiacion ?? depto?.radiacion ?? "";
                           setFormData(prev => ({
                             ...prev,
                             ciudadSolar: e.target.value,
                             ubicacion: e.target.value,
-                            radiacionSolar: ciudad ? String(ciudad.radiacionDia) : "",
+                            radiacionSolar: radiacion !== "" ? String(radiacion) : "",
                           }));
                         }}
                       >
                         <option value="">Selecciona ciudad</option>
-                        {ciudades.map((c, i) => (
-                          <option key={i} value={c.ciudad}>
-                            {c.ciudad} ({c.departamento}) — {c.radiacionDia} kWh/m²/día
-                          </option>
+                        {municipiosDisponibles.map((m) => (
+                          <option key={m.nombre} value={m.nombre}>{m.nombre}</option>
                         ))}
                       </select>
                       {formData.radiacionSolar && (

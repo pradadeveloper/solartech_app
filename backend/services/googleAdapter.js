@@ -302,6 +302,9 @@ async function incrementContador() {
 }
 
 // ─── CIUDADES / RADIACIÓN ──────────────────────────────────────────────────────
+// NOTA: la tabla de radiación en config!D2:G del Sheet es solo referencia visual
+// para el administrador. El valor real usado en el cálculo de dimensionamiento
+// viene de frontend/src/data/colombiaMunicipios.js (departamento + municipio).
 async function getCiudades() {
   try {
     const auth = await getAuth().getClient();
