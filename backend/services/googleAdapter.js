@@ -431,4 +431,70 @@ async function saveAllAsesores(lista) {
   });
 }
 
-module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador, getCiudades, getAsesores, saveAsesor, updateAsesor, deleteAsesor, saveAllAsesores };
+// ─── PROPUESTAS ───────────────────────────────────────────────────────────────
+const PROPUESTA_COLS = [
+  'id', 'leadId', 'opcion', 'kWp', 'paneles', 'inversion_cop',
+  'ahorro_mensual', 'roi_anios', 'nombre_cliente', 'ciudad',
+  'consumo_kwh', 'sistema', 'techo', 'fecha', 'pdf_url', 'estado',
+];
+
+// Crea la pestaña "propuestas" (y su fila de encabezados) si todavía no existe.
+async function _ensurePropuestasSheet(sheets) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: process.env.SHEET_ID });
+  const existe = (meta.data.sheets || []).some(s => s.properties.title === 'propuestas');
+  if (!existe) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: process.env.SHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: 'propuestas' } } }] },
+    });
+  }
+  const headerRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID, range: 'propuestas!A1:P1',
+  });
+  const headers = headerRes.data.values?.[0] || [];
+  if (headers.length === 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: process.env.SHEET_ID, range: 'propuestas!A1',
+      valueInputOption: 'RAW', requestBody: { values: [PROPUESTA_COLS] },
+    });
+  }
+}
+
+async function savePropuesta(datos) {
+  const auth = await getAuth().getClient();
+  const sheets = google.sheets({ version: 'v4', auth });
+  await _ensurePropuestasSheet(sheets);
+  const row = PROPUESTA_COLS.map(c => datos[c] ?? '');
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: process.env.SHEET_ID, range: 'propuestas!A1',
+    valueInputOption: 'RAW', requestBody: { values: [row] },
+  });
+}
+
+async function getAllPropuestas() {
+  try {
+    const auth = await getAuth().getClient();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID, range: 'propuestas!A1:P',
+    });
+    const [rawHeaders, ...rows] = res.data.values || [[]];
+    if (!rawHeaders || !rawHeaders.length) return [];
+    const headers = rawHeaders.map(h => String(h).trim());
+    return rows.map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = row[i] ?? ''; });
+      return obj;
+    });
+  } catch (err) {
+    console.error('[googleAdapter] getAllPropuestas error:', err.message);
+    return [];
+  }
+}
+
+async function getPropuestaById(id) {
+  const todas = await getAllPropuestas();
+  return todas.find(p => String(p.id).trim() === String(id).trim()) || null;
+}
+
+module.exports = { getConfig, saveConfig, getAllLeads, saveLead, updateLead, incrementContador, getCiudades, getAsesores, saveAsesor, updateAsesor, deleteAsesor, saveAllAsesores, savePropuesta, getAllPropuestas, getPropuestaById };

@@ -167,16 +167,14 @@ export default function Resultado() {
   const [opcionSeleccionada, setOpcionSeleccionada] = useState(0);
   const [guardado, setGuardado] = useState(false);
   const [resultadoActivo, setResultadoActivo] = useState(() => resultado ?? {});
-  const [pdfUrls, setPdfUrls] = useState(() => resultado ? [resultado.pdfUrl, null, null] : []);
-  const [generandoPdf, setGenerandoPdf] = useState(false);
   const [cfg, setCfg] = useState({});
-  const [linkCopiado, setLinkCopiado] = useState(false);
   const [versiones, setVersiones] = useState([]);
-  const [guardandoVersion, setGuardandoVersion] = useState(null);
   const [linkVersionCopiado, setLinkVersionCopiado] = useState(null);
   const [generandoPdfVersion, setGenerandoPdfVersion] = useState(null);
   const [estadoActual, setEstadoActual] = useState(() => resultado?.estado ?? "Nuevo");
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
+  const [guardandoPropuesta, setGuardandoPropuesta] = useState(null); // idx de la opción en progreso
+  const [propuestaGuardada, setPropuestaGuardada] = useState(null);   // { propuestaId, pdfUrl, shareUrl }
 
   const cambiarEstado = async (nuevoEstado) => {
     const anterior = estadoActual;
@@ -195,15 +193,6 @@ export default function Resultado() {
     } finally {
       setCambiandoEstado(false);
     }
-  };
-
-  const compartirLink = () => {
-    const codigo = resultado.codigoPublico || resultado.numeroCotizacion;
-    const url = `${window.location.origin}/propuesta/${codigo}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setLinkCopiado(true);
-      setTimeout(() => setLinkCopiado(false), 2500);
-    });
   };
 
   const [opciones, setOpciones] = useState(() => resultado ? [
@@ -239,30 +228,36 @@ export default function Resultado() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultado?.numeroCotizacion]);
 
-  const guardarVersion = async (idx) => {
+  // Guarda la opción elegida como una propuesta real y compartible (POST /api/propuestas/guardar).
+  // Este es el único punto del flujo donde se genera un ID público y su PDF.
+  const guardarYCompartir = async (idx) => {
     const calc = calculos[idx];
-    if (!calc || !resultado?.numeroCotizacion) return;
-    setGuardandoVersion(idx);
+    if (!calc) return;
+    setGuardandoPropuesta(idx);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${resultado.numeroCotizacion}/version`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/propuestas/guardar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ...resultado, ...calc, costokWp: Number(opciones[idx].costokWp), label: opciones[idx].label }),
+        body: JSON.stringify({
+          leadId: resultado?.numeroCotizacion,
+          opcionSeleccionada: opciones[idx].label,
+          datosOpcion: { ...calc, costokWp: Number(opciones[idx].costokWp) },
+          datosCliente: resultado,
+        }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setVersiones(prev => [...prev, {
-          ...resultado, ...calc,
-          numeroCotizacion: data.versionId,
-          label: opciones[idx].label,
-          pdfUrl: '',
-        }]);
-      }
+      if (!res.ok) { alert(data.error || 'No se pudo guardar la propuesta'); return; }
+      setOpcionSeleccionada(idx);
+      setPropuestaGuardada({
+        propuestaId: data.propuestaId,
+        pdfUrl: data.pdfUrl,
+        shareUrl: `${window.location.origin}/propuesta/${data.propuestaId}`,
+      });
     } catch (e) {
-      alert('Error guardando versión');
+      alert('Error guardando la propuesta');
     } finally {
-      setGuardandoVersion(null);
+      setGuardandoPropuesta(null);
     }
   };
 
@@ -343,33 +338,6 @@ export default function Resultado() {
     setGuardado(true);
   };
 
-  const descargarPDF = async () => {
-    if (pdfUrls[opcionSeleccionada]) {
-      const u = pdfUrls[opcionSeleccionada];
-      window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
-      return;
-    }
-    const calc = calculos[opcionSeleccionada];
-    if (!calc) return;
-    setGenerandoPdf(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ...resultado, ...calc, kwp: calc.kwp, consumoKwh: calc.consumoKwh, label: opciones[opcionSeleccionada].label }),
-      });
-      const data = await res.json();
-      setPdfUrls((prev) => prev.map((u, i) => i === opcionSeleccionada ? data.pdfUrl : u));
-      const u = data.pdfUrl;
-      window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
-    } catch (e) {
-      alert('Error generando PDF');
-    } finally {
-      setGenerandoPdf(false);
-    }
-  };
-
   const fechaPropuesta = useMemo(() => new Date().toLocaleDateString("es-CO"), []);
 
   const styles = {
@@ -438,19 +406,12 @@ export default function Resultado() {
           </div>
         </header>
 
-        {/* ── Acciones: siempre visible, arriba de cualquier dato del proyecto ── */}
+        {/* ── Acciones: vista interna del asesor. Descargar PDF y Compartir link
+             viven SOLO después de guardar una opción (modal + /propuesta/:id) ── */}
         <div className="cotActionsBar">
-          <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
-            {generandoPdf ? 'Generando PDF...' : `Descargar ${opciones[opcionSeleccionada]?.label ?? 'propuesta'} PDF`}
-          </button>
-
           <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} />
 
-          <button className="cotBtn cotBtnGhost" onClick={compartirLink}>
-            {linkCopiado ? '¡Link copiado! ✓' : 'Compartir Link'}
-          </button>
-
-          <button className="cotBtn cotBtnGhost" onClick={() => navigate("/")}>
+          <button className="cotBtn cotBtnGhost" onClick={() => navigate("/cliente")}>
             Nueva cotización
           </button>
         </div>
@@ -485,9 +446,6 @@ export default function Resultado() {
 
         {/* Barra de acciones fija — solo mobile (< 768px) */}
         <div className="cotStickyMobileBar">
-          <button className="cotBtn cotBtnPrimary" onClick={descargarPDF} disabled={generandoPdf}>
-            {generandoPdf ? 'Generando...' : 'Descargar PDF'}
-          </button>
           <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} compact />
         </div>
 
@@ -667,12 +625,12 @@ export default function Resultado() {
                         <OpRow label="Ahorro mensual" value={`$${calculos[idx].ahorroMensual.toLocaleString('es-CO')}`} />
                         <OpRow label="Retorno" value={`${calculos[idx].tiempoRetorno} años`} />
                         <button
-                          className="cotBtn cotBtnGhost"
-                          style={{ marginTop: 6, fontSize: '0.78rem', padding: '5px 0', width: '100%' }}
-                          onClick={(e) => { e.stopPropagation(); guardarVersion(idx); }}
-                          disabled={guardandoVersion === idx}
+                          className="cotBtn cotBtnPrimary"
+                          style={{ marginTop: 6, fontSize: '0.8rem', padding: '8px 0', width: '100%' }}
+                          onClick={(e) => { e.stopPropagation(); guardarYCompartir(idx); }}
+                          disabled={guardandoPropuesta === idx}
                         >
-                          {guardandoVersion === idx ? 'Guardando...' : `+ Guardar ${op.label} como versión`}
+                          {guardandoPropuesta === idx ? 'Guardando...' : 'Guardar y compartir esta →'}
                         </button>
                       </div>
                     ) : (
@@ -1021,6 +979,15 @@ export default function Resultado() {
             </div>
           </div>
         )}
+
+        {/* MODAL: propuesta guardada — único lugar donde se ve el link público */}
+        {propuestaGuardada && (
+          <PropuestaGuardadaModal
+            data={propuestaGuardada}
+            onClose={() => setPropuestaGuardada(null)}
+            onVolverDashboard={() => navigate("/")}
+          />
+        )}
       </div>
     </div>
   );
@@ -1275,6 +1242,77 @@ function EstadoSelect({ value, onChange, disabled, compact }) {
     >
       {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
     </select>
+  );
+}
+
+function PropuestaGuardadaModal({ data, onClose, onVolverDashboard }) {
+  const [copiado, setCopiado] = useState(false);
+  const { propuestaId, pdfUrl, shareUrl } = data;
+
+  const copiarLink = () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  };
+
+  const enviarWhatsApp = () => {
+    const texto = `Hola, adjunto tu propuesta solar: ${shareUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+  };
+
+  const abrirPdf = () => {
+    if (!pdfUrl) return;
+    window.open(pdfUrl.startsWith('http') ? pdfUrl : `${process.env.REACT_APP_API_URL}${pdfUrl}`, '_blank');
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 999, padding: 16,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: 26, maxWidth: 440, width: '100%',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.35)', textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
+        <h2 style={{ margin: '0 0 4px', color: '#1a1a1a', fontSize: 20 }}>Propuesta guardada</h2>
+        <p style={{ margin: '0 0 18px', color: '#5a5a5a', fontSize: 13 }}>
+          ID: <b style={{ color: '#b03a22' }}>{propuestaId}</b>
+        </p>
+
+        <p style={{ margin: '0 0 8px', textAlign: 'left', color: '#5a5a5a', fontSize: 13 }}>
+          Comparte este link con el cliente:
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          <input
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.target.select()}
+            style={{
+              flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8,
+              border: '1px solid #dedede', fontSize: 12, color: '#1a1a1a', background: '#f8f9fa',
+            }}
+          />
+          <button className="cotBtn cotBtnPrimary" onClick={copiarLink} style={{ whiteSpace: 'nowrap' }}>
+            {copiado ? '¡Copiado! ✓' : 'Copiar'}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button className="cotBtn cotBtnPrimary" onClick={abrirPdf} style={{ width: '100%', justifyContent: 'center' }}>
+            📥 Descargar PDF
+          </button>
+          <button className="cotBtn cotBtnGhost" onClick={enviarWhatsApp} style={{ width: '100%', justifyContent: 'center', borderColor: '#25d366', color: '#1a1a1a' }}>
+            💬 Enviar por WhatsApp
+          </button>
+          <button className="cotBtn cotBtnGhost" onClick={() => { onClose(); onVolverDashboard(); }} style={{ width: '100%', justifyContent: 'center' }}>
+            ← Volver al dashboard
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

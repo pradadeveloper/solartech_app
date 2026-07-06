@@ -108,6 +108,30 @@ function generarCodigoPublico(leadsExistentes = []) {
   return code;
 }
 
+// ====== Propuestas guardadas (una por opción elegida por el asesor) ======
+const propuestasPath = path.join(__dirname, 'propuestas.json');
+
+async function getAllPropuestas() {
+  if (USE_GOOGLE) return gAdapter.getAllPropuestas();
+  if (!fs.existsSync(propuestasPath)) return [];
+  try { const raw = fs.readFileSync(propuestasPath, 'utf-8').trim(); return raw ? JSON.parse(raw) : []; } catch { return []; }
+}
+
+async function savePropuestaStorage(propuesta) {
+  if (USE_GOOGLE) return gAdapter.savePropuesta(propuesta);
+  const propuestas = await getAllPropuestas();
+  propuestas.push(propuesta);
+  fs.writeFileSync(propuestasPath, JSON.stringify(propuestas, null, 2));
+}
+
+function generarPropuestaId(existentes = []) {
+  let id;
+  do {
+    id = `ST-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
+  } while (existentes.some(p => p.id === id));
+  return id;
+}
+
 async function updateLeadField(numeroCotizacion, fields) {
   if (USE_GOOGLE) return gAdapter.updateLead(numeroCotizacion, fields);
   const leads = await getAllLeads();
@@ -1103,6 +1127,160 @@ app.get('/api/propuesta/:num', async (req, res) => {
       };
     }
     res.json(pub);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== POST /api/propuestas/guardar — guarda la opción elegida por el asesor ======
+// Este es el único punto donde se genera un ID de propuesta y su PDF. La vista
+// /resultado ya NO genera PDF ni link antes de este paso.
+app.post('/api/propuestas/guardar', express.json(), async (req, res) => {
+  try {
+    const { leadId, opcionSeleccionada, datosOpcion = {}, datosCliente = {} } = req.body || {};
+
+    const kwp = Number(datosOpcion.kwp ?? datosOpcion.kWp) || 0;
+    let consumoKwh = Number(datosOpcion.consumoKwh) || 0;
+    let costoKwh = Number(datosOpcion.costoKwh) || Number(datosCliente.costoKwh) || 0;
+
+    const cfg = await leerConfig();
+
+    // Fallback defensivo: si no viene consumoKwh/costoKwh explícito, derivarlo del kWp
+    // (mismo truco que /api/generar-pdf para reproducir el mismo kWp al recalcular).
+    if (!consumoKwh && kwp > 0) {
+      const radiacion = Number(datosOpcion.radiacionSolar) || Number(datosCliente.radiacionSolar) || cfg.radiacionSolar || 3.8;
+      const margen = cfg.margenCobertura || 0.8;
+      const wPromedioDia = kwp * radiacion * margen * 1000;
+      consumoKwh = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
+    }
+    if (!costoKwh && Number(datosOpcion.ahorroMensual) > 0 && consumoKwh > 0) {
+      costoKwh = Math.round(Number(datosOpcion.ahorroMensual) / consumoKwh);
+    }
+
+    if (!kwp || !consumoKwh || !costoKwh) {
+      return res.status(400).json({ error: 'Datos insuficientes para guardar la propuesta (falta kWp, consumo o costo por kWh).' });
+    }
+
+    // Asesor desde el token JWT (si viene)
+    let asesorPDF = {};
+    let vendedor = datosCliente.vendedor || '';
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
+        vendedor = decoded.nombre || decoded.usuario || vendedor;
+        const asesorVivo = usuarios.find(u => u.usuario === decoded.usuario) || {};
+        asesorPDF = {
+          nombre:   asesorVivo.nombre   || decoded.nombre,
+          apellido: asesorVivo.apellido || decoded.apellido,
+          cargo:    asesorVivo.cargo    || decoded.cargo,
+          usuario:  decoded.usuario,
+          celular:  asesorVivo.celular  || decoded.celular || '',
+          correo:   asesorVivo.correo   || decoded.correo  || '',
+        };
+      } catch (_) {}
+    }
+
+    const cfgForCalc = Number(datosOpcion.costokWp) > 0 ? { ...cfg, costokWp: Number(datosOpcion.costokWp) } : cfg;
+    const dataWithFix = { ...datosCliente, consumoKwh, costoKwh };
+    const resultados = calcularProyecto(dataWithFix, cfgForCalc);
+
+    const propuestasExistentes = await getAllPropuestas();
+    const propuestaId = generarPropuestaId(propuestasExistentes);
+
+    const pdfUrl = await generarPDF(dataWithFix, { ...resultados, numeroCotizacion: propuestaId }, asesorPDF, cfg);
+
+    await savePropuestaStorage({
+      id: propuestaId,
+      leadId: leadId ?? '',
+      opcion: opcionSeleccionada ?? '',
+      kWp: resultados.kwp,
+      paneles: resultados.npaneles,
+      inversion_cop: resultados.costoProyectoMasIva,
+      ahorro_mensual: resultados.ahorroMensual,
+      roi_anios: resultados.tiempoRetorno,
+      nombre_cliente: datosCliente.nombre || '',
+      ciudad: datosCliente.ubicacion || datosCliente.ciudadSolar || '',
+      consumo_kwh: resultados.consumoKwh,
+      sistema: datosCliente.sistemaInteres || datosCliente.tipoSolicitud || '',
+      techo: datosCliente.tipoTecho || '',
+      fecha: new Date().toISOString(),
+      pdf_url: pdfUrl,
+      estado: 'Enviada',
+    });
+
+    const base = (process.env.FRONTEND_URL || 'https://solartech-app.vercel.app').replace(/\/$/, '');
+    const shareUrl = `${base}/propuesta/${propuestaId}`;
+
+    res.json({ propuestaId, pdfUrl, shareUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Error interno' });
+  }
+});
+
+// ====== GET /api/propuestas/:id (público — sin auth, para compartir con cliente) ======
+app.get('/api/propuestas/:id', async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const propuestas = await getAllPropuestas();
+    const propuesta = propuestas.find(p => String(p.id).trim() === id);
+    if (!propuesta) return res.status(404).json({ error: 'Propuesta no encontrada' });
+
+    // Enriquecer con datos de contacto y asesor del lead original, si existe
+    let leadInfo = {};
+    let asesorInfo = null;
+    if (propuesta.leadId) {
+      const leads = await getAllLeads();
+      const lead = leads.find(l => String(l.numeroCotizacion) === String(propuesta.leadId));
+      if (lead) {
+        leadInfo = {
+          correo: lead.correo,
+          telefono: lead.telefono,
+          preferenciaContacto: lead.preferenciaContacto,
+          radiacionSolar: lead.radiacionSolar,
+          areaDisponible: lead.areaDisponible,
+          vendedor: lead.vendedor,
+        };
+        const asesor = usuarios.find(u =>
+          u.nombre === lead.vendedor ||
+          `${u.nombre} ${u.apellido}`.trim() === lead.vendedor ||
+          u.usuario === lead.vendedor
+        );
+        if (asesor) {
+          asesorInfo = {
+            nombre:   asesor.nombre,
+            apellido: asesor.apellido || '',
+            cargo:    asesor.cargo   || 'Asesor Comercial',
+            celular:  asesor.celular || '',
+            correo:   asesor.correo  || '',
+          };
+        }
+      }
+    }
+
+    res.json({
+      numeroCotizacion: propuesta.id,
+      codigoPublico: propuesta.id,
+      leadId: propuesta.leadId,
+      opcion: propuesta.opcion,
+      nombre: propuesta.nombre_cliente,
+      ubicacion: propuesta.ciudad,
+      kwp: Number(propuesta.kWp) || 0,
+      npaneles: Number(propuesta.paneles) || 0,
+      costoProyectoMasIva: Number(propuesta.inversion_cop) || 0,
+      ahorroMensual: Number(propuesta.ahorro_mensual) || 0,
+      tiempoRetorno: propuesta.roi_anios !== '' ? Number(propuesta.roi_anios) : null,
+      consumoKwh: Number(propuesta.consumo_kwh) || 0,
+      tipoSolicitud: propuesta.sistema,
+      sistemaInteres: propuesta.sistema,
+      tipoTecho: propuesta.techo,
+      fecha: propuesta.fecha,
+      pdfUrl: propuesta.pdf_url,
+      estado: propuesta.estado,
+      ...leadInfo,
+      asesorInfo,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

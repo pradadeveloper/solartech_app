@@ -145,8 +145,17 @@ export default function PropuestaPublica() {
   const [baseLead, setBaseLead] = useState(null);
 
   useEffect(() => {
+    // Primero busca en la pestaña "propuestas" (flujo nuevo: guardado explícito
+    // desde /resultado). Si no existe, cae al endpoint viejo por compatibilidad
+    // con links de "versiones" ya compartidos antes de este cambio.
+    const buscarPropuesta = async () => {
+      const res = await fetch(`${API}/api/propuestas/${num}`);
+      if (res.ok) return res.json();
+      return fetch(`${API}/api/propuesta/${num}`).then(r => r.json());
+    };
+
     Promise.all([
-      fetch(`${API}/api/propuesta/${num}`).then(r => r.json()),
+      buscarPropuesta(),
       fetch(`${API}/api/config`).then(r => r.json()).catch(() => ({})),
     ]).then(([leadData, cfgData]) => {
       if (leadData.error) { setError(leadData.error); }
