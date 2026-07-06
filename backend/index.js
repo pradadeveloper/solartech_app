@@ -1211,6 +1211,20 @@ app.get('/api/leads/buscar', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ====== GET /api/leads/check-cedula/:cedula ======
+app.get('/api/leads/check-cedula/:cedula', async (req, res) => {
+  const { cedula } = req.params;
+  if (!cedula) return res.json({ exists: false });
+  try {
+    const leads = await getAllLeads();
+    const lead = leads.find(l =>
+      l.identificacion && String(l.identificacion).trim() === String(cedula).trim()
+    );
+    if (lead) return res.json({ exists: true, asesor: lead.vendedor, cotNum: lead.numeroCotizacion });
+    res.json({ exists: false });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ====== GET /api/asesores ======
 app.get('/api/asesores', (_req, res) => {
   res.json(usuarios.map(u => ({

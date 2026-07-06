@@ -24,13 +24,13 @@ export default function CotizadorSolar() {
     departamentoSolar: "",
     ciudadSolar: "",
     radiacionSolar: "",
-    facturaAdjunta: null,
-    notasAdicionales: "",
     areaDisponible: "",
   });
 
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
+  const [clienteExistente, setClienteExistente] = useState(null); // { asesor, cotNum }
+  const [dismissed, setDismissed] = useState({ area: false, radiacion: false });
 
   const municipiosDisponibles = useMemo(() => {
     const depto = departamentos.find((d) => d.nombre === formData.departamentoSolar);
@@ -38,20 +38,17 @@ export default function CotizadorSolar() {
   }, [formData.departamentoSolar]);
 
   const handleChange = (e) => {
-    const { name, value, files, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "file" ? files?.[0] ?? null : value,
-    }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // m² necesarios para cubrir el 100% del consumo con la radiación de la ciudad seleccionada
   const areaMinima = useMemo(() => {
     const consumo = Number(formData.consumoKwh);
-    if (!consumo || consumo <= 0) return null;
-    const rad = Number(formData.radiacionSolar) > 0 ? Number(formData.radiacionSolar) : 3.8;
-    const wPromedioDia = ((consumo * 1000) * 12) / 365;
-    const kwp = (wPromedioDia / (rad * 0.8)) / 1000;
-    return Math.round(kwp * 5.8);
+    const radiacion = Number(formData.radiacionSolar);
+    if (!consumo || consumo <= 0 || !radiacion || radiacion <= 0) return null;
+    const mNecesarios = (consumo * 1000) / (radiacion * 0.18 * (365 / 12) * 1000);
+    return Math.round(mNecesarios);
   }, [formData.consumoKwh, formData.radiacionSolar]);
 
   const areaInsuficiente = useMemo(() => {
@@ -65,51 +62,93 @@ export default function CotizadorSolar() {
     return c > 0 && k > 0 ? String(Math.round(c * k)) : "";
   }, [formData.consumoKwh, formData.costoKwh]);
 
-  const canGoNext = useMemo(() => {
-    const requiredStep1 = [
-      "nombre", "correo", "telefono", "departamentoSolar", "ciudadSolar",
-      "consumoKwh", "costoKwh", "areaDisponible",
-      "tipoSolicitud",
-    ];
-    return requiredStep1.every((k) => String(formData[k] ?? "").trim().length > 0);
-  }, [formData]);
-
-  const [clienteExistente, setClienteExistente] = useState(null); // { vendedor, numeroCotizacion, nombre }
-
-  useEffect(() => {
-    const { identificacion } = formData;
-    if (!identificacion) { setClienteExistente(null); return; }
-
-    const params = new URLSearchParams();
-    params.set('identificacion', identificacion);
-
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/buscar?${params}`);
-        const data = await res.json();
-        setClienteExistente(data.encontrado ? data : null);
-      } catch (_) {}
-    }, 600);
-
-    return () => clearTimeout(timer);
+  const requiredFields = [
+    "nombre", "identificacion", "correo", "telefono",
+    "departamentoSolar", "ciudadSolar", "tipoSolicitud",
+    "consumoKwh", "costoKwh", "areaDisponible", "tipoTecho",
+  ];
+  const canSubmit = useMemo(
+    () => requiredFields.every((k) => String(formData[k] ?? "").trim().length > 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formData]
+  );
+
+  // La alerta de cédula duplicada se limpia apenas el usuario edita el campo;
+  // se vuelve a verificar recién al perder foco (onBlur).
+  useEffect(() => {
+    setClienteExistente(null);
   }, [formData.identificacion]);
 
-  const handleNext = () => {
-    if (step === 1 && canGoNext) setStep(2);
+  useEffect(() => {
+    setDismissed((d) => ({ ...d, area: false }));
+  }, [formData.areaDisponible, formData.consumoKwh, formData.radiacionSolar]);
+
+  useEffect(() => {
+    setDismissed((d) => ({ ...d, radiacion: false }));
+  }, [formData.ciudadSolar]);
+
+  const checkCedula = async () => {
+    const cedula = formData.identificacion.trim();
+    if (!cedula) return;
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/check-cedula/${encodeURIComponent(cedula)}`);
+      const data = await res.json();
+      setClienteExistente(data.exists ? { asesor: data.asesor, cotNum: data.cotNum } : null);
+    } catch (_) {}
   };
 
-  const handleBack = () => {
-    if (step === 2) setStep(1);
-  };
+  const alerts = useMemo(() => {
+    const list = [];
+
+    if (clienteExistente) {
+      list.push({
+        id: "cedula",
+        icon: "🔒",
+        variant: "cotAlertYellow",
+        title: `Cédula ${formData.identificacion} ya registrada`,
+        body: (
+          <>
+            El documento ya tiene una cotización activa.<br />
+            Asesor: <b>{clienteExistente.asesor}</b> — Cot. N-{clienteExistente.cotNum}
+          </>
+        ),
+        onClose: () => setClienteExistente(null),
+      });
+    }
+
+    if (areaInsuficiente && !dismissed.area) {
+      list.push({
+        id: "area",
+        icon: "⚠️",
+        variant: "cotAlertOrange",
+        title: "Área insuficiente",
+        body: (
+          <>
+            Se necesitan <b>{areaMinima} m²</b> para el 100% del consumo.<br />
+            Área actual: <b>{formData.areaDisponible} m²</b>
+          </>
+        ),
+        onClose: () => setDismissed((d) => ({ ...d, area: true })),
+      });
+    }
+
+    if (formData.radiacionSolar && formData.ciudadSolar && !dismissed.radiacion) {
+      list.push({
+        id: "radiacion",
+        icon: "☀️",
+        variant: "cotAlertBlue",
+        title: `Radiación solar: ${formData.radiacionSolar} kWh/m²/día`,
+        body: <>Ciudad: <b>{formData.ciudadSolar}</b></>,
+        onClose: () => setDismissed((d) => ({ ...d, radiacion: true })),
+      });
+    }
+
+    return list;
+  }, [clienteExistente, areaInsuficiente, areaMinima, formData.areaDisponible, formData.identificacion, formData.radiacionSolar, formData.ciudadSolar, dismissed]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (step === 1) {
-      if (canGoNext) setStep(2);
-      return;
-    }
+    if (!canSubmit) return;
 
     setLoading(true);
 
@@ -119,8 +158,6 @@ export default function CotizadorSolar() {
       Object.entries(payload).forEach(([key, value]) => formToSend.append(key, value ?? ""));
 
       const apiUrl = `${process.env.REACT_APP_API_URL}/api/calcular-proyecto`;
-      console.log('🔗 Fetching:', apiUrl);
-
       const token = localStorage.getItem('token');
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -130,7 +167,7 @@ export default function CotizadorSolar() {
 
       if (response.status === 409) {
         const err = await response.json();
-        setClienteExistente({ vendedor: err.vendedor, numeroCotizacion: err.cotizacion, nombre: formData.nombre, campoClave: err.campoClave, mensaje: err.mensaje });
+        setClienteExistente({ asesor: err.vendedor, cotNum: err.cotizacion });
         setLoading(false);
         return;
       }
@@ -162,284 +199,218 @@ export default function CotizadorSolar() {
             <h1 className="cotTitle">Nuevo Cliente — Cotizador Solar</h1>
             <p className="cotSubtitle">Completa los datos y genera la cotización en segundos.</p>
           </div>
-
-          <div className="cotSteps">
-            <span className={`cotStep ${step === 1 ? "isActive" : ""}`}>1</span>
-            <span className="cotStepLine" />
-            <span className={`cotStep ${step === 2 ? "isActive" : ""}`}>2</span>
-          </div>
         </header>
 
         <form onSubmit={handleSubmit} className="cotGrid">
-          {/* Left: Form */}
+          {/* Formulario único */}
           <section className="cotMain">
-            {step === 1 && (
-              <>
-                <Card title="Datos del cliente">
-                  <div className="cotTwoCol">
-                    <Field label="Nombre completo">
-                      <input name="nombre" value={formData.nombre} onChange={handleChange} required />
-                    </Field>
+            <Card title="Datos del cliente">
+              <div className="cotTwoCol">
+                <Field label="Nombre completo">
+                  <input name="nombre" value={formData.nombre} onChange={handleChange} required />
+                </Field>
 
-                    <Field label="Cédula / NIT">
-                      <input name="identificacion" value={formData.identificacion} onChange={handleChange} placeholder="Ej: 1234567890" />
-                    </Field>
+                <Field label="Cédula / NIT">
+                  <input
+                    name="identificacion"
+                    value={formData.identificacion}
+                    onChange={handleChange}
+                    onBlur={checkCedula}
+                    placeholder="Ej: 1234567890"
+                    inputMode="numeric"
+                    required
+                  />
+                </Field>
 
-                    <Field label="Correo electrónico">
-                      <input name="correo" type="email" value={formData.correo} onChange={handleChange} required />
-                    </Field>
+                <Field label="Correo electrónico">
+                  <input name="correo" type="email" value={formData.correo} onChange={handleChange} required />
+                </Field>
 
-                    <Field label="Teléfono">
-                      <input name="telefono" type="tel" value={formData.telefono} onChange={handleChange} required />
-                    </Field>
+                <Field label="Teléfono">
+                  <input name="telefono" type="tel" value={formData.telefono} onChange={handleChange} required />
+                </Field>
 
-                    <Field label="Departamento">
-                      <select
-                        name="departamentoSolar"
-                        value={formData.departamentoSolar}
-                        onChange={(e) => {
-                          setFormData(prev => ({
-                            ...prev,
-                            departamentoSolar: e.target.value,
-                            ciudadSolar: "",
-                            ubicacion: "",
-                            radiacionSolar: "",
-                          }));
-                        }}
-                      >
-                        <option value="">Selecciona departamento</option>
-                        {departamentos.map((d) => (
-                          <option key={d.nombre} value={d.nombre}>{d.nombre}</option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Ciudad / Municipio">
-                      <select
-                        name="ciudadSolar"
-                        value={formData.ciudadSolar}
-                        disabled={!formData.departamentoSolar}
-                        onChange={(e) => {
-                          const depto = departamentos.find((d) => d.nombre === formData.departamentoSolar);
-                          const municipio = municipiosDisponibles.find((m) => m.nombre === e.target.value);
-                          const radiacion = municipio?.radiacion ?? depto?.radiacion ?? "";
-                          setFormData(prev => ({
-                            ...prev,
-                            ciudadSolar: e.target.value,
-                            ubicacion: e.target.value,
-                            radiacionSolar: radiacion !== "" ? String(radiacion) : "",
-                          }));
-                        }}
-                      >
-                        <option value="">Selecciona ciudad</option>
-                        {municipiosDisponibles.map((m) => (
-                          <option key={m.nombre} value={m.nombre}>{m.nombre}</option>
-                        ))}
-                      </select>
-                      {formData.radiacionSolar && (
-                        <span style={{ fontSize: '0.75rem', color: '#b03a22', marginTop: 4, display: 'block' }}>
-                          Radiación: {formData.radiacionSolar} kWh/m²/día
-                        </span>
-                      )}
-                    </Field>
-
-                    <Field label="Tipo de proyecto">
-                      <select name="tipoSolicitud" value={formData.tipoSolicitud} onChange={handleChange} required>
-                        <option value="">Selecciona</option>
-                        <option value="Hogar">Hogar</option>
-                        <option value="Comercial">Comercial</option>
-                        <option value="Empresa">Empresa</option>
-                        <option value="Gran Escala">Granja Solar</option>
-                      </select>
-                    </Field>
-                  </div>
-                </Card>
-
-                <Card title="Consumo y dimensionamiento rápido">
-                  <div className="cotTwoCol">
-                    <Field label="Consumo kWh/mes">
-                      <FormattedInput name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} suffix="kWh/mes" required />
-                    </Field>
-
-                    <Field label={
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        Costo kWh (COP)
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal', fontSize: '0.82rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            name="contribucion"
-                            checked={formData.contribucion}
-                            onChange={(e) => setFormData((prev) => ({ ...prev, contribucion: e.target.checked }))}
-                            style={{ accentColor: '#f5c518', width: '15px', height: '15px' }}
-                          />
-                          Contribución
-                        </label>
-                      </span>
-                    }>
-                      <FormattedInput name="costoKwh" value={formData.costoKwh} onChange={handleChange} prefix="$" required />
-                    </Field>
-
-                    <Field label="Área disponible (m²)">
-                      <FormattedInput name="areaDisponible" value={formData.areaDisponible} onChange={handleChange} suffix="m²" required />
-                    </Field>
-                  </div>
-
-                  {!canGoNext && (
-                    <div className="cotHint">
-                      Completa los campos obligatorios para continuar.
-                    </div>
-                  )}
-                </Card>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <Card title="Detalles del proyecto">
-                  <div className="cotTwoCol">
-                    <Field label="Tipo de techo">
-                      <select name="tipoTecho" value={formData.tipoTecho} onChange={handleChange} required>
-                        <option value="">Selecciona</option>
-                        <option>Standing Seam</option>
-                        <option>Termoacústica</option>
-                        <option>Teja de barro</option>
-                        <option>Manto Asfáltico</option>
-                        <option>Teja Eternit</option>
-                        <option>Madera</option>
-                        <option>Zinc</option>
-                        <option>Suelo</option>
-                        <option>Losa</option>
-                      </select>
-                    </Field>
-
-                    <Field label="Sistema de interés">
-                      <select name="sistemaInteres" value={formData.sistemaInteres} onChange={handleChange}>
-                        <option value="">Selecciona</option>
-                        <option>Interconectado</option>
-                        <option>Aislado</option>
-                        <option>Híbrido</option>
-                      </select>
-                    </Field>
-
-                    <Field label="¿Cómo nos conociste?">
-                      <select name="conociste" value={formData.conociste} onChange={handleChange}>
-                        <option value="">Selecciona</option>
-                        <option>Instagram</option>
-                        <option>Facebook</option>
-                        <option>LinkedIn</option>
-                        <option>Google</option>
-                        <option>Referido</option>
-                        <option>Referido Mercadeo</option>
-                        <option>Gestión comercial</option>
-                        <option>Bancolombia</option>
-                        <option>Banco de Bogotá</option>
-                        <option>Otro</option>
-                      </select>
-                    </Field>
-
-                  </div>
-                </Card>
-
-                <Card title="Adjuntos y notas">
-                  <Field label="Adjunta una foto de la factura (opcional)">
-                    <input type="file" name="facturaAdjunta" onChange={handleChange} />
-                  </Field>
-
-                  <Field label="Notas adicionales">
-                    <textarea
-                      name="notasAdicionales"
-                      value={formData.notasAdicionales}
-                      onChange={handleChange}
-                      placeholder="Ej: sombras, restricciones, urgencia, etc."
-                    />
-                  </Field>
-                </Card>
-              </>
-            )}
-
-            {/* Footer actions */}
-            <div className="cotActions">
-              {step === 2 && (
-                <button type="button" className="cotBtn cotBtnGhost" onClick={handleBack}>
-                  Atrás
-                </button>
-              )}
-
-              {step === 1 ? (
-                <button
-                    type="button"
-                    className="cotBtn cotBtnPrimary"
-                    disabled={!canGoNext}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleNext();
+                <Field label="Departamento">
+                  <select
+                    name="departamentoSolar"
+                    value={formData.departamentoSolar}
+                    onChange={(e) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        departamentoSolar: e.target.value,
+                        ciudadSolar: "",
+                        ubicacion: "",
+                        radiacionSolar: "",
+                      }));
                     }}
+                    required
                   >
-                    Siguiente
-                </button>
-              ) : (
-                <button type="submit" className="cotBtn cotBtnPrimary" disabled={loading}>
-                  {loading ? "Calculando..." : "Calcular"}
-                </button>
-              )}
+                    <option value="">Selecciona departamento</option>
+                    {departamentos.map((d) => (
+                      <option key={d.nombre} value={d.nombre}>{d.nombre}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Ciudad / Municipio">
+                  <select
+                    name="ciudadSolar"
+                    value={formData.ciudadSolar}
+                    disabled={!formData.departamentoSolar}
+                    onChange={(e) => {
+                      const depto = departamentos.find((d) => d.nombre === formData.departamentoSolar);
+                      const municipio = municipiosDisponibles.find((m) => m.nombre === e.target.value);
+                      const radiacion = municipio?.radiacion ?? depto?.radiacion ?? "";
+                      setFormData((prev) => ({
+                        ...prev,
+                        ciudadSolar: e.target.value,
+                        ubicacion: e.target.value,
+                        radiacionSolar: radiacion !== "" ? String(radiacion) : "",
+                      }));
+                    }}
+                    required
+                  >
+                    <option value="">Selecciona ciudad</option>
+                    {municipiosDisponibles.map((m) => (
+                      <option key={m.nombre} value={m.nombre}>{m.nombre}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Tipo de proyecto">
+                  <select name="tipoSolicitud" value={formData.tipoSolicitud} onChange={handleChange} required>
+                    <option value="">Selecciona</option>
+                    <option value="Hogar">Hogar</option>
+                    <option value="Comercial">Comercial</option>
+                    <option value="Empresa">Empresa</option>
+                    <option value="Gran Escala">Granja Solar</option>
+                  </select>
+                </Field>
+              </div>
+            </Card>
+
+            <Card title="Consumo energético">
+              <div className="cotTwoCol">
+                <Field label="Consumo kWh/mes">
+                  <FormattedInput name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} suffix="kWh/mes" required />
+                </Field>
+
+                <Field label={
+                  <span className="cotLabelRow">
+                    Costo kWh (COP)
+                    <label className="cotCheckboxInline">
+                      <input
+                        type="checkbox"
+                        name="contribucion"
+                        checked={formData.contribucion}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, contribucion: e.target.checked }))}
+                      />
+                      Contribución
+                    </label>
+                  </span>
+                }>
+                  <FormattedInput name="costoKwh" value={formData.costoKwh} onChange={handleChange} prefix="$" required />
+                </Field>
+
+                <Field label="Área disponible (m²)">
+                  <FormattedInput name="areaDisponible" value={formData.areaDisponible} onChange={handleChange} suffix="m²" required />
+                  {areaInsuficiente && (
+                    <span className="cotInlineWarning">
+                      Se necesitan {areaMinima} m² para cubrir el 100%. Tienes {formData.areaDisponible} m².
+                    </span>
+                  )}
+                </Field>
+              </div>
+            </Card>
+
+            <Card title="Detalles del proyecto">
+              <div className="cotTwoCol">
+                <Field label="Tipo de techo">
+                  <select name="tipoTecho" value={formData.tipoTecho} onChange={handleChange} required>
+                    <option value="">Selecciona</option>
+                    <option>Standing Seam</option>
+                    <option>Termoacústica</option>
+                    <option>Teja de barro</option>
+                    <option>Manto Asfáltico</option>
+                    <option>Teja Eternit</option>
+                    <option>Madera</option>
+                    <option>Zinc</option>
+                    <option>Suelo</option>
+                    <option>Losa</option>
+                  </select>
+                </Field>
+
+                <Field label="Sistema de interés">
+                  <select name="sistemaInteres" value={formData.sistemaInteres} onChange={handleChange}>
+                    <option value="">Selecciona</option>
+                    <option>Interconectado</option>
+                    <option>Aislado</option>
+                    <option>Híbrido</option>
+                  </select>
+                </Field>
+
+                <Field label="¿Cómo nos conociste?">
+                  <select name="conociste" value={formData.conociste} onChange={handleChange}>
+                    <option value="">Selecciona</option>
+                    <option>Instagram</option>
+                    <option>Facebook</option>
+                    <option>LinkedIn</option>
+                    <option>Google</option>
+                    <option>Referido</option>
+                    <option>Referido Mercadeo</option>
+                    <option>Gestión comercial</option>
+                    <option>Bancolombia</option>
+                    <option>Banco de Bogotá</option>
+                    <option>Otro</option>
+                  </select>
+                </Field>
+              </div>
+            </Card>
+
+            {!canSubmit && (
+              <div className="cotHint">Completa los campos obligatorios para calcular la cotización.</div>
+            )}
+
+            <div className="cotActions">
+              <button type="submit" className="cotBtn cotBtnPrimary" disabled={loading || !canSubmit}>
+                {loading ? "Calculando..." : "Calcular cotización"}
+              </button>
             </div>
           </section>
 
-          {/* Right: Summary */}
+          {/* Panel derecho: resumen + alertas */}
           <aside className="cotSide">
-            <Card title="Resumen del Cliente">
-              <SummaryRow label="Cliente" value={formData.nombre} />
-              <SummaryRow label="Ciudad" value={formData.ubicacion} />
-              <SummaryRow label="kWh/mes" value={formData.consumoKwh ? `${Number(formData.consumoKwh).toLocaleString("es-CO")} kWh/mes` : "—"} />
-              <SummaryRow label="Costo kWh" value={formData.costoKwh ? `$${Number(formData.costoKwh).toLocaleString("es-CO")}` : "—"} />
-              <SummaryRow label="Factura Mensual Promedio" value={valorMensual ? `$${Number(valorMensual).toLocaleString("es-CO")}` : "—"} />
-              <SummaryRow label="Área (m²)" value={formData.areaDisponible ? `${Number(formData.areaDisponible).toLocaleString("es-CO")} m²` : "—"} />
-              <div className="cotDivider" />
-              <SummaryRow label="Canal" value={formData.conociste || "—"} />
-              <SummaryRow label="Tipo" value={formData.tipoSolicitud || "—"} />
+            <button
+              type="button"
+              className="cotSummaryToggle"
+              onClick={() => setMobileSummaryOpen((o) => !o)}
+              aria-expanded={mobileSummaryOpen}
+            >
+              Ver resumen del cliente {mobileSummaryOpen ? "▲" : "▼"}
+            </button>
 
-              {clienteExistente && (
-                <div style={{
-                  marginTop: '14px',
-                  background: 'rgba(243,156,18,0.18)',
-                  border: '1.5px solid #f39c12',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  color: '#fff',
-                  fontSize: '0.82rem',
-                  lineHeight: 1.6,
-                }}>
-                  🔒 <b>Cédula/NIT ya registrada</b><br />
-                  El documento <b>{formData.identificacion}</b> ya tiene una cotización activa.<br />
-                  Asesor: <b>{clienteExistente.vendedor}</b> — Cot. N-{clienteExistente.numeroCotizacion}
-                </div>
-              )}
-            </Card>
+            <div className={`cotSummaryCollapsible${mobileSummaryOpen ? " isOpen" : ""}`}>
+              <Card title="Resumen del cliente">
+                <SummaryRow label="Cliente" value={formData.nombre} />
+                <SummaryRow label="Ciudad" value={formData.ciudadSolar} />
+                <SummaryRow label="kWh/mes" value={formData.consumoKwh ? `${Number(formData.consumoKwh).toLocaleString("es-CO")} kWh/mes` : "—"} />
+                <SummaryRow label="Costo kWh" value={formData.costoKwh ? `$${Number(formData.costoKwh).toLocaleString("es-CO")}` : "—"} />
+                <SummaryRow label="Factura mensual" value={valorMensual ? `$${Number(valorMensual).toLocaleString("es-CO")}` : "—"} />
+                <SummaryRow label="Área m²" value={formData.areaDisponible ? `${Number(formData.areaDisponible).toLocaleString("es-CO")} m²` : "—"} />
+                <div className="cotDivider" />
+                <SummaryRow label="Canal" value={formData.conociste || "—"} />
+                <SummaryRow label="Tipo" value={formData.tipoSolicitud || "—"} />
+              </Card>
+            </div>
 
-            <Card title="Tips rápidos">
-              <ul className="cotTips">
-                <li>Verifica consumo (kWh) y costo por kWh.</li>
-                <li>Si el área es baja, el sistema se limita por m².</li>
-                <li>Adjuntar factura acelera la precisión del cálculo.</li>
-              </ul>
-
-              {areaInsuficiente && (
-                <div style={{
-                  marginTop: '12px',
-                  background: 'rgba(176, 58, 34, 0.12)',
-                  border: '1px solid #B03A22',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  color: '#fff',
-                  fontSize: '0.82rem',
-                  lineHeight: 1.5,
-                }}>
-                  ⚠️ <b>Área insuficiente.</b> Se necesitan <b>{areaMinima} m²</b> para el 100% del consumo. El área actual es <b>{formData.areaDisponible} m²</b>.
-                </div>
-              )}
-
-            </Card>
+            {alerts.length > 0 && (
+              <div className="cotAlertsPanel">
+                <div className="cotAlertsPanelTitle">Alertas del asesor</div>
+                {alerts.map((a) => (
+                  <Alert key={a.id} {...a} />
+                ))}
+              </div>
+            )}
           </aside>
         </form>
       </div>
@@ -503,6 +474,21 @@ function SummaryRow({ label, value }) {
     <div className="cotSummaryRow">
       <span className="cotSummaryLabel">{label}</span>
       <span className="cotSummaryValue">{String(value ?? "—")}</span>
+    </div>
+  );
+}
+
+function Alert({ icon, title, body, variant, onClose }) {
+  return (
+    <div className={`cotAlert ${variant}`}>
+      <span className="cotAlertIcon">{icon}</span>
+      <div className="cotAlertBody">
+        <div className="cotAlertTitle">{title}</div>
+        <div className="cotAlertText">{body}</div>
+      </div>
+      {onClose && (
+        <button type="button" className="cotAlertClose" onClick={onClose} aria-label="Cerrar alerta">×</button>
+      )}
     </div>
   );
 }

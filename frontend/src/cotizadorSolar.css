@@ -467,11 +467,12 @@
   background: rgba(176, 58, 34, 0.25);
 }
 
-/* Grid principal */
+/* Grid principal — 65% formulario / 35% panel resumen */
 .cotGrid {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 65fr 35fr;
   gap: 16px;
+  align-items: start;
 }
 
 .cotMain {
@@ -498,8 +499,8 @@
 }
 
 .cotCardHead {
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -508,18 +509,18 @@
 .cotCardHead h2 {
   margin: 0;
   color: #fff;
-  font-size: 14px;
-  opacity: 0.95;
+  font-size: 15px;
+  font-weight: 700;
 }
 .cotCardBody {
-  padding: 14px;
+  padding: 24px;
 }
 
 /* Campos */
 .cotTwoCol {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 16px;
 }
 
 .cotField {
@@ -529,30 +530,65 @@
 }
 
 .cotLabel {
-  color: #fff;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.cotLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cotCheckboxInline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: normal;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.cotCheckboxInline input {
+  accent-color: #f5c518;
+  width: 15px;
+  height: 15px;
+}
+
+.cotInlineWarning {
+  display: block;
+  margin-top: 4px;
   font-size: 12px;
-  opacity: 0.8;
+  color: #ff9f43;
 }
 
 /* Inputs del nuevo layout */
 .cotizador .cotCard input,
 .cotizador .cotCard select,
 .cotizador .cotCard textarea {
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #0f172a;
-  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
   margin-top: 0;
   margin-bottom: 0;
+}
+
+.cotizador .cotCard select option {
+  background-color: #1a1a2e;
+  color: #fff;
 }
 
 .cotizador .cotCard input:focus,
 .cotizador .cotCard select:focus,
 .cotizador .cotCard textarea:focus {
   outline: none;
-  border: 1px solid rgba(176, 58, 34, 0.8);
-  box-shadow: 0 0 0 2px rgba(176, 58, 34, 0.2);
+  border-color: #b03a22;
 }
 
 /* Hint */
@@ -586,7 +622,7 @@
 /* Actions */
 .cotActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
   padding-top: 6px;
 }
@@ -605,6 +641,8 @@
   color: #fff;
   border-color: rgba(176, 58, 34, 0.85);
   font-weight: 700;
+  padding: 14px 32px;
+  font-size: 16px;
 }
 
 .cotBtnPrimary:disabled {
@@ -647,14 +685,96 @@
   margin: 10px 0;
 }
 
-.cotTips {
-  margin: 0;
-  padding-left: 16px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 12px;
+/* ── Toggle "Ver resumen del cliente" (solo mobile) ── */
+.cotSummaryToggle {
+  display: none;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
 }
-.cotTips li {
-  margin: 8px 0;
+
+/* En desktop el resumen siempre está expandido */
+.cotSummaryCollapsible {
+  display: block;
+}
+
+/* ── Panel de alertas del asesor ── */
+.cotAlertsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cotAlertsPanelTitle {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.cotAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  animation: cotAlertFadeIn 300ms ease;
+}
+.cotAlertIcon {
+  font-size: 16px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.cotAlertBody {
+  flex: 1;
+  min-width: 0;
+}
+.cotAlertTitle {
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.cotAlertText {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.5;
+}
+.cotAlertClose {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.cotAlertYellow {
+  background: rgba(133, 100, 4, 0.35);
+  border: 1px solid #f5c518;
+}
+.cotAlertOrange {
+  background: rgba(154, 74, 4, 0.35);
+  border: 1px solid #ff8c00;
+}
+.cotAlertBlue {
+  background: rgba(13, 71, 161, 0.35);
+  border: 1px solid #2196f3;
+}
+
+@keyframes cotAlertFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* =========================================================
@@ -700,12 +820,46 @@
 /* =========================================================
    Responsivo
    ========================================================= */
-@media (max-width: 1050px) {
+/* ── Breakpoint mobile (< 768px): 1 sola columna, panel de resumen
+   arriba del formulario, toggle colapsable + alertas siempre visibles ── */
+@media (max-width: 768px) {
   .cotGrid {
     grid-template-columns: 1fr;
   }
   .cotTwoCol {
     grid-template-columns: 1fr;
+  }
+
+  .cotCardBody {
+    padding: 16px;
+  }
+
+  /* El panel de resumen + alertas pasa a ir ARRIBA del formulario */
+  .cotMain {
+    order: 2;
+  }
+  .cotSide {
+    order: 1;
+    position: static;
+    top: unset;
+  }
+
+  /* Toggle "Ver resumen del cliente" visible solo en mobile */
+  .cotSummaryToggle {
+    display: block;
+  }
+  .cotSummaryCollapsible {
+    display: none;
+  }
+  .cotSummaryCollapsible.isOpen {
+    display: block;
+  }
+
+  /* Botón calcular: ancho completo, más alto */
+  .cotBtnPrimary {
+    width: 100%;
+    height: 52px;
+    font-size: 16px;
   }
 }
 
@@ -746,12 +900,6 @@
   .cotTwoCol {
     grid-template-columns: 1fr;
     gap: 8px;
-  }
-
-  /* Sidebar: sin sticky en mobile, aparece al final ── */
-  .cotSide {
-    position: static;
-    top: unset;
   }
 
   /* ── Card head: botón auxiliar baja a nueva línea ── */
