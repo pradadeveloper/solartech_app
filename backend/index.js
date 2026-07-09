@@ -384,6 +384,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   const safe = (v) => (v == null || v === '' ? '-' : String(v));
   const cop = (v) => `$${Number(v || 0).toLocaleString('es-CO')}`;
+  const num2 = (v) => Number(v || 0).toFixed(2); // redondeo a 2 decimales (kWp / kW)
 
   function sectionHeader(title) {
     checkY(46);
@@ -510,13 +511,13 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   infoRow2('Correo electronico', safe(data.correo), 'Telefono', safe(data.telefono));
   infoRow2('Municipio / Ubicacion', safe(data.ubicacion), 'Ciudad solar', safe(data.ciudadSolar));
   infoRow2('Tipo de solicitud', safe(data.tipoSolicitud), 'Tipo de techo', safe(data.tipoTecho));
-  infoRow2('Recibe factura', safe(data.recibeFactura), 'Sistema de interes', safe(data.sistemaInteres));
+  infoRow2('Como nos conocio', safe(data.conociste), 'Sistema de interes', safe(data.sistemaInteres));
   gap(6);
 
   // 3. SISTEMA SOLAR
   sectionHeader('TU SISTEMA SOLAR');
-  infoRow2('Potencia del sistema', `${safe(resultados.kwp)} kWp`, 'Numero de paneles', `${safe(resultados.npaneles)} paneles`);
-  infoRow2('Numero de inversores', `${safe(resultados.ninversores)} und`, 'Potencia por panel', `${safe(resultados.potenciaPanel)} W`);
+  infoRow2('Potencia del sistema', `${num2(resultados.kwp)} kWp`, 'Numero de paneles', `${safe(resultados.npaneles)} paneles`);
+  infoRow2('Numero de inversores', `${safe(resultados.ninversores)} und`, 'Potencia AC inversor', `${num2(resultados.potenciaAC)} kW`);
   infoRow2('Generacion mensual', `${safe(resultados.generacionMes ?? resultados.produccionDeEnergia)} kWh/mes`, 'Cobertura del sistema', `${safe(resultados.porcentajeCoberturaProyecto)}%`);
   infoRow2('Consumo del cliente', `${safe(resultados.consumoKwh)} kWh/mes`, 'Area minima requerida', `${safe(resultados.areaMinima)} m2`);
   infoRow2('Area disponible declarada', `${safe(data.areaDisponible)} m2`, 'Radiacion solar local', `${safe(resultados.radiacionSolar)} kWh/m2/dia`);
@@ -548,7 +549,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= 14;
   const componentes = [
     `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi Solar)`,
-    `1 inversor capacidad aprox. ${resultados.kwp} kW (Huawei / Growatt / GoodWe)`,
+    `1 inversor capacidad aprox. ${num2(resultados.kwp)} kW (Huawei / Growatt / GoodWe)`,
     'Estructura de montaje (rieles, clamps, L-Foot y puesta a tierra)',
     'Cableado solar AC/DC, protecciones electricas y fusibles',
     'Instalacion, puesta en marcha y configuracion de monitoreo remoto',
