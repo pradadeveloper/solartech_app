@@ -69,6 +69,22 @@ const PORT = 4000;
 const montserratPath     = path.join(__dirname, "fonts", "Montserrat-Regular.ttf");
 const montserratBoldPath = path.join(__dirname, "fonts", "Montserrat-Bold.ttf");
 
+// Cache de buffers de imágenes de proyectos (leídos una sola vez al arrancar)
+const ASSETS_PATH = path.join(__dirname, 'public', 'assets');
+const PROYECTOS_BUFS = {};
+for (const [key, file] of [
+  ['caribeMotor',     'PROYECTO CARIBE MOTOR PDF.jpg'],
+  ['absorbentes',     'PROYECTO ABSORBENTES DE COLOMBIA PDF.jpg'],
+  ['saferAgro',       'PROYECTO SAFER AGROBIOLÓGICOS PDF.jpg'],
+  ['agricolasUnidas', 'PROYECTO AGRICOLAS UNIDAS PDF.jpg'],
+  ['naturalHarvest',  'PROYECTO NATURAL HARVEST PDF.jpg'],
+]) {
+  const ip = path.join(ASSETS_PATH, file);
+  if (fs.existsSync(ip)) {
+    try { PROYECTOS_BUFS[key] = fs.readFileSync(ip); } catch (_) {}
+  }
+}
+
 // ====== Middlewares ======
 app.use(cors());
 app.use(bodyParser.json());

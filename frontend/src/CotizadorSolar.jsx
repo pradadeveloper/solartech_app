@@ -87,6 +87,39 @@ export default function CotizadorSolar() {
     setDismissed((d) => ({ ...d, radiacion: false }));
   }, [formData.ciudadSolar]);
 
+  const fillRandomData = () => {
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+    const nombres = ["Juan Perez", "Maria Gomez", "Carlos Rodriguez", "Ana Martinez", "Luis Ramirez", "Laura Torres", "Andres Castro", "Sofia Vargas"];
+    const dominios = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com"];
+    const nombre = pick(nombres);
+    const correoUser = nombre.toLowerCase().replace(/\s+/g, ".");
+
+    const depto = departamentos.length ? pick(departamentos) : null;
+    const municipio = depto && depto.municipios.length ? pick(depto.municipios) : null;
+    const radiacion = municipio?.radiacion ?? depto?.radiacion ?? "";
+
+    setFormData((prev) => ({
+      ...prev,
+      nombre,
+      identificacion: String(rand(10000000, 1999999999)),
+      correo: `${correoUser}${rand(1, 99)}@${pick(dominios)}`,
+      telefono: `3${rand(100000000, 199999999)}`,
+      departamentoSolar: depto ? depto.nombre : "",
+      ciudadSolar: municipio ? municipio.nombre : "",
+      ubicacion: municipio ? municipio.nombre : "",
+      radiacionSolar: radiacion !== "" ? String(radiacion) : "",
+      tipoSolicitud: pick(["Hogar", "Comercial", "Empresa", "Gran Escala"]),
+      consumoKwh: String(rand(200, 2500)),
+      costoKwh: String(rand(600, 1100)),
+      areaDisponible: String(rand(40, 500)),
+      tipoTecho: pick(["Standing Seam", "Termoacústica", "Teja de barro", "Manto Asfáltico", "Teja Eternit", "Losa"]),
+      sistemaInteres: pick(["Interconectado", "Aislado", "Híbrido"]),
+      conociste: pick(["Instagram", "Facebook", "LinkedIn", "Google", "Referido"]),
+    }));
+  };
+
   const checkCedula = async () => {
     const cedula = formData.identificacion.trim();
     if (!cedula) return;
@@ -194,10 +227,18 @@ export default function CotizadorSolar() {
       <div className="cotizadorShell">
         {/* Header */}
         <header className="cotHeader">
-          <img src={logo} alt="Logo Solartech" className="cotLogo" />
-          <div className="cotHeaderText">
-            <h1 className="cotTitle">Nuevo Cliente — Cotizador Solar</h1>
-            <p className="cotSubtitle">Completa los datos y genera la cotización en segundos.</p>
+          <div className="cotBrand">
+            <img src={logo} alt="Logo Solartech" className="cotLogo" />
+            <div className="cotHeaderText">
+              <h1 className="cotTitle">Nuevo Cliente — Cotizador Solar</h1>
+              <p className="cotSubtitle">Completa los datos y genera la cotización en segundos.</p>
+            </div>
+          </div>
+
+          <div className="cotHeaderRight">
+            <button type="button" className="cotBtnRandom" onClick={fillRandomData} title="Llenar el formulario con datos de prueba">
+              🎲 Datos aleatorios
+            </button>
           </div>
         </header>
 
@@ -295,20 +336,7 @@ export default function CotizadorSolar() {
                   <FormattedInput name="consumoKwh" value={formData.consumoKwh} onChange={handleChange} suffix="kWh/mes" required />
                 </Field>
 
-                <Field label={
-                  <span className="cotLabelRow">
-                    Costo kWh (COP)
-                    <label className="cotCheckboxInline">
-                      <input
-                        type="checkbox"
-                        name="contribucion"
-                        checked={formData.contribucion}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, contribucion: e.target.checked }))}
-                      />
-                      Contribución
-                    </label>
-                  </span>
-                }>
+                <Field label="Costo kWh (COP)">
                   <FormattedInput name="costoKwh" value={formData.costoKwh} onChange={handleChange} prefix="$" required />
                 </Field>
 
@@ -319,6 +347,18 @@ export default function CotizadorSolar() {
                       Se necesitan {areaMinima} m² para cubrir el 100%. Tienes {formData.areaDisponible} m².
                     </span>
                   )}
+                </Field>
+
+                <Field label="¿Aplica contribución?">
+                  <label className="cotCheckField">
+                    <input
+                      type="checkbox"
+                      name="contribucion"
+                      checked={formData.contribucion}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, contribucion: e.target.checked }))}
+                    />
+                    <span>Contribución</span>
+                  </label>
                 </Field>
               </div>
             </Card>
