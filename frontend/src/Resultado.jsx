@@ -1,26 +1,12 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import logo from "./assets/logo_solartech.webp";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import "./cotizadorSolar.css"; // usa tu misma hoja
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
 } from "recharts";
-import { useCalculadora, CALC_DEFAULTS } from "./hooks/useCalculadora";
-
-const TIPOS_TECHO = ["Standing Seam", "Termoacústica", "Teja de barro", "Manto Asfáltico", "Teja Eternit", "Madera", "Zinc", "Suelo", "Losa"];
-const TIPOS_SISTEMA = ["Interconectado", "Aislado", "Híbrido"];
-const CAMPOS_VARIABLES_EDITABLES = ["consumoKwh", "costoKwh", "areaM2", "radiacion", "costoKwp", "tipoSistema", "tipoTecho", "ivaPct", "anticipo1Pct", "descuentoRenta"];
-
-const ESTADOS = ["Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado", "Perdido"];
-const ESTADO_BADGE = {
-  "Nuevo":          { bg: "rgba(52,152,219,.18)", color: "#3498db" },
-  "En negociación": { bg: "rgba(243,156,18,.18)",  color: "#f39c12" },
-  "Cotizado":       { bg: "rgba(155,89,182,.18)",  color: "#9b59b6" },
-  "Enviado":        { bg: "rgba(26,188,156,.18)",  color: "#1abc9c" },
-  "Cerrado":        { bg: "rgba(46,204,113,.18)",  color: "#2ecc71" },
-  "Perdido":        { bg: "rgba(231,76,60,.18)",   color: "#e74c3c" },
-};
+import { CALC_DEFAULTS } from "./hooks/useCalculadora";
 
 // ── Replica las fórmulas del backend (formulas.js) para el comparador ──
 // Las mismas fórmulas que el servidor: sin PR en generación, excedentes CREG, FLOOR en paneles.
@@ -164,7 +150,6 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
 }
 
 export default function Resultado() {
-  const [mostrarModal, setMostrarModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { resultado } = location.state || {};
@@ -176,85 +161,26 @@ export default function Resultado() {
   const [versiones, setVersiones] = useState([]);
   const [linkVersionCopiado, setLinkVersionCopiado] = useState(null);
   const [generandoPdfVersion, setGenerandoPdfVersion] = useState(null);
-  const [estadoActual, setEstadoActual] = useState(() => resultado?.estado ?? "Nuevo");
-  const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [guardandoPropuesta, setGuardandoPropuesta] = useState(null); // idx de la opción en progreso
   const [propuestaGuardada, setPropuestaGuardada] = useState(null);   // { propuestaId, pdfUrl, shareUrl }
 
-  // ── Panel "Variables del proyecto" — editable en vivo, recalcula con useCalculadora ──
-  const [variables, setVariables] = useState(() => ({
-    consumoKwh: resultado?.consumoKwh ?? "",
-    costoKwh: resultado?.costoKwh ?? "",
-    areaM2: resultado?.areaDisponible ?? "",
-    radiacion: resultado?.radiacionSolar ?? CALC_DEFAULTS.radiacionSolar,
-    costoKwp: resultado?.costokwpproyecto ?? CALC_DEFAULTS.costokWp,
-    tipoSistema: resultado?.sistemaInteres ?? "Interconectado",
-    tipoTecho: resultado?.tipoTecho ?? "",
-    ivaPct: CALC_DEFAULTS.ivaPct,
-    descuentoRenta: CALC_DEFAULTS.descuentoRentaPct,
-    anticipo1Pct: resultado?.porcentajeAnticipo ?? CALC_DEFAULTS.anticipo1Pct,
-    anticipo2Pct: resultado?.porcentajeEntregaMateriales ?? CALC_DEFAULTS.anticipo2Pct,
-    anticipo3Pct: resultado?.porcentajeRetie ?? CALC_DEFAULTS.anticipo3Pct,
-    potenciaPanel: CALC_DEFAULTS.potenciaPanel,
-    margenCobertura: CALC_DEFAULTS.margenCobertura,
-    capacidadInversor: CALC_DEFAULTS.capacidadInversor,
-    longitudRiel: CALC_DEFAULTS.longitudRiel,
-    cableSolar: CALC_DEFAULTS.cableSolar,
-    sobredimension: CALC_DEFAULTS.sobredimension,
-    maxAC100kWp: CALC_DEFAULTS.maxAC100kWp,
-    mantenimientoKwp: CALC_DEFAULTS.mantenimientoKwp,
-    inflacion: CALC_DEFAULTS.inflacion,
-    factorCO2: CALC_DEFAULTS.factorCO2,
-    factorArboles: CALC_DEFAULTS.factorArboles,
-    factorGalones: CALC_DEFAULTS.factorGalones,
-    factorAreaM2PorKwp: CALC_DEFAULTS.factorAreaM2PorKwp,
-    costoGeneracion: CALC_DEFAULTS.costoGeneracion,
-    costoComercializacion: CALC_DEFAULTS.costoComercializacion,
-    contribucion: resultado?.contribucion ?? false,
-  }));
-  const variablesOriginales = useRef(variables);
-  const cfgAplicadoRef = useRef(false);
-  const [variablesPanelOpen, setVariablesPanelOpen] = useState(false);
-
-  const resultadosLive = useCalculadora(variables);
-
-  const variablesModificadas = useMemo(
-    () => CAMPOS_VARIABLES_EDITABLES.filter(
-      (k) => String(variables[k]) !== String(variablesOriginales.current[k])
-    ),
-    [variables]
-  );
-
-  const handleVariableChange = (campo, nuevoValor) => {
-    setVariables((prev) => ({ ...prev, [campo]: nuevoValor }));
-  };
-
-  const restaurarVariables = () => setVariables(variablesOriginales.current);
-
-  const cambiarEstado = async (nuevoEstado) => {
-    const anterior = estadoActual;
-    setEstadoActual(nuevoEstado);
-    if (!resultado?.numeroCotizacion) return;
-    setCambiandoEstado(true);
-    try {
-      await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${resultado.numeroCotizacion}/estado`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado: nuevoEstado }),
-      });
-    } catch (e) {
-      setEstadoActual(anterior);
-      alert("No se pudo actualizar el estado");
-    } finally {
-      setCambiandoEstado(false);
-    }
-  };
-
-  const [opciones, setOpciones] = useState(() => resultado ? [
-    { label: "Opción A", kwp: String(resultado.kwp ?? ""), costokWp: "4200000" },
-    { label: "Opción B", kwp: "", costokWp: "4200000" },
-    { label: "Opción C", kwp: "", costokWp: "4200000" },
-  ] : []);
+  // ── Comparador: cada opción (A/B/C) tiene sus propias 6 variables editables ──
+  // Todos los resultados de la opción se recalculan a partir de estas variables.
+  const [opciones, setOpciones] = useState(() => {
+    if (!resultado) return [];
+    const base = {
+      costokWp: String(resultado.costokwpproyecto || CALC_DEFAULTS.costokWp),
+      consumoKwh: String(resultado.consumoKwh ?? ""),
+      costoKwh: String(resultado.costoKwh ?? ""),
+      areaM2: String(resultado.areaDisponible ?? ""),
+      radiacion: String(resultado.radiacionSolar ?? CALC_DEFAULTS.radiacionSolar),
+    };
+    return [
+      { label: "Opción A", kwp: String(resultado.kwp ?? ""), ...base },
+      { label: "Opción B", kwp: "", ...base },
+      { label: "Opción C", kwp: "", ...base },
+    ];
+  });
 
   useEffect(() => {
     fetch(`${process.env.REACT_APP_API_URL}/api/config`)
@@ -265,37 +191,6 @@ export default function Resultado() {
           setOpciones((prev) =>
             prev.map((op) => ({ ...op, costokWp: String(data.costokWp) }))
           );
-        }
-
-        // Completa las variables editables con los valores de configuración (una sola vez).
-        // Después de esto queda fijada la línea base para "variable modificada".
-        if (!cfgAplicadoRef.current) {
-          cfgAplicadoRef.current = true;
-          setVariables((prev) => {
-            const next = {
-              ...prev,
-              ivaPct: data.ivaPct ?? prev.ivaPct,
-              descuentoRenta: data.descuentoRentaPct ?? prev.descuentoRenta,
-              potenciaPanel: data.potenciaPanel ?? prev.potenciaPanel,
-              margenCobertura: data.margenCobertura ?? prev.margenCobertura,
-              capacidadInversor: data.capacidadInversor ?? prev.capacidadInversor,
-              longitudRiel: data.longitudRiel ?? prev.longitudRiel,
-              cableSolar: data.cableSolar ?? prev.cableSolar,
-              sobredimension: data.sobredimension ?? prev.sobredimension,
-              maxAC100kWp: data.maxAC100kWp ?? prev.maxAC100kWp,
-              mantenimientoKwp: data.mantenimientoKwp ?? prev.mantenimientoKwp,
-              inflacion: data.inflacion ?? prev.inflacion,
-              factorCO2: data.factorCO2 ?? prev.factorCO2,
-              factorArboles: data.factorArboles ?? prev.factorArboles,
-              factorGalones: data.factorGalones ?? prev.factorGalones,
-              factorAreaM2PorKwp: data.factorAreaM2PorKwp ?? prev.factorAreaM2PorKwp,
-              costoGeneracion: data.costoGeneracion ?? prev.costoGeneracion,
-              costoComercializacion: data.costoComercializacion ?? prev.costoComercializacion,
-              costoKwp: prev.costoKwp || data.costokWp || CALC_DEFAULTS.costokWp,
-            };
-            variablesOriginales.current = next;
-            return next;
-          });
         }
       })
       .catch(() => {});
@@ -391,14 +286,16 @@ export default function Resultado() {
     }
   };
 
-  // Las opciones A/B/C también reflejan las variables editadas en el panel
-  // "Variables del proyecto" (consumo, costo kWh, radiación, área).
+  // Cada opción A/B/C se calcula con sus propias 6 variables editables:
+  // kWp, costo base por kWp, consumo, costo kWh, área y radiación.
   const calculos = opciones.map((op) =>
-    op.kwp ? calcularLocal(op.kwp, variables.costoKwh, op.costokWp, {
-      ...cfg, ...resultado, ...variables,
-      consumoKwh: variables.consumoKwh,
-      radiacionSolar: variables.radiacion,
-      areaDisponible: variables.areaM2,
+    op.kwp ? calcularLocal(op.kwp, op.costoKwh, op.costokWp, {
+      ...cfg, ...resultado,
+      consumoKwh: op.consumoKwh,
+      costoKwh: op.costoKwh,
+      radiacionSolar: op.radiacion,
+      areaDisponible: op.areaM2,
+      contribucion: resultado?.contribucion,
     }) : null
   );
 
@@ -432,32 +329,6 @@ export default function Resultado() {
   };
 
   const fechaPropuesta = useMemo(() => new Date().toLocaleDateString("es-CO"), []);
-
-  const styles = {
-    modalOverlay: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      backgroundColor: "rgba(0,0,0,0.65)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 999,
-      padding: "16px",
-    },
-    modalContent: {
-      backgroundColor: "#fff",
-      padding: "18px",
-      borderRadius: "14px",
-      maxWidth: "860px",
-      width: "100%",
-      boxShadow: "0 10px 25px rgba(0,0,0,0.35)",
-      maxHeight: "80vh",
-      overflow: "auto",
-    },
-  };
 
   if (!resultado) {
     return (
@@ -499,19 +370,6 @@ export default function Resultado() {
           </div>
         </header>
 
-        {/* ── Acciones: vista interna del asesor. Descargar PDF y Compartir link
-             viven SOLO después de guardar una opción (modal + /propuesta/:id) ── */}
-        <div className="cotActionsBar">
-          <div className="cotActionsGroup">
-            <span className="cotActionsLabel">Estado</span>
-            <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} />
-          </div>
-
-          <button className="cotBtn cotBtnGhost" onClick={() => navigate("/cliente")}>
-            + Nueva cotización
-          </button>
-        </div>
-
         {/* KPIs clave: visibles en todos los tamaños de pantalla */}
         <div className="mobileHero">
           <div className="mobileHeroItem">
@@ -538,11 +396,6 @@ export default function Resultado() {
             <span className="mobileHeroLabel">N° paneles</span>
             <span className="mobileHeroValue">{resultadoActivo?.npaneles ?? '—'}</span>
           </div>
-        </div>
-
-        {/* Barra de acciones fija — solo mobile (< 768px) */}
-        <div className="cotStickyMobileBar">
-          <EstadoSelect value={estadoActual} disabled={cambiandoEstado} onChange={cambiarEstado} compact />
         </div>
 
         {/* Intro */}
@@ -653,7 +506,8 @@ export default function Resultado() {
               }
             >
               <p style={{ margin: '0 0 14px', opacity: 0.8, fontSize: '0.85rem' }}>
-                Edita el kWp y el costo por kWp de cada opción para comparar escenarios. Marca la opción a enviar al cliente.
+                Edita las variables de cada opción (kWp, costo por kWp, consumo, costo kWh, área y radiación)
+                para comparar escenarios. Marca la opción a enviar al cliente.
               </p>
 
               {/* Inputs de cada opción */}
@@ -680,33 +534,12 @@ export default function Resultado() {
                       )}
                     </div>
 
-                    <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>kWp del sistema</label>
-                    <input
-                      type="number"
-                      value={op.kwp}
-                      placeholder="Ej: 11"
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => actualizarOpcion(idx, 'kwp', e.target.value)}
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        background: '#fff', border: '1px solid #dedede',
-                        borderRadius: 6, padding: '6px 10px', color: '#1a1a1a', fontSize: '0.9rem',
-                        marginBottom: 8,
-                      }}
-                    />
-                    <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>Costo base por kWp ($)</label>
-                    <input
-                      type="number"
-                      value={op.costokWp}
-                      placeholder="Ej: 3500000"
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => actualizarOpcion(idx, 'costokWp', e.target.value)}
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        background: '#fff', border: '1px solid #dedede',
-                        borderRadius: 6, padding: '6px 10px', color: '#1a1a1a', fontSize: '0.9rem',
-                      }}
-                    />
+                    <OpInput label="kWp del sistema" value={op.kwp} placeholder="Ej: 11" step="0.01" onChange={(v) => actualizarOpcion(idx, 'kwp', v)} />
+                    <OpInput label="Costo base por kWp ($)" value={op.costokWp} placeholder="Ej: 4500000" onChange={(v) => actualizarOpcion(idx, 'costokWp', v)} />
+                    <OpInput label="Consumo kWh/mes" value={op.consumoKwh} placeholder="Ej: 210" onChange={(v) => actualizarOpcion(idx, 'consumoKwh', v)} />
+                    <OpInput label="Costo kWh (COP)" value={op.costoKwh} placeholder="Ej: 880" onChange={(v) => actualizarOpcion(idx, 'costoKwh', v)} />
+                    <OpInput label="Área disponible (m²)" value={op.areaM2} placeholder="Ej: 247" onChange={(v) => actualizarOpcion(idx, 'areaM2', v)} />
+                    <OpInput label="Radiación solar (kWh/m²/día)" value={op.radiacion} placeholder="Ej: 3.8" step="0.1" onChange={(v) => actualizarOpcion(idx, 'radiacion', v)} />
 
                     {calculos[idx] ? (
                       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -715,6 +548,7 @@ export default function Resultado() {
                         <OpRow label="Cobertura factura" value={`${calculos[idx].porcentajeCoberturaProyecto}%`} accent />
                         <OpRow label="Paneles" value={calculos[idx].npaneles} />
                         <OpRow label="Inversores" value={calculos[idx].ninversores} />
+                        <OpRow label="Área disponible" value={`${op.areaM2 || '—'} m²`} />
                         <OpRow label="Área mínima" value={`${calculos[idx].areaMinima} m²`} />
                         <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                         <OpRow label="Inversión + IVA" value={`$${calculos[idx].costoProyectoMasIva.toLocaleString('es-CO')}`} accent />
@@ -754,8 +588,12 @@ export default function Resultado() {
                       {[
                         { label: 'kWp instalado', key: 'kwp' },
                         { label: 'Consumo real', key: 'consumoKwh' },
+                        { label: 'Costo kWh', key: 'costoKwh', fmt: true },
+                        { label: 'Radiación solar', key: 'radiacionSolar' },
                         { label: 'Generación mensual', key: 'generacionMes' },
+                        { label: 'Cobertura factura (%)', key: 'porcentajeCoberturaProyecto' },
                         { label: 'N° Paneles', key: 'npaneles' },
+                        { label: 'Área mínima (m²)', key: 'areaMinima' },
                         { label: 'Inversión + IVA', key: 'costoProyectoMasIva', fmt: true },
                         { label: 'Ahorro mensual', key: 'ahorroMensual', fmt: true },
                         { label: 'Ahorro anual', key: 'ahorroAnual', fmt: true },
@@ -779,15 +617,6 @@ export default function Resultado() {
             {/* PROPUESTA ECONÓMICA */}
             <Card
               title="Propuesta económica"
-              right={
-                <button
-                  type="button"
-                  className="cotBtn cotBtnGhost"
-                  onClick={() => setMostrarModal(true)}
-                >
-                  Detalle de los equipos
-                </button>
-              }
             >
               <div className="tableWrap">
                 <table className="table">
@@ -798,10 +627,8 @@ export default function Resultado() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.cantidadPaneles ?? resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Inversor {resultadoActivo.potenciaAC != null ? `${resultadoActivo.potenciaAC} kW` : ""}</td><td className="num">{resultadoActivo.cantidadInversores ?? resultadoActivo.ninversores}</td></tr>
-                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1</td></tr>
-                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1</td></tr>
+                    <tr><td>Paneles</td><td className="num">{resultadoActivo.cantidadPaneles ?? resultadoActivo.npaneles}</td></tr>
+                    <tr><td>Inversor</td><td className="num">1</td></tr>
                     <tr><td>Diseño e ingeniería</td><td className="num">{resultadoActivo.cantidadDisenoIngenieria ?? 1}</td></tr>
                     <tr><td>Certificado RETIE</td><td className="num">{resultadoActivo.cantidadCertificadoRetie ?? 1}</td></tr>
                     {(resultadoActivo.cantidadEstudioConexion ?? 0) > 0 && (
@@ -970,117 +797,45 @@ export default function Resultado() {
 
           {/* Right: Side summary */}
           <aside className="cotSide">
-            <Card
-              title="Variables del proyecto"
-              right={variablesModificadas.length > 0 && (
-                <span className="varBadge">
-                  ⚡ {variablesModificadas.length} variable{variablesModificadas.length !== 1 ? "s" : ""} modificada{variablesModificadas.length !== 1 ? "s" : ""}
-                </span>
-              )}
+            <button
+              type="button"
+              className="cotBtn cotBtnGhost"
+              style={{ width: "100%", marginBottom: 12, justifyContent: "center" }}
+              onClick={() => navigate("/cliente")}
             >
-              <button
-                type="button"
-                className="varPanelToggle"
-                onClick={() => setVariablesPanelOpen((o) => !o)}
-                aria-expanded={variablesPanelOpen}
-              >
-                Variables del proyecto ⚡ {variablesPanelOpen ? "Cerrar" : "Editar"}
-              </button>
+              + Nueva cotización
+            </button>
 
-              <div className={`varPanelBody${variablesPanelOpen ? " isOpen" : ""}`}>
-                {/* Sección 1 — datos del cliente (readonly) */}
-                <div className="varSectionTitle">Datos del cliente</div>
-                <SummaryRow label="Cotización" value={`N-${resultado.numeroCotizacion}`} />
-                <SummaryRow label="Cliente" value={resultado.nombre} />
-                <SummaryRow label="Ciudad" value={resultado.ubicacion} />
-                <SummaryRow
-                  label="Asesor"
-                  value={resultado.vendedor || [localStorage.getItem("nombreUsuario"), localStorage.getItem("apellidoUsuario")].filter(Boolean).join(" ") || "—"}
-                />
+            <Card title="Variables del proyecto">
+              {/* Datos del cliente (readonly) */}
+              <div className="varSectionTitle">Datos del cliente</div>
+              <SummaryRow label="Cotización" value={`N-${resultado.numeroCotizacion}`} />
+              <SummaryRow label="Cliente" value={resultado.nombre} />
+              <SummaryRow label="Ciudad" value={resultado.ubicacion} />
+              <SummaryRow
+                label="Asesor"
+                value={resultado.vendedor || [localStorage.getItem("nombreUsuario"), localStorage.getItem("apellidoUsuario")].filter(Boolean).join(" ") || "—"}
+              />
 
-                <div className="cotDivider" />
+              <div className="cotDivider" />
 
-                {/* Sección 2 — variables editables */}
-                <div className="varSectionTitle">Consumo</div>
-                <EditableField
-                  label="Consumo kWh/mes" unit="kWh/mes" value={variables.consumoKwh}
-                  changed={variablesModificadas.includes("consumoKwh")}
-                  onChange={(v) => handleVariableChange("consumoKwh", v)}
-                />
-                <EditableField
-                  label="Costo kWh (COP)" prefix="$" value={variables.costoKwh}
-                  changed={variablesModificadas.includes("costoKwh")}
-                  onChange={(v) => handleVariableChange("costoKwh", v)}
-                />
-                <EditableField
-                  label="Área disponible" unit="m²" value={variables.areaM2}
-                  changed={variablesModificadas.includes("areaM2")}
-                  onChange={(v) => handleVariableChange("areaM2", v)}
-                />
-
-                <div className="varSectionTitle">Sistema</div>
-                <EditableField
-                  label="Radiación solar" unit="kWh/m²/día" step="0.1" value={variables.radiacion}
-                  changed={variablesModificadas.includes("radiacion")}
-                  onChange={(v) => handleVariableChange("radiacion", v)}
-                />
-                <EditableField
-                  label="Costo x kWp ($)" prefix="$" value={variables.costoKwp}
-                  changed={variablesModificadas.includes("costoKwp")}
-                  onChange={(v) => handleVariableChange("costoKwp", v)}
-                />
-                <EditableField
-                  label="Tipo de sistema" type="select" options={TIPOS_SISTEMA} value={variables.tipoSistema}
-                  changed={variablesModificadas.includes("tipoSistema")}
-                  onChange={(v) => handleVariableChange("tipoSistema", v)}
-                />
-                <EditableField
-                  label="Tipo de techo" type="select" options={TIPOS_TECHO} value={variables.tipoTecho}
-                  changed={variablesModificadas.includes("tipoTecho")}
-                  onChange={(v) => handleVariableChange("tipoTecho", v)}
-                />
-
-                <div className="varSectionTitle">Financiero</div>
-                <EditableField
-                  label="IVA (%)" unit="%" value={variables.ivaPct}
-                  changed={variablesModificadas.includes("ivaPct")}
-                  onChange={(v) => handleVariableChange("ivaPct", v)}
-                />
-                <EditableField
-                  label="Anticipo 1 (%)" unit="%" value={variables.anticipo1Pct}
-                  changed={variablesModificadas.includes("anticipo1Pct")}
-                  onChange={(v) => handleVariableChange("anticipo1Pct", v)}
-                />
-                <EditableField
-                  label="Descuento renta (%)" unit="%" value={variables.descuentoRenta}
-                  changed={variablesModificadas.includes("descuentoRenta")}
-                  onChange={(v) => handleVariableChange("descuentoRenta", v)}
-                />
-
-                {variablesModificadas.length > 0 && (
-                  <button type="button" className="cotBtn cotBtnGhost" style={{ width: "100%", marginTop: 10 }} onClick={restaurarVariables}>
-                    Restaurar valores originales
-                  </button>
-                )}
-
-                <div className="cotDivider" />
-
-                {/* Sección 3 — resultados calculados (readonly, en vivo) */}
-                <div className="varSectionTitle">Resultados calculados</div>
-                <SummaryRow label="Potencia DC" value={`${resultadosLive?.kwp ?? "—"} kWp`} />
-                <SummaryRow label="Potencia AC" value={`${resultadosLive?.potenciaAC ?? "—"} kW`} />
-                <SummaryRow label="N° paneles" value={`${resultadosLive?.npaneles ?? "—"} und`} />
-                <SummaryRow label="N° inversores" value={`${resultadosLive?.ninversores ?? "—"} und`} />
-                <SummaryRow label="Generación mensual" value={`${money(resultadosLive?.generacionMes)} kWh/mes`} />
-                <SummaryRow label="Cobertura factura" value={`${resultadosLive?.porcentajeCoberturaProyecto ?? "—"}%`} />
-                <SummaryRow label="Autoconsumo / Excedentes" value={`${resultadosLive?.porcentajeAhorro ?? "—"}% / ${resultadosLive?.porcentajeVenta ?? "—"}%`} />
-                <SummaryRow label="Inversión total" value={`$ ${money(resultadosLive?.costoProyectoMasIva)}`} />
-                <SummaryRow label="$/kWp" value={`$ ${money(resultadosLive?.valorKwp)}`} />
-                <SummaryRow label="Ahorro mensual" value={`$ ${money(resultadosLive?.ahorroMensual)}`} />
-                <SummaryRow label="Ahorro anual" value={`$ ${money(resultadosLive?.ahorroAnual)}`} />
-                <SummaryRow label="Retorno de inversión" value={`${resultadosLive?.tiempoRetorno ?? "—"} años`} />
-                <SummaryRow label="TIR 10 años" value={`${resultadosLive?.tir10Anos ?? "—"}%`} />
+              {/* Resultados de la opción seleccionada en el comparador */}
+              <div className="varSectionTitle">
+                Resultados — {opciones[opcionSeleccionada]?.label ?? "Opción A"}
               </div>
+              <SummaryRow label="Potencia DC" value={`${chartData?.kwp ?? "—"} kWp`} />
+              <SummaryRow label="Potencia AC" value={`${chartData?.potenciaAC ?? "—"} kW`} />
+              <SummaryRow label="N° paneles" value={`${chartData?.npaneles ?? "—"} und`} />
+              <SummaryRow label="N° inversores" value={`${chartData?.ninversores ?? "—"} und`} />
+              <SummaryRow label="Generación mensual" value={`${money(chartData?.generacionMes)} kWh/mes`} />
+              <SummaryRow label="Cobertura factura" value={`${chartData?.porcentajeCoberturaProyecto ?? "—"}%`} />
+              <SummaryRow label="Autoconsumo / Excedentes" value={`${chartData?.porcentajeAhorro ?? "—"}% / ${chartData?.porcentajeVenta ?? "—"}%`} />
+              <SummaryRow label="Inversión total" value={`$ ${money(chartData?.costoProyectoMasIva)}`} />
+              <SummaryRow label="$/kWp" value={`$ ${money(chartData?.valorKwp ?? chartData?.costokwpproyecto)}`} />
+              <SummaryRow label="Ahorro mensual" value={`$ ${money(chartData?.ahorroMensual)}`} />
+              <SummaryRow label="Ahorro anual" value={`$ ${money(chartData?.ahorroAnual)}`} />
+              <SummaryRow label="Retorno de inversión" value={`${chartData?.tiempoRetorno ?? "—"} años`} />
+              <SummaryRow label="TIR 10 años" value={`${chartData?.tir10Anos ?? "—"}%`} />
             </Card>
 
             {versiones.length > 0 && (
@@ -1130,41 +885,6 @@ export default function Resultado() {
           </aside>
         </div>
 
-        {/* MODAL DETALLE EQUIPOS */}
-        {mostrarModal && (
-          <div style={styles.modalOverlay} onClick={() => setMostrarModal(false)}>
-            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <h3 className="title" style={{ marginTop: 0 }}>Detalle de equipos</h3>
-
-              <div className="tableWrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Equipo</th>
-                      <th className="num">Cantidad</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>Paneles {resultadoActivo.potenciaPanel}W</td><td className="num">{resultadoActivo.npaneles}</td></tr>
-                    <tr><td>Inversor {resultadoActivo.potenciaAC != null ? `${resultadoActivo.potenciaAC} kW` : ""}</td><td className="num">{resultadoActivo.ninversores ?? 1}</td></tr>
-                    <tr><td>Riel 47</td><td className="num">{resultadoActivo.riel47}</td></tr>
-                    <tr><td>Mid Clamp</td><td className="num">{resultadoActivo.midCland}</td></tr>
-                    <tr><td>End Clamp</td><td className="num">{resultadoActivo.endCland}</td></tr>
-                    <tr><td>L-Foot</td><td className="num">{resultadoActivo.lFoot}</td></tr>
-                    <tr><td>Grounding Loop</td><td className="num">{resultadoActivo.groundingLoop}</td></tr>
-                    <tr><td>Cable solar</td><td className="num">{resultadoActivo.cableSolar}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="cotActions" style={{ marginTop: 14 }}>
-                <button className="cotBtn cotBtnPrimary" onClick={() => setMostrarModal(false)}>
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* MODAL: propuesta guardada — único lugar donde se ve el link público */}
         {propuestaGuardada && (
@@ -1407,31 +1127,6 @@ function ChartStat({ icon, label, value }) {
 
 /* ---------- mini componentes UI (mismo estilo del cotizador) ---------- */
 
-function EstadoSelect({ value, onChange, disabled, compact }) {
-  const badge = ESTADO_BADGE[value] ?? ESTADO_BADGE["Nuevo"];
-  return (
-    <select
-      className="estadoSelect"
-      aria-label="Cambiar estado"
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        background: badge.bg,
-        color: badge.color,
-        border: `1px solid ${badge.color}`,
-        borderRadius: 20,
-        padding: compact ? "6px 10px" : "8px 16px",
-        fontSize: compact ? "0.8rem" : "0.85rem",
-        fontWeight: 700,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-    >
-      {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
-    </select>
-  );
-}
-
 function PropuestaGuardadaModal({ data, onClose, onVolverDashboard }) {
   const [copiado, setCopiado] = useState(false);
   const { propuestaId, pdfUrl, shareUrl } = data;
@@ -1524,66 +1219,6 @@ function SummaryRow({ label, value }) {
   );
 }
 
-// ── Campo editable en línea (lápiz ✏️) del panel "Variables del proyecto" ──
-function EditableField({ label, value, unit, prefix, type = "number", options, step, changed, onChange }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  const empezarEdicion = () => { setDraft(value); setEditing(true); };
-
-  const guardar = (nuevoValor) => {
-    onChange(nuevoValor ?? draft);
-    setEditing(false);
-  };
-
-  const unitDisplay = unit === "%" ? "%" : unit ? ` ${unit}` : "";
-  const displayValue = type === "select"
-    ? (value || "—")
-    : `${prefix ?? ""}${Number.isFinite(Number(value)) ? Number(value).toLocaleString("es-CO") : (value ?? "—")}${unitDisplay}`;
-
-  return (
-    <div className={`editable-field${editing ? " editing" : ""}`}>
-      <span className="field-label">{label}</span>
-      <div className="field-value-row">
-        {editing ? (
-          type === "select" ? (
-            <select
-              autoFocus
-              className="field-input"
-              value={draft}
-              onChange={(e) => { setDraft(e.target.value); guardar(e.target.value); }}
-              onBlur={() => guardar()}
-            >
-              {options.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          ) : (
-            <>
-              <input
-                type="number"
-                step={step}
-                autoFocus
-                className="field-input"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                onBlur={() => guardar()}
-                onKeyDown={(e) => { if (e.key === "Enter") guardar(); }}
-              />
-              {unit && <span className="field-unit">{unit}</span>}
-              <button type="button" className="save-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => guardar()} title="Guardar">✓</button>
-            </>
-          )
-        ) : (
-          <>
-            <span className={`field-value${changed ? " field-value--changed" : ""}`}>{displayValue}</span>
-            <button type="button" className="edit-btn" onClick={empezarEdicion} title="Editar">✏️</button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Metric({ label, value, isGreen }) {
   return (
     <div className="pgenerales" style={{ margin: 0 }}>
@@ -1603,6 +1238,29 @@ function OpRow({ label, value, accent }) {
       <span style={{ color: '#5a5a5a' }}>{label}</span>
       <b style={{ color: accent ? '#b03a22' : '#1a1a1a' }}>{value ?? '—'}</b>
     </div>
+  );
+}
+
+// Input editable de una variable dentro de la tarjeta de cada opción (A/B/C)
+function OpInput({ label, value, onChange, placeholder, step }) {
+  return (
+    <>
+      <label style={{ fontSize: '0.75rem', color: '#5a5a5a', display: 'block', marginBottom: 4 }}>{label}</label>
+      <input
+        type="number"
+        step={step}
+        value={value}
+        placeholder={placeholder}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          background: '#fff', border: '1px solid #dedede',
+          borderRadius: 6, padding: '6px 10px', color: '#1a1a1a', fontSize: '0.9rem',
+          marginBottom: 8,
+        }}
+      />
+    </>
   );
 }
 
