@@ -1155,9 +1155,25 @@ function PropuestaGuardadaModal({ data, onClose, onVolverDashboard }) {
       zIndex: 999, padding: 16,
     }}>
       <div style={{
+        position: 'relative',
         background: '#fff', borderRadius: 16, padding: 26, maxWidth: 440, width: '100%',
         boxShadow: '0 10px 25px rgba(0,0,0,0.35)', textAlign: 'center',
       }}>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          title="Cerrar"
+          style={{
+            position: 'absolute', top: 12, right: 12,
+            width: 30, height: 30, borderRadius: '50%',
+            border: 'none', cursor: 'pointer',
+            background: '#f1f1f1', color: '#5a5a5a',
+            fontSize: 18, lineHeight: 1, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
         <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
         <h2 style={{ margin: '0 0 4px', color: '#1a1a1a', fontSize: 20 }}>Propuesta guardada</h2>
         <p style={{ margin: '0 0 18px', color: '#5a5a5a', fontSize: 13 }}>
