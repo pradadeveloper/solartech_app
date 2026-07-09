@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import logo from "./assets/logo_solartech.webp";
 import "./cotizadorSolar.css";
 import "./propuestaPublica.css";
@@ -83,6 +83,75 @@ const IconMail = () => (
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
   </svg>
 );
+
+/* ── Metric icons (18px, stroke-based, inherit currentColor) ── */
+const mkIcon = (children) => () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+);
+const IconBolt    = mkIcon(<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />);
+const IconGauge   = mkIcon(<><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /><path d="M13.4 12.6 19 7" /><path d="M6.34 17.66A8 8 0 1 1 20 12" /></>);
+const IconActivity= mkIcon(<polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />);
+const IconTrendUp = mkIcon(<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>);
+const IconClock   = mkIcon(<><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></>);
+const IconMaximize= mkIcon(<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3" />);
+const IconRuler   = mkIcon(<><path d="M3 8l13 13 5-5L8 3z" /><path d="M7 7l1.5 1.5M10 4l1.5 1.5M13 10l1.5 1.5M16 7l1.5 1.5" /></>);
+const IconPie     = mkIcon(<><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></>);
+const IconWallet  = mkIcon(<><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0 0 4h4v-4z" /></>);
+const IconPiggy   = mkIcon(<><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h2.5l1-1.5h4l1 1.5H18v-3c1-.7 1.7-1.6 2-2.5h2v-4h-2c0-1-.5-1.5-1-2z" /><path d="M9 8h4" /><circle cx="16" cy="11" r="0.5" /></>);
+const IconCoins   = mkIcon(<><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /></>);
+const IconReceipt = mkIcon(<><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z" /><path d="M8 8h8M8 12h6" /></>);
+const IconCalendar= mkIcon(<><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>);
+const IconHome    = mkIcon(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>);
+const IconLeaf    = mkIcon(<><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" /><path d="M2 21c0-3 1.85-5.36 5.08-6" /></>);
+const IconTree    = mkIcon(<><path d="M12 22v-7" /><path d="M9 8a3 3 0 0 1 0-6c1 0 1.7.4 2.2 1A3 3 0 0 1 16 5a3 3 0 0 1-1 5" /><path d="M12 15l-3.5-3.5a3 3 0 1 1 4.2-4.2" /><path d="M12 15l3.5-3.5a3 3 0 1 0-4.2-4.2" /></>);
+const IconFuel    = mkIcon(<><path d="M3 22V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v18" /><path d="M2 22h12" /><path d="M13 8h3l3 3v6a2 2 0 0 1-4 0v-4" /><path d="M6 6h4" /></>);
+
+/* ═══ UX helpers: scroll-reveal + count-up (respetan reduced-motion) ═══ */
+function useInView(rootMargin = '0px 0px -40px 0px') {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setInView(true); obs.unobserve(el); }
+    }, { threshold: 0.1, rootMargin });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [rootMargin]);
+  return [ref, inView];
+}
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+
+function CountUp({ value, prefix = '', suffix = '', money = false, className }) {
+  const [ref, inView] = useInView();
+  const target = Number(value) || 0;
+  const [display, setDisplay] = useState(prefersReducedMotion() ? target : 0);
+  useEffect(() => {
+    if (!inView) return;
+    if (prefersReducedMotion()) { setDisplay(target); return; }
+    let raf, start = null;
+    const dur = 1100;
+    const step = (t) => {
+      if (start === null) start = t;
+      const p = Math.min(1, (t - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(target * eased);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, target]);
+  const dec = money ? 0 : (Number.isInteger(target) ? 0 : 1);
+  const formatted = money
+    ? Math.round(display).toLocaleString('es-CO')
+    : display.toFixed(dec);
+  return <span ref={ref} className={className}>{prefix}{formatted}{suffix}</span>;
+}
 
 /* ═══════════════════════════════════════════════════════════
    CÁLCULO LOCAL — REGLA CERO: no modificar esta función
@@ -373,19 +442,27 @@ export default function PropuestaPublica() {
         {/* ── Hero métricas ── */}
         <div className="pp-hero">
           <div className="pp-hero-metric">
-            <span className="pp-hero-value">{r?.kwp ?? '—'} kWp</span>
+            <span className="pp-hero-icon"><IconBolt /></span>
+            {r?.kwp != null
+              ? <CountUp className="pp-hero-value" value={r.kwp} suffix=" kWp" />
+              : <span className="pp-hero-value">— kWp</span>}
             <span className="pp-hero-label">Potencia</span>
           </div>
           <div className="pp-hero-metric">
-            <span className="pp-hero-value pp-hero-value--accent">${money(r?.costoProyectoMasIva)}</span>
+            <span className="pp-hero-icon"><IconWallet /></span>
+            <CountUp className="pp-hero-value pp-hero-value--accent" value={r?.costoProyectoMasIva} prefix="$" money />
             <span className="pp-hero-label">Inversión total</span>
           </div>
           <div className="pp-hero-metric">
-            <span className="pp-hero-value">{tiempoRetorno ?? '—'} años</span>
+            <span className="pp-hero-icon"><IconClock /></span>
+            {tiempoRetorno != null
+              ? <CountUp className="pp-hero-value" value={tiempoRetorno} suffix=" años" />
+              : <span className="pp-hero-value">— años</span>}
             <span className="pp-hero-label">Retorno</span>
           </div>
           <div className="pp-hero-metric">
-            <span className="pp-hero-value">${money(ahorroMensual)}</span>
+            <span className="pp-hero-icon"><IconPiggy /></span>
+            <CountUp className="pp-hero-value" value={ahorroMensual} prefix="$" money />
             <span className="pp-hero-label">Ahorro / mes</span>
           </div>
         </div>
@@ -429,14 +506,14 @@ export default function PropuestaPublica() {
             {/* Tu sistema solar */}
             <Card title="Tu sistema solar">
               <div className="pp-metrics-grid">
-                <Metric label="Potencia del sistema"   value={`${r?.kwp ?? '—'} kWp`} />
-                <Metric label="Consumo mensual"        value={`${money(r?.consumoKwh)} kWh/mes`} />
-                <Metric label="Producción mensual"     value={`${money(r?.produccionDeEnergia)} kWh/mes`} />
-                <Metric label="Consumo promedio día"   value={`${money(r?.wPromedioDia)} W/día`} />
-                <Metric label="Radiación solar local"  value={`${r?.radiacionSolar ?? '—'} kWh/m²/día`} />
-                <Metric label="Área disponible"        value={`${money(lead?.areaDisponible)} m²`} />
-                <Metric label="Cobertura de factura"   value={`${r?.coberturaFactura ?? r?.porcentajeCoberturaProyecto ?? '—'}%`} />
-                <Metric label="Área mínima requerida"  value={`${r?.areaMinima ?? '—'} m²`} />
+                <Metric icon={<IconBolt />}     label="Potencia del sistema"   value={`${r?.kwp ?? '—'} kWp`} />
+                <Metric icon={<IconGauge />}    label="Consumo mensual"        value={`${money(r?.consumoKwh)} kWh/mes`} />
+                <Metric icon={<IconTrendUp />}  label="Producción mensual"     value={`${money(r?.produccionDeEnergia)} kWh/mes`} />
+                <Metric icon={<IconActivity />} label="Consumo promedio día"   value={`${money(r?.wPromedioDia)} W/día`} />
+                <Metric icon={<IconSun />}      label="Radiación solar local"  value={`${r?.radiacionSolar ?? '—'} kWh/m²/día`} />
+                <Metric icon={<IconMaximize />} label="Área disponible"        value={`${money(lead?.areaDisponible)} m²`} />
+                <Metric icon={<IconPie />}      label="Cobertura de factura"   value={`${r?.coberturaFactura ?? r?.porcentajeCoberturaProyecto ?? '—'}%`} />
+                <Metric icon={<IconRuler />}    label="Área mínima requerida"  value={`${r?.areaMinima ?? '—'} m²`} />
               </div>
               <div className="pp-divider" />
               <ChartSistemaSolar r={r} />
@@ -448,14 +525,14 @@ export default function PropuestaPublica() {
             {/* Análisis financiero */}
             <Card title="Análisis financiero">
               <div className="pp-metrics-grid">
-                <Metric label="Inversión estimada (con IVA)"   value={`$ ${money(r?.costoProyectoMasIva)}`} />
-                <Metric label="Ahorro mensual estimado"        value={`$ ${money(ahorroMensual)}`} />
-                <Metric label="Ahorro anual estimado"          value={`$ ${money(ahorroAnual)}`} />
-                <Metric label="Ahorro proyectado a 10 años"    value={`$ ${money(ahorro10Anos)}`} />
-                <Metric label="Retorno de inversión"           value={`${tiempoRetorno ?? '—'} años`} />
-                <Metric label="Descuento declaración de renta" value={`$ ${money(descuentoDeclaracion)}`} />
-                <Metric label="Vida útil estimada"             value="25 años" />
-                <Metric label="Valorización aproximada"        value="4 – 10%" />
+                <Metric icon={<IconWallet />}   label="Inversión estimada (con IVA)"   value={`$ ${money(r?.costoProyectoMasIva)}`} />
+                <Metric icon={<IconPiggy />}    label="Ahorro mensual estimado"        value={`$ ${money(ahorroMensual)}`} />
+                <Metric icon={<IconCoins />}    label="Ahorro anual estimado"          value={`$ ${money(ahorroAnual)}`} />
+                <Metric icon={<IconTrendUp />}  label="Ahorro proyectado a 10 años"    value={`$ ${money(ahorro10Anos)}`} />
+                <Metric icon={<IconClock />}    label="Retorno de inversión"           value={`${tiempoRetorno ?? '—'} años`} />
+                <Metric icon={<IconReceipt />}  label="Descuento declaración de renta" value={`$ ${money(descuentoDeclaracion)}`} />
+                <Metric icon={<IconCalendar />} label="Vida útil estimada"             value="25 años" />
+                <Metric icon={<IconHome />}     label="Valorización aproximada"        value="4 – 10%" />
               </div>
               <div className="pp-divider" />
               <ChartFinanciero r={r} />
@@ -535,9 +612,9 @@ export default function PropuestaPublica() {
             <Card title="Impacto ambiental">
               <div className="pp-env-wrap">
                 <div className="pp-metrics-grid">
-                  <Metric label="CO₂ evitado al año"             value={`${r?.co2EvitadoToneladas ?? '—'} toneladas`} isGreen />
-                  <Metric label="Árboles equivalentes sembrados" value={`${money(r?.arbolesEquivalentes)} árboles/año`} isGreen />
-                  <Metric label="Gasolina no consumida"          value={`${money(r?.galonesGasolinaEvitados)} galones/año`} isGreen />
+                  <Metric icon={<IconLeaf />}  label="CO₂ evitado al año"             value={`${r?.co2EvitadoToneladas ?? '—'} toneladas`} isGreen />
+                  <Metric icon={<IconTree />}  label="Árboles equivalentes sembrados" value={`${money(r?.arbolesEquivalentes)} árboles/año`} isGreen />
+                  <Metric icon={<IconFuel />}  label="Gasolina no consumida"          value={`${money(r?.galonesGasolinaEvitados)} galones/año`} isGreen />
                 </div>
               </div>
             </Card>
@@ -1109,8 +1186,9 @@ function ChartStat({ icon, label, value }) {
 
 /* ── UI Components ── */
 function Card({ title, right, children }) {
+  const [ref, inView] = useInView();
   return (
-    <div className="cotCard">
+    <div ref={ref} className={`cotCard pp-reveal${inView ? ' pp-reveal--in' : ''}`}>
       <div className="cotCardHead">
         <h2>{title}</h2>
         {right}
@@ -1129,11 +1207,14 @@ function SummaryRow({ label, value }) {
   );
 }
 
-function Metric({ label, value, isGreen }) {
+function Metric({ label, value, isGreen, icon }) {
   return (
-    <div className="pp-metric">
-      <span className={`pp-metric-value${isGreen ? ' pp-metric-value--green' : ''}`}>{value}</span>
-      <span className="pp-metric-label">{label}</span>
+    <div className={`pp-metric${isGreen ? ' pp-metric--green' : ''}${icon ? ' pp-metric--hasicon' : ''}`}>
+      {icon && <span className="pp-metric-icon">{icon}</span>}
+      <span className="pp-metric-text">
+        <span className={`pp-metric-value${isGreen ? ' pp-metric-value--green' : ''}`}>{value}</span>
+        <span className="pp-metric-label">{label}</span>
+      </span>
     </div>
   );
 }
