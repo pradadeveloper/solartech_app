@@ -301,6 +301,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     ['industria',  'banner_panel_solar_industria.jpg'],
     ['industria2', 'banner_panel_solar_industria_2.jpg'],
     ['industria3', 'banner_panel_solar_industria_3.jpg'],
+    ['pdf1',       'BANNER_PDF_1.jpeg'],
+    ['pdf2',       'BANNER_PDF_2.jpeg'],
   ]) {
     const bp = path.join(assetsPath, file);
     if (fs.existsSync(bp)) {
@@ -367,8 +369,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     // Banner full-size solo si withBanner=true (páginas que lo solicitan explícitamente)
     if (pageCount >= 2 && withBanner) {
       const pageBanner =
-        pageCount === 2 ? (bannerImgs.hogar    || bannerImgs.industria2) :
+        pageCount === 2 ? (bannerImgs.pdf1     || bannerImgs.hogar    || bannerImgs.industria2) :
         pageCount === 3 ? (bannerImgs.industria || bannerImgs.industria2) :
+        pageCount === 7 ? (bannerImgs.pdf2     || bannerImgs.industria2 || bannerImgs.industria3) :
                           (bannerImgs.industria2 || bannerImgs.industria3 || bannerImgs.industria);
       if (pageBanner) {
         const bH = 155;
