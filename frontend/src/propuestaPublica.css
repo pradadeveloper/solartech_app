@@ -891,6 +891,14 @@
 .pp-sim-chart {
   display: flex;
   flex-direction: column;
+  gap: 18px;
+}
+
+/* Los KPIs viven bajo la gráfica: 3 columnas para llenar el ancho
+   y quedar en 2 filas, equilibrando la altura con la columna de controles. */
+.pp-sim-chart .pp-sim-results-grid {
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: auto;
 }
 
 /* ── 23d. Costo de no hacer nada (BLOQUE 3) ─────────────── */
@@ -1018,7 +1026,8 @@
 }
 
 @media (max-width: 600px) {
-  .pp-sim-results-grid {
+  .pp-sim-results-grid,
+  .pp-sim-chart .pp-sim-results-grid {
     grid-template-columns: 1fr 1fr;
     gap: 12px 16px;
   }

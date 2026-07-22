@@ -6,6 +6,7 @@ import "./dashboardAdmon.css";
 const NAV_ITEMS = [
   { label: 'Resumen',              path: '/',              adminOnly: false },
   { label: 'Leads y Cotizaciones', path: '/leads',         adminOnly: false },
+  { label: 'Agente IA',            path: '/agente',        adminOnly: false },
   { label: 'Asesores',             path: '/asesores',      adminOnly: true  },
   { label: 'Proyectos',            path: null,             adminOnly: false },
   { label: 'Configuración',        path: '/configuracion', adminOnly: true  },

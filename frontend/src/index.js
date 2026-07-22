@@ -7,6 +7,7 @@ import Resultado from './Resultado';
 import LeadsCotizaciones from './LeadsCotizaciones';
 import Asesores from './Asesores';
 import Configuracion from './Configuracion';
+import AgenteIA from './AgenteIA';
 import Login from './Login';
 import PropuestaPublica from './PropuestaPublica';
 
@@ -28,6 +29,7 @@ root.render(
         <Route path="cliente" element={<CotizadorSolar />} />
         <Route path="resultado" element={<Resultado />} />
         <Route path="leads" element={<LeadsCotizaciones />} />
+        <Route path="agente" element={<AgenteIA />} />
         <Route path="asesores" element={<Asesores />} />
         <Route path="configuracion" element={<Configuracion />} />
       </Route>

@@ -42,7 +42,7 @@ const DEFAULTS = {
   descuentoRentaPct:     50,        // % de descuento en renta (beneficio tributario)
   costoGeneracion:       330,       // COP/kWh — tarifa de generación CREG
   costoComercializacion: 120,       // COP/kWh — cargo de comercialización CREG
-  factorAreaM2PorKwp:    5.5,       // m²/kWp de techo requerido (Excel: 5.5)
+  factorAreaM2PorKwp:    5.8,       // m²/kWp de techo requerido (Excel: 5.5)
   factorCO2:             0.3612,    // tonCO2/kWp·año
   factorArboles:         0.02,      // tonCO2 absorbidas por árbol/año
   factorGalones:         117.6,     // galones equivalentes por tonCO2

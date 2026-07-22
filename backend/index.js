@@ -871,7 +871,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(6);
 
 
-  // 12. CONDICIONES COMERCIALES — misma página que Marcas Aliadas
+  // 12. CONDICIONES COMERCIALES — siempre arranca en página propia, debajo del
+  // banner, para que el listado no quede partido a la mitad de la hoja anterior.
+  newPage();
   gap(4);
   sectionHeader('CONDICIONES COMERCIALES');
   const condiciones = [
@@ -1594,6 +1596,24 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
   }
 });
 
+// ====== POST /api/agente-ia ======
+// Chat del Agente IA. Responde en streaming (SSE) sobre las cotizaciones
+// visibles para el usuario autenticado. Ver backend/agenteIA.js.
+const { crearHandler: crearHandlerAgenteIA } = require('./agenteIA');
+app.post(
+  '/api/agente-ia',
+  express.json(),
+  crearHandlerAgenteIA({ getAllLeads, jwt, JWT_SECRET })
+);
+
+// Indica al frontend si el módulo está configurado (para ocultarlo si no).
+app.get('/api/agente-ia/estado', (_req, res) => {
+  res.json({ disponible: !!process.env.ANTHROPIC_API_KEY });
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log('⚠  Agente IA deshabilitado: falta ANTHROPIC_API_KEY en backend/.env');
+  }
 });

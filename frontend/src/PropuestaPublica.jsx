@@ -990,17 +990,6 @@ function SimuladorFinanciero({
             </div>
             <input type="checkbox" checked={simDepreciacion} onChange={(e) => setSimDepreciacion(e.target.checked)} />
           </label>
-
-          {simulador && (
-            <div className="pp-sim-results-grid">
-              <Metric label="Inversión total" value={formatCOP(simulador.inversionTotal)} />
-              <Metric label="Ahorro anual" value={formatCOP(simulador.ahorroAnualBase)} isGreen />
-              <Metric label="Payback" value={`${simulador.payback ?? '—'} años`} />
-              <Metric label="TIR" value={`${simulador.tir ?? '—'}%`} />
-              <Metric label="VPN" value={formatCOP(simulador.vpn)} />
-              <Metric label="ROI" value={`${simulador.roi ?? '—'}%`} />
-            </div>
-          )}
         </div>
 
         <div className="pp-sim-chart">
@@ -1020,6 +1009,17 @@ function SimuladorFinanciero({
               </ResponsiveContainer>
             </div>
           )}
+
+          {simulador && (
+            <div className="pp-sim-results-grid">
+              <Metric label="Inversión total" value={formatCOP(simulador.inversionTotal)} />
+              <Metric label="Ahorro anual" value={formatCOP(simulador.ahorroAnualBase)} isGreen />
+              <Metric label="Payback" value={`${simulador.payback ?? '—'} años`} />
+              <Metric label="TIR" value={`${simulador.tir ?? '—'}%`} />
+              <Metric label="VPN" value={formatCOP(simulador.vpn)} />
+              <Metric label="ROI" value={`${simulador.roi ?? '—'}%`} />
+            </div>
+          )}
         </div>
       </div>
     </Card>
@@ -1030,33 +1030,48 @@ function SimuladorFinanciero({
 function CostoNoHacerNada({ r }) {
   const consumo = Number(r?.consumoKwh) || 0;
   const costoKwh = Number(r?.costoKwh) || 0;
-  const ahorroAnual = Number(r?.ahorroAnual) || 0;
   const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
   if (!consumo || !costoKwh || !inversionTotal) return null;
 
-  const inflacion = 0.08;
-  const horizonte = 25;
-  let factorAcumulado = 0;
-  for (let t = 0; t < horizonte; t++) factorAcumulado += Math.pow(1 + inflacion, t);
+  const HORIZONTE = 5;                 // años
+  const INCREMENTO_ANUAL = 0.08;       // alza promedio anual del kWh en Colombia
+  const facturaMensual = consumo * costoKwh;
+  const cobertura = (Number(r?.coberturaFactura ?? r?.porcentajeCoberturaProyecto) || 0) / 100;
 
-  const sinSolar25 = Math.round(consumo * 12 * costoKwh * factorAcumulado);
-  const conSolar25 = Math.round(ahorroAnual * horizonte - inversionTotal);
+  // Izquierda: lo que pagaría en facturas durante 5 años, indexado por el alza anual.
+  let factorAcumulado = 0;
+  for (let t = 0; t < HORIZONTE; t++) factorAcumulado += Math.pow(1 + INCREMENTO_ANUAL, t);
+  const sinSolar = Math.round(facturaMensual * 12 * factorAcumulado);
+
+  // Derecha: (factura × 12 meses × 5 años × %cobertura) − valor del proyecto.
+  const conSolar = Math.round(facturaMensual * 12 * HORIZONTE * cobertura - inversionTotal);
+  const enGanancia = conSolar >= 0;
 
   return (
     <Card title="El costo de no hacer nada">
-      <p className="pp-chart-subtitle">Comparación del gasto acumulado en energía a 25 años: sin solar vs con solar</p>
+      <p className="pp-chart-subtitle">
+        Comparación a {HORIZONTE} años: lo que pagarías en facturas vs lo que te dejaría el sistema solar
+      </p>
       <div className="pp-cost-grid">
         <div className="pp-cost-card pp-cost-card--red">
           <span className="pp-cost-icon">📈</span>
-          <span className="pp-cost-label">Sin solar (25 años)</span>
-          <span className="pp-cost-value pp-cost-value--red">~ {formatCOP(sinSolar25)}</span>
-          <span className="pp-cost-sublabel">Pagados en facturas de energía</span>
+          <span className="pp-cost-label">Sin solar ({HORIZONTE} años)</span>
+          <span className="pp-cost-value pp-cost-value--red">~ {formatCOP(sinSolar)}</span>
+          <span className="pp-cost-sublabel">
+            Pagados en facturas, con alza anual del {INCREMENTO_ANUAL * 100}%
+          </span>
         </div>
         <div className="pp-cost-card pp-cost-card--green">
           <span className="pp-cost-icon">☀️</span>
-          <span className="pp-cost-label">Con solar (25 años)</span>
-          <span className="pp-cost-value pp-cost-value--green">+ {formatCOP(conSolar25)}</span>
-          <span className="pp-cost-sublabel">Ganancia neta acumulada después de inversión</span>
+          <span className="pp-cost-label">Con solar ({HORIZONTE} años)</span>
+          <span className={`pp-cost-value ${enGanancia ? 'pp-cost-value--green' : 'pp-cost-value--red'}`}>
+            {enGanancia ? '+' : '−'} {formatCOP(Math.abs(conSolar))}
+          </span>
+          <span className="pp-cost-sublabel">
+            {enGanancia
+              ? 'Ganancia neta acumulada después de la inversión'
+              : `Pendiente por recuperar de la inversión a ${HORIZONTE} años`}
+          </span>
         </div>
       </div>
     </Card>
