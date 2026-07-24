@@ -176,9 +176,12 @@ export default function AgenteIA() {
 
             if (evento === "texto") {
               acumulado += payload.texto;
+              // Instantánea por iteración: el updater de setState puede ejecutarse
+              // despues, y para entonces `acumulado` ya habria avanzado.
+              const textoActual = acumulado;
               setMensajes((prev) => {
                 const copia = [...prev];
-                copia[copia.length - 1] = { role: "assistant", content: acumulado };
+                copia[copia.length - 1] = { role: "assistant", content: textoActual };
                 return copia;
               });
             } else if (evento === "error") {
