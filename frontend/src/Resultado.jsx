@@ -1276,18 +1276,21 @@ function CostoNoHacerNada({ r }) {
   const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
   if (!consumo || !costoKwh || !inversionTotal) return null;
 
-  const HORIZONTE = 5;                 // años
+  const HORIZONTE = 10;                // años
   const INCREMENTO_ANUAL = 0.08;       // alza promedio anual del kWh en Colombia
+  // OJO: r.consumoKwh no es la factura total del cliente, es la energía que produce
+  // el sistema (se deriva de los kWp). Por eso facturaMensual x 12 YA es el ahorro
+  // anual, y multiplicarlo ademas por %cobertura descontaria la cobertura dos veces.
   const facturaMensual = consumo * costoKwh;
-  const cobertura = (Number(r?.porcentajeCoberturaProyecto ?? r?.coberturaFactura) || 0) / 100;
 
-  // Izquierda: lo que pagaría en facturas durante 5 años, indexado por el alza anual.
+  // Izquierda: lo que pagaría en facturas durante el horizonte, indexado por el alza anual.
   let factorAcumulado = 0;
   for (let t = 0; t < HORIZONTE; t++) factorAcumulado += Math.pow(1 + INCREMENTO_ANUAL, t);
   const sinSolar = Math.round(facturaMensual * 12 * factorAcumulado);
 
-  // Derecha: (factura × 12 meses × 5 años × %cobertura) − valor del proyecto.
-  const conSolar = Math.round(facturaMensual * 12 * HORIZONTE * cobertura - inversionTotal);
+  // Derecha: (ahorro anual × años) − valor del proyecto. Coherente con el
+  // "Retorno X años" que muestra la misma propuesta.
+  const conSolar = Math.round(facturaMensual * 12 * HORIZONTE - inversionTotal);
   const enGanancia = conSolar >= 0;
 
   return (

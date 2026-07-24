@@ -244,7 +244,6 @@ export default function PropuestaPublica() {
   const [copiado, setCopiado]   = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [pdfUrlLocal, setPdfUrlLocal]   = useState(null);
-  const [mostrarModal, setMostrarModal] = useState(false);
   const [baseLead, setBaseLead] = useState(null);
 
   // ── BLOQUE 2 — Simulador financiero what-if ──
@@ -567,11 +566,6 @@ export default function PropuestaPublica() {
             {/* Propuesta económica */}
             <Card
               title="Propuesta económica"
-              right={
-                <button type="button" className="pp-btn-ghost" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setMostrarModal(true)}>
-                  Ver detalle de equipos
-                </button>
-              }
             >
               <div className="tableWrap">
                 <table className="table">
@@ -762,33 +756,6 @@ export default function PropuestaPublica() {
             </Card>
           </aside>
         </div>
-
-        {/* ── Modal detalle de equipos ── */}
-        {mostrarModal && (
-          <div className="pp-modal-overlay" onClick={() => setMostrarModal(false)}>
-            <div className="pp-modal-body" onClick={e => e.stopPropagation()}>
-              <h3 className="pp-modal-title">Detalle de equipos</h3>
-              <div className="tableWrap">
-                <table className="table">
-                  <thead><tr><th>Equipo</th><th className="num">Cantidad</th></tr></thead>
-                  <tbody>
-                    <tr><td>Paneles {r?.potenciaPanel}W</td><td className="num">{r?.npaneles}</td></tr>
-                    <tr><td>Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
-                    <tr><td>Riel 47</td><td className="num">{r?.riel47}</td></tr>
-                    <tr><td>Mid Clamp</td><td className="num">{r?.midCland}</td></tr>
-                    <tr><td>End Clamp</td><td className="num">{r?.endCland}</td></tr>
-                    <tr><td>L-Foot</td><td className="num">{r?.lFoot}</td></tr>
-                    <tr><td>Grounding Loop</td><td className="num">{r?.groundingLoop}</td></tr>
-                    <tr><td>Cable solar</td><td className="num">{r?.cableSolar} m</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="pp-btn-primary" onClick={() => setMostrarModal(false)}>Cerrar</button>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
 
@@ -1100,18 +1067,21 @@ function CostoNoHacerNada({ r }) {
   const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
   if (!consumo || !costoKwh || !inversionTotal) return null;
 
-  const HORIZONTE = 5;                 // años
+  const HORIZONTE = 10;                // años
   const INCREMENTO_ANUAL = 0.08;       // alza promedio anual del kWh en Colombia
+  // OJO: r.consumoKwh no es la factura total del cliente, es la energía que produce
+  // el sistema (se deriva de los kWp). Por eso facturaMensual x 12 YA es el ahorro
+  // anual, y multiplicarlo ademas por %cobertura descontaria la cobertura dos veces.
   const facturaMensual = consumo * costoKwh;
-  const cobertura = (Number(r?.coberturaFactura ?? r?.porcentajeCoberturaProyecto) || 0) / 100;
 
-  // Izquierda: lo que pagaría en facturas durante 5 años, indexado por el alza anual.
+  // Izquierda: lo que pagaría en facturas durante el horizonte, indexado por el alza anual.
   let factorAcumulado = 0;
   for (let t = 0; t < HORIZONTE; t++) factorAcumulado += Math.pow(1 + INCREMENTO_ANUAL, t);
   const sinSolar = Math.round(facturaMensual * 12 * factorAcumulado);
 
-  // Derecha: (factura × 12 meses × 5 años × %cobertura) − valor del proyecto.
-  const conSolar = Math.round(facturaMensual * 12 * HORIZONTE * cobertura - inversionTotal);
+  // Derecha: (ahorro anual × años) − valor del proyecto. Coherente con el
+  // "Retorno X años" que muestra la misma propuesta.
+  const conSolar = Math.round(facturaMensual * 12 * HORIZONTE - inversionTotal);
   const enGanancia = conSolar >= 0;
 
   return (
