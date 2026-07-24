@@ -179,13 +179,19 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
 
   const potenciaPanel   = Number(base.potenciaPanel)   || 585;
   const radiacionSolar  = Number(base.radiacionSolar)  || 3.8;
-  const margenCobertura = Number(base.margenCobertura) || 0.8;
   const longitudRiel    = Number(base.longitudRiel)    || 4.7;
   const cableSolar      = Number(base.cableSolar)      || 10;
 
-  const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(1));
-  const wPromedioDia = Number((kwp * radiacionSolarCobertura * 1000).toFixed(1));
-  const consumo = Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
+  // Producción y consumo diario con las MISMAS fórmulas del backend (formulas.js)
+  // y de la hoja Resultado — SIN factor PR. Antes se aplicaba margenCobertura (0,8),
+  // lo que daba una producción y una cobertura menores a las que vio el asesor y a
+  // las del PDF (mismo cálculo canónico). Esa divergencia es la que hacía que la
+  // cobertura saliera distinta al guardar y compartir.
+  const wPromedioDia = Math.round(kwp * radiacionSolar * 1000);
+  const produccionDeEnergia = Math.round((kwp * radiacionSolar * 365) / 12);
+  const consumo = consumoRealFactura > 0
+    ? consumoRealFactura
+    : Number(((wPromedioDia * 365) / (1000 * 12)).toFixed(1));
   const npaneles = Math.ceil((kwp * 1000) / potenciaPanel);
   const ninversores = 1;
   const riel47      = Math.ceil(((npaneles * 1.15) / longitudRiel) * 2);
@@ -193,7 +199,6 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const endCland    = Math.ceil(npaneles / 2);
   const lFoot       = Math.ceil(riel47 * 3);
   const groundingLoop = Math.round(riel47 / 2) * 2;
-  const produccionDeEnergia = Math.round((potenciaPanel * npaneles * radiacionSolarCobertura * 30) / 1000);
   const areaMinima = Math.round(kwp * 5.8);
 
   const coberturaFactura = consumoRealFactura > 0
@@ -297,7 +302,31 @@ export default function PropuestaPublica() {
     return calcularLocal(lead.kwp, costoKwh, storedCostokWp, { ...cfg, ...lead, consumoKwh: consumoKwhBase });
   }, [lead, cfg, baseLead]);
 
-  const r = useMemo(() => ({ ...lead, ...calc }), [lead, calc]);
+  const r = useMemo(() => {
+    if (!lead && !calc) return {};
+    const merged = { ...lead, ...calc };
+    // Prioridad a los valores que el backend YA calculó y guardó al generar la
+    // propuesta (los mismos del PDF y de la hoja Resultado). El recálculo local
+    // del navegador usa un modelo distinto de ahorro/retorno, así que dejarlo
+    // pisar estos campos hacía que el cliente viera cifras que no coincidían con
+    // lo que configuró el asesor ni con su propio PDF.
+    if (Number(lead?.costoProyectoMasIva) > 0) {
+      const totalIva = Number(lead.costoProyectoMasIva);
+      const base = Math.round(totalIva / 1.05);   // IVA solar 5% (Ley 1715)
+      merged.costoProyectoMasIva = totalIva;
+      merged.costoProyecto       = base;
+      merged.ivaProyecto         = totalIva - base;
+    }
+    if (Number(lead?.consumoKwh) > 0)          merged.consumoKwh          = Number(lead.consumoKwh);
+    if (lead?.tiempoRetorno != null && lead.tiempoRetorno !== '') merged.tiempoRetorno = Number(lead.tiempoRetorno);
+    if (Number(lead?.ahorroMensual) > 0) {
+      const am = Number(lead.ahorroMensual);
+      merged.ahorroMensual = am;
+      merged.ahorroAnual   = Math.round(am * 12);
+      merged.ahorro10Anos  = Math.round(am * 12 * 10);
+    }
+    return merged;
+  }, [lead, calc]);
 
   // Seed la tarifa del simulador con el costo kWh real de la propuesta (una sola vez).
   useEffect(() => {
@@ -1062,26 +1091,28 @@ function SimuladorFinanciero({
 
 /* BLOQUE 3 ─── El costo de no hacer nada */
 function CostoNoHacerNada({ r }) {
-  const consumo = Number(r?.consumoKwh) || 0;
+  const consumo = Number(r?.consumoKwh) || 0;   // consumo REAL del cliente (canónico)
   const costoKwh = Number(r?.costoKwh) || 0;
   const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
-  if (!consumo || !costoKwh || !inversionTotal) return null;
+  // Ahorro anual CANÓNICO (mismo del backend, la hoja Resultado y el PDF): ya
+  // considera la cobertura y los excedentes, así que es la base correcta para el
+  // lado "con solar". Antes se usaba la factura completa asumiendo 100% de
+  // cobertura, lo que contradecía el retorno y la cobertura de la propuesta.
+  const ahorroAnualBase = Number(r?.ahorroAnual) || (Number(r?.ahorroMensual) || 0) * 12;
+  if (!consumo || !costoKwh || !inversionTotal || !ahorroAnualBase) return null;
 
   const HORIZONTE = 10;                // años
   const INCREMENTO_ANUAL = 0.08;       // alza promedio anual del kWh en Colombia
-  // OJO: r.consumoKwh no es la factura total del cliente, es la energía que produce
-  // el sistema (se deriva de los kWp). Por eso facturaMensual x 12 YA es el ahorro
-  // anual, y multiplicarlo ademas por %cobertura descontaria la cobertura dos veces.
-  const facturaMensual = consumo * costoKwh;
+  const facturaMensual = consumo * costoKwh;   // factura mensual sin solar
 
   // Izquierda: lo que pagaría en facturas durante el horizonte, indexado por el alza anual.
   let factorAcumulado = 0;
   for (let t = 0; t < HORIZONTE; t++) factorAcumulado += Math.pow(1 + INCREMENTO_ANUAL, t);
   const sinSolar = Math.round(facturaMensual * 12 * factorAcumulado);
 
-  // Derecha: (ahorro anual × años) − valor del proyecto. Coherente con el
-  // "Retorno X años" que muestra la misma propuesta.
-  const conSolar = Math.round(facturaMensual * 12 * HORIZONTE - inversionTotal);
+  // Derecha: (ahorro anual canónico × años) − valor del proyecto. Cruza cero en
+  // inversión / ahorroAnual años = el mismo "Retorno" que muestra la propuesta.
+  const conSolar = Math.round(ahorroAnualBase * HORIZONTE - inversionTotal);
   const enGanancia = conSolar >= 0;
 
   return (
