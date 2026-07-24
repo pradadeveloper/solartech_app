@@ -331,6 +331,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   let page;
   let y;
   let pageCount = 0;
+  let bannerSuprimido = false;   // ver newPage(): corta el banner en saltos automáticos
 
   function newPage(withBanner = true) {
     pageCount++;
@@ -366,8 +367,11 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
     y = H - headerH - 18;
 
-    // Banner full-size solo si withBanner=true (páginas que lo solicitan explícitamente)
-    if (pageCount >= 2 && withBanner) {
+    // Banner full-size solo si withBanner=true (páginas que lo solicitan explícitamente).
+    // bannerSuprimido lo activan las secciones que no toleran una imagen intercalada
+    // (p.ej. el listado de condiciones), donde el salto lo dispara checkY/para y no
+    // habria forma de pasarles withBanner=false.
+    if (pageCount >= 2 && withBanner && !bannerSuprimido) {
       const pageBanner =
         pageCount === 2 ? (bannerImgs.pdf1     || bannerImgs.hogar    || bannerImgs.industria2) :
         pageCount === 3 ? (bannerImgs.industria || bannerImgs.industria2) :
@@ -871,9 +875,11 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   gap(6);
 
 
-  // 12. CONDICIONES COMERCIALES — siempre arranca en página propia, debajo del
-  // banner, para que el listado no quede partido a la mitad de la hoja anterior.
-  newPage();
+  // 12. CONDICIONES COMERCIALES — arranca en página propia y, si el listado se
+  // desborda, las páginas siguientes van sin banner: una foto a media lista parte
+  // la numeración y es justo lo que se veía antes.
+  newPage(false);
+  bannerSuprimido = true;
   gap(4);
   sectionHeader('CONDICIONES COMERCIALES');
   const condiciones = [
@@ -895,11 +901,16 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     'Validez de la oferta: quince (15) dias calendario a partir de su emision.',
   ];
   condiciones.forEach((c, i) => {
-    checkY(30);
+    // Reservamos el alto real del item (numero + todas sus lineas) antes de
+    // dibujarlo. Con un checkY fijo, un item de 3 lineas podia partirse y dejar
+    // el numero solo al final de la pagina.
+    const lineas = wrapWords(c, cW - 22 - 8, 8.5).length;
+    checkY(lineas * 12.5 + 6);
     page.drawText(`${i + 1}.`, { x: margin + 10, y, size: 8.5, font, color: COLOR_ACCENT });
     para(c, 22, 8.5, COLOR_TEXT);
     gap(2);
   });
+  bannerSuprimido = false;   // el resto del documento vuelve a llevar banner
   gap(8);
 
   // 13. DATOS DEL ASESOR COMERCIAL — última página
