@@ -105,6 +105,9 @@ const IconHome    = mkIcon(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-
 const IconLeaf    = mkIcon(<><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" /><path d="M2 21c0-3 1.85-5.36 5.08-6" /></>);
 const IconTree    = mkIcon(<><path d="M12 22v-7" /><path d="M9 8a3 3 0 0 1 0-6c1 0 1.7.4 2.2 1A3 3 0 0 1 16 5a3 3 0 0 1-1 5" /><path d="M12 15l-3.5-3.5a3 3 0 1 1 4.2-4.2" /><path d="M12 15l3.5-3.5a3 3 0 1 0-4.2-4.2" /></>);
 const IconFuel    = mkIcon(<><path d="M3 22V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v18" /><path d="M2 22h12" /><path d="M13 8h3l3 3v6a2 2 0 0 1-4 0v-4" /><path d="M6 6h4" /></>);
+const IconGlobe   = mkIcon(<><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" /></>);
+const IconCar     = mkIcon(<><path d="M5 17h14M6 17l-1.5-5 1.8-4.2A2 2 0 0 1 8.1 6.5h7.8a2 2 0 0 1 1.8 1.3L19.5 12 18 17" /><circle cx="7.5" cy="17.5" r="1.5" /><circle cx="16.5" cy="17.5" r="1.5" /></>);
+const IconPlug    = mkIcon(<><path d="M9 2v6M15 2v6" /><path d="M6 8h12v3a6 6 0 0 1-12 0z" /><path d="M12 17v5" /></>);
 
 /* ═══ UX helpers: scroll-reveal + count-up (respetan reduced-motion) ═══ */
 function useInView(rootMargin = '0px 0px -40px 0px') {
@@ -166,6 +169,10 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
     kwp = Number(((Number(base.npaneles) * potPanel) / 1000).toFixed(1));
   }
 
+  // 2 decimales: normaliza también las propuestas ya guardadas con ruido de
+  // punto flotante (p.ej. 3,7199999999999998 kWp).
+  kwp = Math.round(kwp * 100) / 100;
+
   if (!kwp || !costoUnidad) return null;
 
   const consumoRealFactura = Number(base.consumoKwh) || 0;
@@ -212,6 +219,9 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
   const co2EvitadoToneladas  = Number((kwp * 1.2 * 0.7 * 0.43).toFixed(2));
   const arbolesEquivalentes  = Math.round(co2EvitadoToneladas / 0.02);
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * 117.6);
+  const co2EvitadoVidaUtil   = Number((co2EvitadoToneladas * 25).toFixed(1));  // 25 años de vida útil
+  const kmAutoEvitados       = Math.round(galonesGasolinaEvitados * 45);       // ~45 km por galón
+  const energiaLimpiaAnual   = Math.round(produccionDeEnergia * 12);
 
   return {
     kwp, consumoKwh: consumo, costoKwh: costoUnidad, consumo, wPromedioDia,
@@ -220,6 +230,7 @@ function calcularLocal(kwpInput, costoKwh, costokWpInput, base = {}) {
     costoProyecto, ivaProyecto, costoProyectoMasIva, costokwpproyecto,
     descuentoDeclaracion, ahorroMensual, ahorroAnual, ahorro10Anos, tiempoRetorno,
     co2EvitadoToneladas, arbolesEquivalentes, galonesGasolinaEvitados,
+    co2EvitadoVidaUtil, kmAutoEvitados, energiaLimpiaAnual,
     potenciaPanel, radiacionSolar,
   };
 }
@@ -316,7 +327,9 @@ export default function PropuestaPublica() {
 
     const ahorroAnualBase = consumoKwh * 12 * tarifa;
     const beneficioRenta = simDeduccionRenta ? inversionSinIva * 0.25 * 0.35 : 0;
-    const beneficioDepreciacion = simDepreciacion ? inversionSinIva * 0.20 * 5 : 0;
+    // El beneficio de depreciar es el escudo fiscal (depreciación x tasa de renta ~35%),
+    // NO el 100% del activo: depreciarlo entero no devuelve su valor en efectivo.
+    const beneficioDepreciacion = simDepreciacion ? inversionSinIva * 0.35 : 0;
     const inversionNeta = Math.max(0, inversionTotal - beneficioRenta - beneficioDepreciacion);
 
     const payback = ahorroAnualBase > 0 ? Number((inversionNeta / ahorroAnualBase).toFixed(1)) : null;
@@ -613,8 +626,11 @@ export default function PropuestaPublica() {
               <div className="pp-env-wrap">
                 <div className="pp-metrics-grid">
                   <Metric icon={<IconLeaf />}  label="CO₂ evitado al año"             value={`${r?.co2EvitadoToneladas ?? '—'} toneladas`} isGreen />
+                  <Metric icon={<IconPlug />}  label="Energía limpia generada"        value={`${money(r?.energiaLimpiaAnual)} kWh/año`} isGreen />
                   <Metric icon={<IconTree />}  label="Árboles equivalentes sembrados" value={`${money(r?.arbolesEquivalentes)} árboles/año`} isGreen />
+                  <Metric icon={<IconCar />}   label="Kilómetros en carro no recorridos" value={`${money(r?.kmAutoEvitados)} km/año`} isGreen />
                   <Metric icon={<IconFuel />}  label="Gasolina no consumida"          value={`${money(r?.galonesGasolinaEvitados)} galones/año`} isGreen />
+                  <Metric icon={<IconGlobe />} label="CO₂ evitado en 25 años"         value={`${r?.co2EvitadoVidaUtil ?? '—'} toneladas`} isGreen />
                 </div>
               </div>
             </Card>
@@ -905,10 +921,56 @@ function ChartFinanciero({ r }) {
   );
 }
 
+/* Tooltip del gráfico Generación vs Consumo — traduce los kWh del mes a pesos */
+function TooltipGenConsumo({ active, payload, label, costoKwh }) {
+  if (!active || !payload || !payload.length) return null;
+
+  const val = (key) => Number(payload.find(p => p.dataKey === key)?.value) || 0;
+  const consumo = val('Consumo');
+  const generacion = val('Generación');
+  const pesos = (kwh) => `$ ${Math.round(kwh * costoKwh).toLocaleString('es-CO')}`;
+
+  const diffKwh = consumo - generacion;       // + falta por cubrir · − excedente
+  const cubre = diffKwh <= 0;
+
+  return (
+    <div className="pp-tt">
+      <div className="pp-tt-title">{label}</div>
+
+      <div className="pp-tt-row">
+        <span className="pp-tt-dot" style={{ background: C1 }} />
+        <span className="pp-tt-label">Consumo</span>
+        <span className="pp-tt-kwh">{Math.round(consumo).toLocaleString('es-CO')} kWh</span>
+        <span className="pp-tt-money">{pesos(consumo)}</span>
+      </div>
+
+      <div className="pp-tt-row">
+        <span className="pp-tt-dot" style={{ background: '#2ecc71' }} />
+        <span className="pp-tt-label">Generación</span>
+        <span className="pp-tt-kwh">{Math.round(generacion).toLocaleString('es-CO')} kWh</span>
+        <span className="pp-tt-money">{pesos(generacion)}</span>
+      </div>
+
+      <div className="pp-tt-sep" />
+
+      <div className={`pp-tt-hero${cubre ? ' pp-tt-hero--green' : ''}`}>
+        <span className="pp-tt-hero-label">
+          {cubre ? 'Excedente a favor' : 'Diferencia por pagar'}
+        </span>
+        <span className="pp-tt-hero-value">{pesos(Math.abs(diffKwh))}</span>
+      </div>
+      <div className="pp-tt-foot">
+        {Math.round(Math.abs(diffKwh)).toLocaleString('es-CO')} kWh · ahorro del mes {pesos(Math.min(generacion, consumo))}
+      </div>
+    </div>
+  );
+}
+
 /* BLOQUE 1 ─── Generación vs Consumo mensual */
 function ChartGeneracionConsumo({ r, ciudad }) {
   const consumo = Number(r?.consumoKwh) || 0;
   const generacionBase = Number(r?.produccionDeEnergia) || 0;
+  const costoKwh = Number(r?.costoKwh) || 0;
   if (!consumo || !generacionBase) return null;
 
   const data = MESES.map((mes, i) => ({
@@ -919,14 +981,19 @@ function ChartGeneracionConsumo({ r, ciudad }) {
 
   return (
     <Card title="Generación mensual estimada vs Consumo">
-      <p className="pp-chart-subtitle">Basado en radiación solar promedio de {ciudad || 'tu ciudad'}</p>
+      <p className="pp-chart-subtitle">
+        Basado en radiación solar promedio de {ciudad || 'tu ciudad'}
+        {costoKwh > 0 && ' — pasa el cursor sobre un mes para ver la diferencia en pesos'}
+      </p>
       <div className="pp-chart-responsive">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
             <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#888' }} />
             <YAxis tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={38} />
-            <Tooltip formatter={(v) => `${Number(v).toLocaleString('es-CO')} kWh`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            {costoKwh > 0
+              ? <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} content={<TooltipGenConsumo costoKwh={costoKwh} />} />
+              : <Tooltip formatter={(v) => `${Number(v).toLocaleString('es-CO')} kWh`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />}
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="Consumo" fill={C1} radius={[4, 4, 0, 0]} />
             <Bar dataKey="Generación" fill="#2ecc71" radius={[4, 4, 0, 0]} />
@@ -986,7 +1053,7 @@ function SimuladorFinanciero({
           <label className="pp-toggle-row">
             <div>
               <span className="pp-toggle-label">Depreciación acelerada</span>
-              <span className="pp-toggle-sublabel">Deprecia en 5 años (Ley 1715, Art. 14) en vez de 20 años</span>
+              <span className="pp-toggle-sublabel">Deprecia en 5 años (Ley 1715, Art. 14) en vez de 20 — escudo fiscal ~35% del valor sin IVA</span>
             </div>
             <input type="checkbox" checked={simDepreciacion} onChange={(e) => setSimDepreciacion(e.target.checked)} />
           </label>

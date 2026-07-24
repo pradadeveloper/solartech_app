@@ -274,9 +274,10 @@
 }
 
 /* ── 7. Mini blocks ─────────────────────────────────────── */
+/* 3 bloques por fila: llenan el ancho completo y no dejan celdas vacías */
 .pp-blocks-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -287,13 +288,14 @@
   padding: 16px;
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
 .pp-block-title {
   font-size: 13px;
   font-weight: 700;
   color: #1A1A1A;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .pp-block-lines {
@@ -311,8 +313,10 @@
   line-height: 1.5;
 }
 
+/* margin-top:auto ancla el badge al fondo -> todas las tarjetas de la fila
+   quedan alineadas aunque tengan distinta cantidad de líneas */
 .pp-block-foot {
-  margin-top: 12px;
+  margin-top: auto;
   display: inline-block;
   background: rgba(176, 58, 34, 0.08);
   color: #B03A22;
@@ -1049,6 +1053,98 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+/* ── 23g. Tooltip Generación vs Consumo (kWh → pesos) ───── */
+.pp-tt {
+  background: #ffffff;
+  border: 1px solid #DEDEDE;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  min-width: 262px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.pp-tt-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1A1A1A;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 9px;
+}
+
+.pp-tt-row {
+  display: grid;
+  grid-template-columns: 9px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.pp-tt-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.pp-tt-label {
+  color: #5A5A5A;
+}
+
+.pp-tt-kwh {
+  color: #8A8A8A;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.pp-tt-money {
+  font-weight: 700;
+  color: #1A1A1A;
+  font-variant-numeric: tabular-nums;
+  min-width: 78px;
+  text-align: right;
+}
+
+.pp-tt-sep {
+  height: 1px;
+  background: #EBEBEB;
+  margin: 9px 0 8px;
+}
+
+.pp-tt-hero {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pp-tt-hero-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #B03A22;
+}
+
+.pp-tt-hero-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: #B03A22;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-tt-hero--green .pp-tt-hero-label,
+.pp-tt-hero--green .pp-tt-hero-value {
+  color: #16a34a;
+}
+
+.pp-tt-foot {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #8A8A8A;
 }
 
 /* ── 24. Movimiento: scroll-reveal + keyframes ──────────── */
