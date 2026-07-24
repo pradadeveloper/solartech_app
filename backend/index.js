@@ -1161,7 +1161,9 @@ app.post('/api/propuestas/guardar', express.json(), async (req, res) => {
   try {
     const { leadId, opcionSeleccionada, datosOpcion = {}, datosCliente = {} } = req.body || {};
 
-    const kwp = Number(datosOpcion.kwp ?? datosOpcion.kWp) || 0;
+    // Redondeamos a 2 decimales antes de persistir: evita guardar valores como
+    // 3,7199999999999998 kWp que luego ensucian la propuesta y el PDF.
+    const kwp = Math.round((Number(datosOpcion.kwp ?? datosOpcion.kWp) || 0) * 100) / 100;
     let consumoKwh = Number(datosOpcion.consumoKwh) || 0;
     let costoKwh = Number(datosOpcion.costoKwh) || Number(datosCliente.costoKwh) || 0;
 
