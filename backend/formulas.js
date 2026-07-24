@@ -46,6 +46,8 @@ const DEFAULTS = {
   factorCO2:             0.3612,    // tonCO2/kWp·año
   factorArboles:         0.02,      // tonCO2 absorbidas por árbol/año
   factorGalones:         117.6,     // galones equivalentes por tonCO2
+  factorKmPorGalon:      45,        // km que recorre un auto promedio por galón (~12 km/L)
+  vidaUtilAnios:         25,        // años de vida útil garantizada del sistema
   sobredimension:        0.30,      // factor de sobredimensionamiento DC/AC (Excel: 30%)
   maxAC100kWp:           135,       // kWp DC umbral pequeño/gran autogenerador
   mantenimientoKwp:      45000,     // COP/kWp/año de mantenimiento
@@ -99,6 +101,8 @@ function calcularProyecto({
   const factorAreaM2PorKwp = n(cfg.factorAreaM2PorKwp, DEFAULTS.factorAreaM2PorKwp);
   const factorArboles      = n(cfg.factorArboles,      DEFAULTS.factorArboles);
   const factorGalones      = n(cfg.factorGalones,      DEFAULTS.factorGalones);
+  const factorKmPorGalon   = n(cfg.factorKmPorGalon,   DEFAULTS.factorKmPorGalon);
+  const vidaUtilAnios      = n(cfg.vidaUtilAnios,      DEFAULTS.vidaUtilAnios);
   const sobredimension     = tn(cfg.sobredimension,    DEFAULTS.sobredimension);
   const maxAC100kWp        = n(cfg.maxAC100kWp,        DEFAULTS.maxAC100kWp);
   const mantenimientoKwp   = n(cfg.mantenimientoKwp,   DEFAULTS.mantenimientoKwp);
@@ -134,7 +138,9 @@ function calcularProyecto({
   else                                   kwpLimitado = maxGrandeCalc;
 
   // E7 — kWp instalado (FLOOR al panel entero, igual que Excel)
-  const kwp = Math.floor(kwpLimitado / kWpPorPanel) * kWpPorPanel;
+  // Redondeamos a 2 decimales: paneles_enteros × 0,62 arrastra ruido de punto
+  // flotante (p.ej. 6 × 0,62 = 3,7199999999999998) que ensucia la UI.
+  const kwp = Number((Math.floor(kwpLimitado / kWpPorPanel) * kWpPorPanel).toFixed(2));
 
   // E8 — Potencia AC
   const potenciaAC = Number((kwp / (1 + sobredimension)).toFixed(2));
@@ -192,15 +198,18 @@ function calcularProyecto({
 
   // ── 7. TIR — perspectiva del cliente ─────────────────────
   // Flujos: inversión inicial negativa + ahorros anuales indexados por IPC
-  let tir5Anos = null, tir10Anos = null, tir15Anos = null;
+  // El horizonte llega a 25 años: es la vida útil garantizada del sistema y el
+  // mismo rango que grafica la propuesta.
+  let tir5Anos = null, tir10Anos = null, tir15Anos = null, tir25Anos = null;
   if (ahorroAnual > 0 && costoProyectoMasIva > 0) {
     const flujos = [-costoProyectoMasIva];
-    for (let i = 1; i <= 15; i++) {
+    for (let i = 1; i <= 25; i++) {
       flujos.push(Math.round(ahorroAnual * Math.pow(1 + inflacion, i - 1)));
     }
     try { tir5Anos  = Number((calcularTIR(flujos.slice(0, 6))  * 100).toFixed(1)); } catch(e) {}
     try { tir10Anos = Number((calcularTIR(flujos.slice(0, 11)) * 100).toFixed(1)); } catch(e) {}
     try { tir15Anos = Number((calcularTIR(flujos.slice(0, 16)) * 100).toFixed(1)); } catch(e) {}
+    try { tir25Anos = Number((calcularTIR(flujos.slice(0, 26)) * 100).toFixed(1)); } catch(e) {}
   }
 
   // ── 8. Equipos ───────────────────────────────────────────
@@ -250,6 +259,12 @@ function calcularProyecto({
   const co2EvitadoToneladas     = Number((kwp * factorCO2).toFixed(2));
   const arbolesEquivalentes     = Math.round(co2EvitadoToneladas / factorArboles);
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * factorGalones);
+  // CO2 acumulado durante toda la vida útil del sistema.
+  const co2EvitadoVidaUtil      = Number((co2EvitadoToneladas * vidaUtilAnios).toFixed(1));
+  // Equivalencia tangible: km que dejaría de recorrer un auto a gasolina.
+  const kmAutoEvitados          = Math.round(galonesGasolinaEvitados * factorKmPorGalon);
+  // Dato físico directo, sin factor de conversión.
+  const energiaLimpiaAnual      = Math.round(generacionMes * 12);
 
   const equipos = ['Paneles solares', 'Inversor', 'Estructuras', 'Cableado'];
 
@@ -291,6 +306,7 @@ function calcularProyecto({
     tir5Anos,
     tir10Anos,
     tir15Anos,
+    tir25Anos,
     costoProyecto,
     ahorroMensual,
     ahorroAnual,
@@ -388,6 +404,7 @@ function calcularProyecto({
     tir5Anos,
     tir10Anos,
     tir15Anos,
+    tir25Anos,
 
     equipos,
     areaMinima,
@@ -395,6 +412,9 @@ function calcularProyecto({
     arbolesEquivalentes,
     galonesGasolinaEvitados,
     co2EvitadoToneladas,
+    co2EvitadoVidaUtil,
+    kmAutoEvitados,
+    energiaLimpiaAnual,
 
     cantidadPaneles,
     cantidadInversores,

@@ -26,6 +26,8 @@ export const CALC_DEFAULTS = {
   factorCO2: 0.3612,
   factorArboles: 0.02,
   factorGalones: 117.6,
+  factorKmPorGalon: 45,
+  vidaUtilAnios: 25,
   sobredimension: 0.30,
   maxAC100kWp: 135,
   mantenimientoKwp: 45000,
@@ -81,6 +83,8 @@ export function calcularProyectoLocal(vars = {}) {
   const factorAreaM2PorKwp    = n(vars.factorAreaM2PorKwp,   CALC_DEFAULTS.factorAreaM2PorKwp);
   const factorArboles         = n(vars.factorArboles,        CALC_DEFAULTS.factorArboles);
   const factorGalones         = n(vars.factorGalones,        CALC_DEFAULTS.factorGalones);
+  const factorKmPorGalon      = n(vars.factorKmPorGalon,     CALC_DEFAULTS.factorKmPorGalon);
+  const vidaUtilAnios         = n(vars.vidaUtilAnios,        CALC_DEFAULTS.vidaUtilAnios);
   const sobredimension        = tn(vars.sobredimension,      CALC_DEFAULTS.sobredimension);
   const maxAC100kWp           = n(vars.maxAC100kWp,          CALC_DEFAULTS.maxAC100kWp);
   const mantenimientoKwp      = n(vars.mantenimientoKwp,     CALC_DEFAULTS.mantenimientoKwp);
@@ -112,7 +116,8 @@ export function calcularProyectoLocal(vars = {}) {
   else if (maxGrandeCalc < maxAC100kWp)  kwpLimitado = maxAC100kWp;
   else                                   kwpLimitado = maxGrandeCalc;
 
-  const kwp = Math.floor(kwpLimitado / kWpPorPanel) * kWpPorPanel;
+  // 2 decimales: paneles_enteros × 0,62 arrastra ruido de punto flotante.
+  const kwp = Number((Math.floor(kwpLimitado / kWpPorPanel) * kWpPorPanel).toFixed(2));
   const potenciaAC = Number((kwp / (1 + sobredimension)).toFixed(2));
 
   // ── 3. Producción ──
@@ -162,13 +167,15 @@ export function calcularProyectoLocal(vars = {}) {
     : null;
 
   // ── 7. TIR — perspectiva del cliente ──
-  let tir5Anos = null, tir10Anos = null, tir15Anos = null;
+  // Horizonte a 25 años: vida útil garantizada del sistema.
+  let tir5Anos = null, tir10Anos = null, tir15Anos = null, tir25Anos = null;
   if (ahorroAnual > 0 && costoProyectoMasIva > 0) {
     const flujos = [-costoProyectoMasIva];
-    for (let i = 1; i <= 15; i++) flujos.push(Math.round(ahorroAnual * Math.pow(1 + inflacion, i - 1)));
+    for (let i = 1; i <= 25; i++) flujos.push(Math.round(ahorroAnual * Math.pow(1 + inflacion, i - 1)));
     try { tir5Anos  = Number((calcularTIR(flujos.slice(0, 6))  * 100).toFixed(1)); } catch (e) {}
     try { tir10Anos = Number((calcularTIR(flujos.slice(0, 11)) * 100).toFixed(1)); } catch (e) {}
     try { tir15Anos = Number((calcularTIR(flujos.slice(0, 16)) * 100).toFixed(1)); } catch (e) {}
+    try { tir25Anos = Number((calcularTIR(flujos.slice(0, 26)) * 100).toFixed(1)); } catch (e) {}
   }
 
   // ── 8. Equipos ──
@@ -191,6 +198,9 @@ export function calcularProyectoLocal(vars = {}) {
   const co2EvitadoToneladas     = Number((kwp * factorCO2).toFixed(2));
   const arbolesEquivalentes     = Math.round(co2EvitadoToneladas / factorArboles);
   const galonesGasolinaEvitados = Math.round(co2EvitadoToneladas * factorGalones);
+  const co2EvitadoVidaUtil      = Number((co2EvitadoToneladas * vidaUtilAnios).toFixed(1));
+  const kmAutoEvitados          = Math.round(galonesGasolinaEvitados * factorKmPorGalon);
+  const energiaLimpiaAnual      = Math.round(generacionMes * 12);
 
   return {
     consumoKwh: consumo,
@@ -245,11 +255,15 @@ export function calcularProyectoLocal(vars = {}) {
     tir5Anos,
     tir10Anos,
     tir15Anos,
+    tir25Anos,
 
     areaMinima,
     arbolesEquivalentes,
     galonesGasolinaEvitados,
     co2EvitadoToneladas,
+    co2EvitadoVidaUtil,
+    kmAutoEvitados,
+    energiaLimpiaAnual,
 
     mantenimientoAnual,
     indexacionIPC: inflacion,
