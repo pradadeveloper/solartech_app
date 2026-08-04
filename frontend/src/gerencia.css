@@ -1,0 +1,87 @@
+/* ============================================================
+   RESUMEN GERENCIA + FORECAST EQUIPOS — vistas admin imprimibles
+   ============================================================ */
+.ger { min-width: 0; }
+
+.ger-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.ger-title { margin: 0; font-size: 1.25rem; color: var(--text); }
+.ger-sub { margin: 4px 0 0; font-size: 0.85rem; color: var(--muted); }
+
+.ger-print { white-space: nowrap; }
+
+/* KPIs */
+.ger-kpis {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 22px;
+}
+.ger-kpi {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 3px;
+}
+.ger-kpi__value { font-size: 1.6rem; font-weight: 800; color: var(--text); line-height: 1; }
+.ger-kpi__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.ger-kpi__sub { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+.ger-kpi--good .ger-kpi__value { color: #16a34a; }
+.ger-kpi--bad  .ger-kpi__value { color: #dc2626; }
+
+/* Tabla */
+.ger-tablewrap {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  overflow-x: auto;
+}
+.ger-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 720px; }
+.ger-table th {
+  background: var(--panel2); color: var(--muted); font-weight: 700; text-align: right;
+  padding: 12px 14px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.ger-table td {
+  padding: 12px 14px; text-align: right; color: var(--text);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.ger-table tbody tr:hover { background: var(--panel2); }
+.ger-table tfoot td {
+  font-weight: 800; background: var(--accent-light); color: var(--text);
+  border-top: 2px solid var(--accent); border-bottom: none;
+}
+.ger-good { color: #16a34a; font-weight: 700; }
+.ger-bad  { color: #dc2626; font-weight: 700; }
+
+.ger-foot { margin-top: 16px; font-size: 0.76rem; color: var(--muted2); line-height: 1.6; }
+
+/* Forecast: encabezado de mes y control de lead time */
+.fc-month {
+  background: var(--accent-light); font-weight: 800; color: var(--accent);
+  text-transform: capitalize;
+}
+.fc-control {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 18px; font-size: 0.85rem; color: var(--muted);
+}
+.fc-control label { font-weight: 700; color: var(--text); }
+.fc-control input {
+  width: 90px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; color: var(--text); font-size: 0.9rem; font-weight: 700;
+}
+.fc-control input:focus { outline: none; border-color: var(--accent); }
+
+@media (max-width: 900px) {
+  .ger-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Impresión: solo el reporte, sin sidebar/topbar ── */
+@media print {
+  .sidebar, .sidebar-backdrop, .topbar, .ger-print { display: none !important; }
+  .dash, .dash--sidebar { display: block !important; }
+  .main, .content { margin: 0 !important; padding: 0 !important; }
+  .ger-kpi, .ger-tablewrap, .ger-table th { background: #fff !important; }
+  .ger-table, .ger-tablewrap { border-color: #ccc !important; }
+  .ger-table th, .ger-table td { border-color: #ddd !important; }
+  .ger-title { color: #000 !important; }
+  .ger-tablewrap { overflow: visible !important; }
+  .ger-table { min-width: 0 !important; font-size: 10px !important; }
+  @page { margin: 1.2cm; }
+}

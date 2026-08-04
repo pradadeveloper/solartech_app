@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./dashboardAdmon.css";
+import LeadCRMDrawer from "./LeadCRMDrawer";
 
 const ESTADOS = ["", "Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado", "Perdido"];
 
@@ -41,6 +42,8 @@ export default function LeadsCotizaciones() {
   const [loading, setLoading] = useState(true);
   const [f, setF] = useState(FILTRO_INIT);
   const [generandoPdf, setGenerandoPdf] = useState({});
+  const [leadActivoNum, setLeadActivoNum] = useState(null);   // numeroCotizacion del drawer abierto
+  const [guardandoEstado, setGuardandoEstado] = useState(false);
   const navigate = useNavigate();
 
   const rol = localStorage.getItem('rolUsuario') || 'Asesor';
@@ -116,16 +119,57 @@ export default function LeadsCotizaciones() {
     return lista;
   }, [leads, f]);
 
+  const matchLead = (l, lead) => String(l.numeroCotizacion) === String(lead.numeroCotizacion);
+
   const actualizarEstado = async (lead, estado) => {
-    setLeads((prev) =>
-      prev.map((l) => l.id === lead.id ? { ...l, estado } : l)
-    );
-    await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${lead.numeroCotizacion}/estado`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado }),
-    });
+    setGuardandoEstado(true);
+    // Optimista: cambia estado ya.
+    setLeads((prev) => prev.map((l) => matchLead(l, lead) ? { ...l, estado } : l));
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${lead.numeroCotizacion}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ estado }),
+      });
+      const data = await res.json();
+      // El backend devuelve el historial actualizado y (si cerró) la fecha de cierre.
+      if (data.historialEstados) {
+        setLeads((prev) => prev.map((l) => matchLead(l, lead)
+          ? { ...l, estado, historialEstados: data.historialEstados, ...(estado === "Cerrado" && !l.fechaCierre ? { fechaCierre: new Date().toISOString() } : {}) }
+          : l));
+      }
+    } catch {
+      alert("No se pudo actualizar el estado.");
+    } finally {
+      setGuardandoEstado(false);
+    }
   };
+
+  const agregarActividad = async (lead, tipo, texto) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${lead.numeroCotizacion}/actividad`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ tipo, texto }),
+      });
+      const data = await res.json();
+      if (data.actividad) {
+        setLeads((prev) => prev.map((l) => matchLead(l, lead)
+          ? { ...l, actividades: [...(l.actividades || []), data.actividad] }
+          : l));
+      } else {
+        alert(data.error || "No se pudo guardar la nota.");
+      }
+    } catch {
+      alert("No se pudo guardar la nota.");
+    }
+  };
+
+  const leadActivo = leadActivoNum != null
+    ? leads.find((l) => String(l.numeroCotizacion) === String(leadActivoNum)) || null
+    : null;
 
   const opcionPrincipal = (lead) => lead.opciones?.find((o) => o.seleccionada) ?? null;
   const pdfPrincipal = (lead) => {
@@ -212,7 +256,14 @@ export default function LeadsCotizaciones() {
             return (
               <div key={lead.id} className="lead-card">
                 <div className="lead-card__top">
-                  <div className="lead-card__nombre">{lead.nombre}</div>
+                  <button
+                    className="lead-card__nombre"
+                    onClick={() => setLeadActivoNum(lead.numeroCotizacion)}
+                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}
+                    title="Abrir gestión CRM"
+                  >
+                    {lead.nombre}
+                  </button>
                   <span className="lead-card__fecha">{safeDate(lead.fecha)}</span>
                 </div>
                 <div className="lead-card__valor">{money(lead.costoProyectoMasIva)}</div>
@@ -400,7 +451,15 @@ export default function LeadsCotizaciones() {
                       <td style={{ padding: "10px 12px", color: "var(--muted)", whiteSpace: "nowrap" }}>
                         {safeDate(lead.fecha)}
                       </td>
-                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{lead.nombre}</td>
+                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                        <button
+                          onClick={() => setLeadActivoNum(lead.numeroCotizacion)}
+                          style={{ background: "none", border: "none", padding: 0, font: "inherit", fontWeight: 600, color: "var(--text)", cursor: "pointer", textAlign: "left" }}
+                          title="Abrir gestión CRM"
+                        >
+                          {lead.nombre}
+                        </button>
+                      </td>
                       <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.ubicacion}</td>
                       <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right" }}>{lead.consumoKwh ?? "—"}</td>
                       <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right", color: "var(--accent)" }}>{lead.kwp ?? "—"}</td>
@@ -483,6 +542,18 @@ export default function LeadsCotizaciones() {
           </table>
         </div>
         </>
+      )}
+
+      {leadActivo && (
+        <LeadCRMDrawer
+          lead={leadActivo}
+          guardando={guardandoEstado}
+          pdfUrl={pdfPrincipal(leadActivo)}
+          onClose={() => setLeadActivoNum(null)}
+          onEstado={(estado) => actualizarEstado(leadActivo, estado)}
+          onActividad={(tipo, texto) => agregarActividad(leadActivo, tipo, texto)}
+          onVerCompleto={(lead) => { setLeadActivoNum(null); verLead(lead); }}
+        />
       )}
     </div>
   );

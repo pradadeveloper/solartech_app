@@ -5,6 +5,8 @@ import DashboardResumen from './DashboardResumen';
 import CotizadorSolar from './CotizadorSolar';
 import Resultado from './Resultado';
 import LeadsCotizaciones from './LeadsCotizaciones';
+import ResumenGerencia from './ResumenGerencia';
+import ForecastEquipos from './ForecastEquipos';
 import Asesores from './Asesores';
 import Configuracion from './Configuracion';
 import AgenteIA from './AgenteIA';
@@ -29,6 +31,8 @@ root.render(
         <Route path="cliente" element={<CotizadorSolar />} />
         <Route path="resultado" element={<Resultado />} />
         <Route path="leads" element={<LeadsCotizaciones />} />
+        <Route path="gerencia" element={<ResumenGerencia />} />
+        <Route path="forecast" element={<ForecastEquipos />} />
         <Route path="agente" element={<AgenteIA />} />
         <Route path="asesores" element={<Asesores />} />
         <Route path="configuracion" element={<Configuracion />} />

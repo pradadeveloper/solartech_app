@@ -6,13 +6,14 @@ import "./dashboardAdmon.css";
 const NAV_ITEMS = [
   { label: 'Resumen',              path: '/',              adminOnly: false },
   { label: 'Leads y Cotizaciones', path: '/leads',         adminOnly: false },
+  { label: 'Resumen Gerencia',     path: '/gerencia',      adminOnly: true  },
+  { label: 'Forecast Equipos',     path: '/forecast',      adminOnly: true  },
   { label: 'Agente IA',            path: '/agente',        adminOnly: false },
   { label: 'Asesores',             path: '/asesores',      adminOnly: true  },
-  { label: 'Proyectos',            path: null,             adminOnly: false },
   { label: 'Configuración',        path: '/configuracion', adminOnly: true  },
 ];
 
-const RUTAS_ADMIN = ['/asesores', '/configuracion'];
+const RUTAS_ADMIN = ['/gerencia', '/forecast', '/asesores', '/configuracion'];
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
