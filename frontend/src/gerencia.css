@@ -11,6 +11,8 @@
 .ger-sub { margin: 4px 0 0; font-size: 0.85rem; color: var(--muted); }
 
 .ger-print { white-space: nowrap; }
+.ger-head__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.ger-print:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* KPIs */
 .ger-kpis {

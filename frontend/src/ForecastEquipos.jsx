@@ -81,6 +81,25 @@ export default function ForecastEquipos() {
 
   const hoy = new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" });
 
+  // Exporta el forecast a CSV (Excel lo abre con doble click).
+  const exportarCSV = () => {
+    const encabezados = ["Mes de entrega", "Proyectos", ...LINEAS.map((l) => `${l.label} (${l.unidad})`)];
+    const filas = meses.map((mes) => [
+      `"${mes.label}"`,
+      mes.proyectos,
+      ...LINEAS.map((l) => mes.lineas[l.key] || 0),
+    ]);
+    const filaTotal = ["TOTAL", cerrados.length, ...LINEAS.map((l) => total[l.key] || 0)];
+    const csv = [encabezados, ...filas, filaTotal].map((r) => r.join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `forecast_equipos_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) return <p style={{ color: "var(--muted)", textAlign: "center", marginTop: 60 }}>Cargando forecast…</p>;
 
   return (
@@ -92,7 +111,12 @@ export default function ForecastEquipos() {
             Equipos a adquirir según proyectos cerrados · {cerrados.length} proyecto{cerrados.length === 1 ? "" : "s"} · {hoy}
           </p>
         </div>
-        <button className="btn btn--primary ger-print" onClick={() => window.print()}>🖨 Imprimir</button>
+        <div className="ger-head__actions">
+          <button className="btn btn--ghost ger-print" onClick={exportarCSV} disabled={cerrados.length === 0}>
+            ↓ Exportar a Excel
+          </button>
+          <button className="btn btn--primary ger-print" onClick={() => window.print()}>🖨 Imprimir</button>
+        </div>
       </div>
 
       {/* Control de lead time */}
