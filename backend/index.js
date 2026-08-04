@@ -151,10 +151,28 @@ function generarPropuestaId(existentes = []) {
 async function updateLeadField(numeroCotizacion, fields) {
   if (USE_GOOGLE) return gAdapter.updateLead(numeroCotizacion, fields);
   const leads = await getAllLeads();
-  const idx = leads.findIndex(l => l.numeroCotizacion === numeroCotizacion);
+  // Comparación por string: los leads base guardan numeroCotizacion como número
+  // y los params de ruta llegan como string ("83" !== 83 rompía el match).
+  const idx = leads.findIndex(l => String(l.numeroCotizacion) === String(numeroCotizacion));
   if (idx === -1) throw new Error('Lead no encontrado');
   Object.assign(leads[idx], fields);
   fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
+}
+
+// Devuelve un lead por numeroCotizacion (match por string), o null.
+async function getLead(numeroCotizacion) {
+  const leads = await getAllLeads();
+  return leads.find(l => String(l.numeroCotizacion) === String(numeroCotizacion)) || null;
+}
+
+// Extrae { nombre, usuario, rol } del Bearer token, o null si no hay/está mal.
+function getUsuarioDeReq(req) {
+  const auth = req.headers['authorization'];
+  if (!auth || !auth.startsWith('Bearer ')) return null;
+  try {
+    const d = jwt.verify(auth.slice(7), JWT_SECRET);
+    return { nombre: d.nombre || d.usuario, usuario: d.usuario, rol: d.rol || 'Asesor' };
+  } catch (_) { return null; }
 }
 
 async function getNextContador() {
@@ -1514,8 +1532,50 @@ app.patch('/api/leads/:numeroCotizacion/estado', express.json(), async (req, res
   const num = String(req.params.numeroCotizacion);
   const { estado } = req.body;
   try {
-    await updateLeadField(num, { estado });
-    res.json({ ok: true });
+    const lead = await getLead(num);
+    if (!lead) throw new Error('Lead no encontrado');
+
+    const usuario = getUsuarioDeReq(req);
+    const fecha = new Date().toISOString();
+    const estadoAnterior = lead.estado || 'Nuevo';
+
+    // Ciclo de vida: registramos el cambio solo si el estado realmente cambia.
+    const historial = Array.isArray(lead.historialEstados) ? lead.historialEstados.slice() : [];
+    const campos = { estado };
+    if (estado !== estadoAnterior) {
+      historial.push({ de: estadoAnterior, a: estado, fecha, usuario: usuario?.nombre || lead.vendedor || 'Sistema' });
+      campos.historialEstados = historial;
+      // fechaCierre: se fija al primer paso a "Cerrado" (base del forecast de equipos).
+      if (estado === 'Cerrado' && !lead.fechaCierre) campos.fechaCierre = fecha;
+    }
+
+    await updateLeadField(num, campos);
+    res.json({ ok: true, historialEstados: campos.historialEstados || historial });
+  } catch (err) {
+    res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
+  }
+});
+
+// ====== POST /api/leads/:numeroCotizacion/actividad — nota/gestión del asesor ======
+app.post('/api/leads/:numeroCotizacion/actividad', express.json(), async (req, res) => {
+  const num = String(req.params.numeroCotizacion);
+  const { tipo, texto } = req.body || {};
+  if (!texto || !String(texto).trim()) return res.status(400).json({ error: 'La nota no puede estar vacía.' });
+  try {
+    const lead = await getLead(num);
+    if (!lead) throw new Error('Lead no encontrado');
+    const usuario = getUsuarioDeReq(req);
+    const actividad = {
+      id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      tipo: tipo || 'nota',           // 'nota' | 'llamada' | 'correo' | 'reunion' | 'whatsapp'
+      texto: String(texto).trim(),
+      fecha: new Date().toISOString(),
+      usuario: usuario?.nombre || lead.vendedor || 'Sistema',
+    };
+    const actividades = Array.isArray(lead.actividades) ? lead.actividades.slice() : [];
+    actividades.push(actividad);
+    await updateLeadField(num, { actividades });
+    res.json({ ok: true, actividad });
   } catch (err) {
     res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
   }
