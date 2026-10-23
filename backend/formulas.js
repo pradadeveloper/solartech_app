@@ -151,7 +151,9 @@ function calcularProyecto({
   const facturaPromedio = Math.round(consumo * costoUnidad);
 
   // ── 4. Excedentes — E11, E12 ─────────────────────────────
-  const costoKwhAjustado = contribucion ? costoUnidad * 1.2 : costoUnidad;          // E25
+  // El formulario llega como multipart: "false" es texto y antes contaba como verdadero.
+  const pagaContribucion = contribucion === true || ['true', 'si', 'sí', '1'].includes(String(contribucion).trim().toLowerCase());
+  const costoKwhAjustado = pagaContribucion ? costoUnidad * 1.2 : costoUnidad;      // E25
   const ratioGenConsumo  = consumo > 0 ? generacionMes / consumo : 0;              // E11
 
   let excedentes;
@@ -353,7 +355,7 @@ function calcularProyecto({
     consumoKwh: consumo,
     costoKwh: costoUnidad,
     costoKwhAjustado,
-    contribucion: !!contribucion,
+    contribucion: pagaContribucion,
     valorMensual: facturaPromedio,
     areaDisponible: Number.isNaN(areaDisp) ? null : areaDisp,
 

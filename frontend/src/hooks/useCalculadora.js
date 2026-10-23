@@ -94,7 +94,8 @@ export function calcularProyectoLocal(vars = {}) {
   const anticipo3Pct          = tn(vars.anticipo3Pct,        CALC_DEFAULTS.anticipo3Pct);
   const costoGeneracion       = tn(vars.costoGeneracion,     CALC_DEFAULTS.costoGeneracion);
   const costoComercializacion = tn(vars.costoComercializacion, CALC_DEFAULTS.costoComercializacion);
-  const contribucion          = !!vars.contribucion;
+  // Puede llegar como texto ("false" contaba como verdadero).
+  const contribucion          = vars.contribucion === true || ['true', 'si', 'sí', '1'].includes(String(vars.contribucion).trim().toLowerCase());
 
   // ── 1. Radiación ──
   const radiacionSolarCobertura = Number((radiacionSolar * margenCobertura).toFixed(2));

@@ -18,6 +18,8 @@ export default function CotizadorSolar() {
     tipoSolicitud: "",
     tipoTecho: "",
     sistemaInteres: "Interconectado",
+    modalidad: "recursos_propios",   // recursos_propios | ppa
+    tipoDocumento: "",               // CC | NIT — con NIT aplica la Ley 1715
     consumoKwh: "",
     costoKwh: "",
     conociste: "",
@@ -65,7 +67,7 @@ export default function CotizadorSolar() {
   const requiredFields = [
     "nombre", "identificacion", "correo", "telefono",
     "departamentoSolar", "ciudadSolar", "tipoSolicitud",
-    "consumoKwh", "costoKwh", "areaDisponible", "tipoTecho",
+    "consumoKwh", "costoKwh", "areaDisponible", "tipoTecho", "tipoDocumento",
   ];
   const canSubmit = useMemo(
     () => requiredFields.every((k) => String(formData[k] ?? "").trim().length > 0),
@@ -115,7 +117,7 @@ export default function CotizadorSolar() {
       costoKwh: String(rand(600, 1100)),
       areaDisponible: String(rand(40, 500)),
       tipoTecho: pick(["Standing Seam", "Termoacústica", "Teja de barro", "Manto Asfáltico", "Teja Eternit", "Losa"]),
-      sistemaInteres: pick(["Interconectado", "Aislado", "Híbrido"]),
+      sistemaInteres: pick(["Interconectado", "Aislado", "Híbrido"]), tipoDocumento: pick(["CC", "NIT"]),
       conociste: pick(["Instagram", "Facebook", "LinkedIn", "Google", "Referido"]),
     }));
   };
@@ -238,6 +240,15 @@ export default function CotizadorSolar() {
                   <input name="nombre" value={formData.nombre} onChange={handleChange} required />
                 </Field>
 
+                <Field label="Tipo de documento">
+                  <select name="tipoDocumento" value={formData.tipoDocumento} onChange={handleChange} required>
+                    <option value="">Selecciona</option>
+                    <option value="CC">Cédula de ciudadanía</option>
+                    <option value="NIT">NIT (empresa)</option>
+                    <option value="CE">Cédula de extranjería</option>
+                  </select>
+                </Field>
+
                 <Field label="Cédula / NIT">
                   <input
                     name="identificacion"
@@ -352,6 +363,22 @@ export default function CotizadorSolar() {
 
             <Card title="Detalles del proyecto">
               <div className="cotTwoCol">
+                <Field label="Modalidad de negocio">
+                  <select name="modalidad" value={formData.modalidad} onChange={handleChange}>
+                    <option value="recursos_propios">Recursos propios</option>
+                    <option value="ppa">PPA (sin inversión)</option>
+                  </select>
+                </Field>
+
+                <div className="cotField">
+                  <span className="cotLabel">&nbsp;</span>
+                  <p className="cotNotaModalidad">
+                    {formData.modalidad === "ppa"
+                      ? "Solartech invierte; el cliente paga la energía 35 % más barata por 15 años y luego los equipos son suyos."
+                      : "El cliente compra el sistema. Con NIT se incluyen los beneficios de la Ley 1715."}
+                  </p>
+                </div>
+
                 <Field label="Tipo de techo">
                   <select name="tipoTecho" value={formData.tipoTecho} onChange={handleChange} required>
                     <option value="">Selecciona</option>
@@ -427,6 +454,7 @@ export default function CotizadorSolar() {
                 <div className="cotDivider" />
                 <SummaryRow label="Canal" value={formData.conociste || "—"} />
                 <SummaryRow label="Tipo" value={formData.tipoSolicitud || "—"} />
+                <SummaryRow label="Modalidad" value={formData.modalidad === "ppa" ? "PPA (sin inversión)" : "Recursos propios"} />
               </Card>
             </div>
 

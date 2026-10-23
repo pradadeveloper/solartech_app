@@ -1,13 +1,13 @@
 import { useParams } from "react-router-dom";
+import { AnalisisRecursosPropios, PropuestaPPA } from "./components/FinanzasPropuesta";
+import { calcularPPA, entradasDesde } from "./finanzas";
 import { avisar } from "./components/Avisos";
 import { useMemo, useState, useEffect, useRef } from "react";
 import logo from "./assets/logo_solartech.webp";
 import "./cotizadorSolar.css";
 import "./propuestaPublica.css";
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine,
-  BarChart, Bar, LineChart, Line, Legend,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, XAxis, YAxis, CartesianGrid, BarChart, Bar, Legend,
 } from "recharts";
 
 const API = process.env.REACT_APP_API_URL;
@@ -15,24 +15,7 @@ const API = process.env.REACT_APP_API_URL;
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const FACTORES_MES = [0.85, 0.88, 0.92, 0.95, 0.97, 1.0, 1.02, 1.0, 0.97, 0.93, 0.88, 0.85];
 
-const formatCOP = (v) => `$ ${Math.round(Number(v) || 0).toLocaleString('es-CO')} COP`;
 
-// TIR (Newton-Raphson) — helper propio del simulador what-if (BLOQUE 2), no toca calcularLocal.
-function calcularTIRSimulador(flujos, guess = 0.1) {
-  let tasa = guess;
-  for (let i = 0; i < 1000; i++) {
-    let vpn = 0, dvpn = 0;
-    for (let t = 0; t < flujos.length; t++) {
-      vpn += flujos[t] / Math.pow(1 + tasa, t);
-      dvpn -= (t * flujos[t]) / Math.pow(1 + tasa, t + 1);
-    }
-    if (dvpn === 0) break;
-    const nueva = tasa - vpn / dvpn;
-    if (Math.abs(nueva - tasa) < 1e-7) return nueva;
-    tasa = nueva;
-  }
-  return tasa;
-}
 
 /* ── Inline SVG icons — no deps ── */
 const IconDownload = () => (
@@ -99,10 +82,6 @@ const IconRuler   = mkIcon(<><path d="M3 8l13 13 5-5L8 3z" /><path d="M7 7l1.5 1
 const IconPie     = mkIcon(<><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></>);
 const IconWallet  = mkIcon(<><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0 0 4h4v-4z" /></>);
 const IconPiggy   = mkIcon(<><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h2.5l1-1.5h4l1 1.5H18v-3c1-.7 1.7-1.6 2-2.5h2v-4h-2c0-1-.5-1.5-1-2z" /><path d="M9 8h4" /><circle cx="16" cy="11" r="0.5" /></>);
-const IconCoins   = mkIcon(<><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /></>);
-const IconReceipt = mkIcon(<><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z" /><path d="M8 8h8M8 12h6" /></>);
-const IconCalendar= mkIcon(<><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>);
-const IconHome    = mkIcon(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>);
 const IconLeaf    = mkIcon(<><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" /><path d="M2 21c0-3 1.85-5.36 5.08-6" /></>);
 const IconTree    = mkIcon(<><path d="M12 22v-7" /><path d="M9 8a3 3 0 0 1 0-6c1 0 1.7.4 2.2 1A3 3 0 0 1 16 5a3 3 0 0 1-1 5" /><path d="M12 15l-3.5-3.5a3 3 0 1 1 4.2-4.2" /><path d="M12 15l3.5-3.5a3 3 0 1 0-4.2-4.2" /></>);
 const IconFuel    = mkIcon(<><path d="M3 22V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v18" /><path d="M2 22h12" /><path d="M13 8h3l3 3v6a2 2 0 0 1-4 0v-4" /><path d="M6 6h4" /></>);
@@ -252,12 +231,6 @@ export default function PropuestaPublica() {
   const [pdfUrlLocal, setPdfUrlLocal]   = useState(null);
   const [baseLead, setBaseLead] = useState(null);
 
-  // ── BLOQUE 2 — Simulador financiero what-if ──
-  const [simTarifa, setSimTarifa] = useState(null);       // se seed una vez cargue la propuesta
-  const [simHorizonte, setSimHorizonte] = useState(25);
-  const [simInflacion, setSimInflacion] = useState(8);
-  const [simDeduccionRenta, setSimDeduccionRenta] = useState(false);
-  const [simDepreciacion, setSimDepreciacion] = useState(false);
 
   useEffect(() => {
     // Primero busca en la pestaña "propuestas" (flujo nuevo: guardado explícito
@@ -329,66 +302,17 @@ export default function PropuestaPublica() {
     return merged;
   }, [lead, calc]);
 
-  // Seed la tarifa del simulador con el costo kWh real de la propuesta (una sola vez).
-  useEffect(() => {
-    if (simTarifa === null && r?.costoKwh > 0) setSimTarifa(Number(r.costoKwh));
-  }, [simTarifa, r?.costoKwh]);
+  // Modalidad de negocio: recursos propios (compra) o PPA (sin inversión).
+  const modalidad = lead?.modalidad === 'ppa' ? 'ppa' : 'recursos_propios';
+  const ppaHero = Number(r?.kwp) > 0 && Number(r?.costoKwh) > 0 ? calcularPPA(entradasDesde(r), cfg) : null;
+
 
   const money = (v) => typeof v === 'number' ? v.toLocaleString('es-CO') : (v ?? '—');
 
   const ahorroMensual        = r?.ahorroMensual  || 0;
   const ahorroAnual          = r?.ahorroAnual    || 0;
   const tiempoRetorno        = r?.tiempoRetorno  || null;
-  const ahorro10Anos         = r?.ahorro10Anos   ?? (ahorroAnual > 0 ? ahorroAnual * 10 : null);
-  const descuentoDeclaracion = r?.descuentoDeclaracion ??
-    (lead?.costoProyectoMasIva > 0 ? Math.round((lead.costoProyectoMasIva / 1.05) * 0.5) : null);
 
-  // ── BLOQUE 2 — Simulador financiero what-if: recalcula todo en vivo con los sliders/toggles ──
-  const simulador = useMemo(() => {
-    const consumoKwh = Number(r?.consumoKwh) || 0;
-    const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
-    const inversionSinIva = Number(r?.costoProyecto) || 0;
-    const tarifa = Number(simTarifa) || 0;
-    const inflacion = Number(simInflacion) / 100;
-    const horizonte = Number(simHorizonte) || 25;
-
-    if (!consumoKwh || !inversionTotal || !tarifa) return null;
-
-    const ahorroAnualBase = consumoKwh * 12 * tarifa;
-    const beneficioRenta = simDeduccionRenta ? inversionSinIva * 0.25 * 0.35 : 0;
-    // El beneficio de depreciar es el escudo fiscal (depreciación x tasa de renta ~35%),
-    // NO el 100% del activo: depreciarlo entero no devuelve su valor en efectivo.
-    const beneficioDepreciacion = simDepreciacion ? inversionSinIva * 0.35 : 0;
-    const inversionNeta = Math.max(0, inversionTotal - beneficioRenta - beneficioDepreciacion);
-
-    const payback = ahorroAnualBase > 0 ? Number((inversionNeta / ahorroAnualBase).toFixed(1)) : null;
-
-    // Flujos para TIR/VPN: año 0 = -inversión neta, años 1..horizonte = ahorro indexado por inflación
-    const flujos = [-inversionNeta];
-    for (let i = 1; i <= horizonte; i++) {
-      flujos.push(ahorroAnualBase * Math.pow(1 + inflacion, i - 1));
-    }
-
-    let tir = null;
-    try { tir = Number((calcularTIRSimulador(flujos) * 100).toFixed(1)); } catch (e) {}
-
-    const tasaDescuento = 0.10;
-    const vpn = Math.round(flujos.reduce((acc, flujo, t) => acc + flujo / Math.pow(1 + tasaDescuento, t), 0));
-
-    const ahorroTotalNominal = flujos.slice(1).reduce((a, b) => a + b, 0);
-    const roi = inversionNeta > 0 ? Number((((ahorroTotalNominal - inversionNeta) / inversionNeta) * 100).toFixed(1)) : null;
-
-    // Serie del gráfico de flujo de caja acumulado (fórmulas tal como se especificaron)
-    const cashflow = Array.from({ length: horizonte + 1 }, (_, N) => ({
-      year: N,
-      'Con solar': Math.round(-inversionTotal + ahorroAnualBase * N * Math.pow(1 + inflacion, N)),
-      'Sin solar': Math.round(-(consumoKwh * 12 * tarifa * N * Math.pow(1 + inflacion, N))),
-    }));
-
-    return {
-      inversionTotal, ahorroAnualBase, payback, tir, vpn, roi, cashflow,
-    };
-  }, [r?.consumoKwh, r?.costoProyectoMasIva, r?.costoProyecto, simTarifa, simInflacion, simHorizonte, simDeduccionRenta, simDepreciacion]);
 
   const descargarPdf = async () => {
     const url = pdfUrlLocal || lead?.pdfUrl;
@@ -490,23 +414,45 @@ export default function PropuestaPublica() {
               : <span className="pp-hero-value">— kWp</span>}
             <span className="pp-hero-label">Potencia</span>
           </div>
-          <div className="pp-hero-metric">
-            <span className="pp-hero-icon"><IconWallet /></span>
-            <CountUp className="pp-hero-value pp-hero-value--accent" value={r?.costoProyectoMasIva} prefix="$" money />
-            <span className="pp-hero-label">Inversión total</span>
-          </div>
-          <div className="pp-hero-metric">
-            <span className="pp-hero-icon"><IconClock /></span>
-            {tiempoRetorno != null
-              ? <CountUp className="pp-hero-value" value={tiempoRetorno} suffix=" años" />
-              : <span className="pp-hero-value">— años</span>}
-            <span className="pp-hero-label">Retorno</span>
-          </div>
-          <div className="pp-hero-metric">
-            <span className="pp-hero-icon"><IconPiggy /></span>
-            <CountUp className="pp-hero-value" value={ahorroMensual} prefix="$" money />
-            <span className="pp-hero-label">Ahorro / mes</span>
-          </div>
+          {modalidad === 'ppa' && ppaHero ? (
+            <>
+              <div className="pp-hero-metric">
+                <span className="pp-hero-icon"><IconWallet /></span>
+                <span className="pp-hero-value pp-hero-value--accent">$0</span>
+                <span className="pp-hero-label">Tu inversión</span>
+              </div>
+              <div className="pp-hero-metric">
+                <span className="pp-hero-icon"><IconClock /></span>
+                <CountUp className="pp-hero-value" value={Math.round(ppaHero.tarifaPPA1)} prefix="$" money />
+                <span className="pp-hero-label">Tu tarifa por kWh ({Math.round(ppaHero.descuento * 100)} % menos)</span>
+              </div>
+              <div className="pp-hero-metric">
+                <span className="pp-hero-icon"><IconPiggy /></span>
+                <CountUp className="pp-hero-value" value={Math.round(ppaHero.ahorroMensual1)} prefix="$" money />
+                <span className="pp-hero-label">Ahorro el primer mes</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="pp-hero-metric">
+                <span className="pp-hero-icon"><IconWallet /></span>
+                <CountUp className="pp-hero-value pp-hero-value--accent" value={r?.costoProyectoMasIva} prefix="$" money />
+                <span className="pp-hero-label">Inversión total</span>
+              </div>
+              <div className="pp-hero-metric">
+                <span className="pp-hero-icon"><IconClock /></span>
+                {tiempoRetorno != null
+                  ? <CountUp className="pp-hero-value" value={tiempoRetorno} suffix=" años" />
+                  : <span className="pp-hero-value">— años</span>}
+                <span className="pp-hero-label">Retorno</span>
+              </div>
+              <div className="pp-hero-metric">
+                <span className="pp-hero-icon"><IconPiggy /></span>
+                <CountUp className="pp-hero-value" value={ahorroMensual} prefix="$" money />
+                <span className="pp-hero-label">Ahorro / mes</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="cotGrid">
@@ -564,86 +510,65 @@ export default function PropuestaPublica() {
             {/* BLOQUE 1 — Generación vs Consumo mensual */}
             <ChartGeneracionConsumo r={r} ciudad={lead.ubicacion} />
 
-            {/* Análisis financiero */}
-            <Card title="Análisis financiero">
-              <div className="pp-metrics-grid">
-                <Metric icon={<IconWallet />}   label="Inversión estimada (con IVA)"   value={`$ ${money(r?.costoProyectoMasIva)}`} />
-                <Metric icon={<IconPiggy />}    label="Ahorro mensual estimado"        value={`$ ${money(ahorroMensual)}`} />
-                <Metric icon={<IconCoins />}    label="Ahorro anual estimado"          value={`$ ${money(ahorroAnual)}`} />
-                <Metric icon={<IconTrendUp />}  label="Ahorro proyectado a 10 años"    value={`$ ${money(ahorro10Anos)}`} />
-                <Metric icon={<IconClock />}    label="Retorno de inversión"           value={`${tiempoRetorno ?? '—'} años`} />
-                <Metric icon={<IconReceipt />}  label="Descuento declaración de renta" value={`$ ${money(descuentoDeclaracion)}`} />
-                <Metric icon={<IconCalendar />} label="Vida útil estimada"             value="25 años" />
-                <Metric icon={<IconHome />}     label="Valorización aproximada"        value="4 – 10%" />
-              </div>
-              <div className="pp-divider" />
-              <ChartFinanciero r={r} />
-            </Card>
-
-            {/* BLOQUE 2 — Simulador financiero what-if */}
-            <SimuladorFinanciero
-              simTarifa={simTarifa} setSimTarifa={setSimTarifa}
-              simHorizonte={simHorizonte} setSimHorizonte={setSimHorizonte}
-              simInflacion={simInflacion} setSimInflacion={setSimInflacion}
-              simDeduccionRenta={simDeduccionRenta} setSimDeduccionRenta={setSimDeduccionRenta}
-              simDepreciacion={simDepreciacion} setSimDepreciacion={setSimDepreciacion}
-              simulador={simulador}
-            />
-
-            {/* BLOQUE 3 — El costo de no hacer nada */}
-            <CostoNoHacerNada r={r} />
-
-            {/* Propuesta económica */}
-            <Card
-              title="Propuesta económica"
-            >
-              <div className="tableWrap">
-                <table className="table">
-                  <thead><tr><th>Ítem incluido</th><th className="num">Cant.</th></tr></thead>
-                  <tbody>
-                    <tr><td>Paneles {r?.potenciaPanel ?? calc?.potenciaPanel ?? cfg.potenciaPanel}W</td><td className="num">{r?.npaneles}</td></tr>
-                    <tr><td>Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
-                    <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1</td></tr>
-                    <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1</td></tr>
-                    <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
-                    <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
-                    <tr><td>Instalación y puesta en marcha</td><td className="num">1</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="pp-divider" />
-
-              <div className="tableWrap">
-                <table className="table">
-                  <thead><tr><th>Resumen de inversión</th><th className="num">Valor</th></tr></thead>
-                  <tbody>
-                    <tr><td>Inversión del proyecto solar</td><td className="num">$ {money(r?.costoProyecto)}</td></tr>
-                    <tr><td>IVA (5%)</td><td className="num">$ {money(r?.ivaProyecto)}</td></tr>
-                    <tr className="pp-table-total"><td><b>Total inversión</b></td><td className="num"><b>$ {money(r?.costoProyectoMasIva)}</b></td></tr>
-                    <tr><td>Costo por kWp</td><td className="num">$ {money(r?.costokwpproyecto)}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="pp-divider" />
-              <ChartPropuesta r={r} />
-            </Card>
-
-            {/* Formas de pago */}
-            <Card title="Formas de pago">
-              <div className="tableWrap">
-                <table className="table">
-                  <thead><tr><th>Hito de pago</th><th className="num">Porcentaje</th></tr></thead>
-                  <tbody>
-                    <tr><td>Anticipo</td><td className="num">50%</td></tr>
-                    <tr><td>Entrega de materiales</td><td className="num">40%</td></tr>
-                    <tr><td>RETIE</td><td className="num">10%</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="pp-divider" />
-              <ChartFormasPago r={r} />
-            </Card>
+            {/* Análisis financiero según la modalidad (finanzas.js, igual que el PDF) */}
+            {modalidad === 'ppa' ? (
+              <PropuestaPPA r={r} cfg={cfg} Card={Card} Metric={Metric} />
+            ) : (
+              <>
+                <AnalisisRecursosPropios r={r} cfg={cfg} Card={Card} Metric={Metric} />
+                {/* Propuesta económica */}
+                <Card
+                  title="Propuesta económica"
+                >
+                  <div className="tableWrap">
+                    <table className="table">
+                      <thead><tr><th>Ítem incluido</th><th className="num">Cant.</th></tr></thead>
+                      <tbody>
+                        <tr><td>Paneles {r?.potenciaPanel ?? calc?.potenciaPanel ?? cfg.potenciaPanel}W</td><td className="num">{r?.npaneles}</td></tr>
+                        <tr><td>Inversor {r?.kwp} kW</td><td className="num">1</td></tr>
+                        <tr><td>Estructura (rieles, clamps, L-Foot, puesta a tierra)</td><td className="num">1</td></tr>
+                        <tr><td>Cableado, protecciones eléctricas y fusibles</td><td className="num">1</td></tr>
+                        <tr><td>Trámites ante operador de red</td><td className="num">1</td></tr>
+                        <tr><td>Sistema de monitoreo</td><td className="num">1</td></tr>
+                        <tr><td>Instalación y puesta en marcha</td><td className="num">1</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+    
+                  <div className="pp-divider" />
+    
+                  <div className="tableWrap">
+                    <table className="table">
+                      <thead><tr><th>Resumen de inversión</th><th className="num">Valor</th></tr></thead>
+                      <tbody>
+                        <tr><td>Inversión del proyecto solar</td><td className="num">$ {money(r?.costoProyecto)}</td></tr>
+                        <tr><td>IVA (5%)</td><td className="num">$ {money(r?.ivaProyecto)}</td></tr>
+                        <tr className="pp-table-total"><td><b>Total inversión</b></td><td className="num"><b>$ {money(r?.costoProyectoMasIva)}</b></td></tr>
+                        <tr><td>Costo por kWp</td><td className="num">$ {money(r?.costokwpproyecto)}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="pp-divider" />
+                  <ChartPropuesta r={r} />
+                </Card>
+    
+                {/* Formas de pago */}
+                <Card title="Formas de pago">
+                  <div className="tableWrap">
+                    <table className="table">
+                      <thead><tr><th>Hito de pago</th><th className="num">Porcentaje</th></tr></thead>
+                      <tbody>
+                        <tr><td>Anticipo</td><td className="num">50%</td></tr>
+                        <tr><td>Entrega de materiales</td><td className="num">40%</td></tr>
+                        <tr><td>RETIE</td><td className="num">10%</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="pp-divider" />
+                  <ChartFormasPago r={r} />
+                </Card>
+              </>
+            )}
 
             {/* Impacto ambiental */}
             <Card title="Impacto ambiental">
@@ -695,24 +620,26 @@ export default function PropuestaPublica() {
               </div>
             </Card>
 
-            {/* Condiciones comerciales */}
-            <Card title="Condiciones comerciales">
-              <ol className="condicionesComerciales">
-                <li>La cantidad de paneles e inversores podrá variar dependiendo de la potencia disponible.</li>
-                <li>Con la aceptación se aceptan políticas de servicio post y garantías.</li>
-                <li>Incluye viáticos y desplazamiento técnico hasta el lugar de instalación.</li>
-                <li>Tiempo de entrega: 120 días a RETIE desde el primer pago.</li>
-                <li>Repuestos / reparaciones solo por el tiempo restante de garantía vigente.</li>
-                <li>Puede haber costos adicionales tras visita técnica.</li>
-                <li>El sistema no opera durante interrupciones de la red (si aplica al tipo de sistema).</li>
-                <li>Capacidad de techo: losa 50 kg/m² y teja 15 kg/m².</li>
-                <li>Garantías: Paneles 12 años · Inversores 5 años · Instalación 5 años *(sujeto a mantenimientos anuales)*</li>
-                <li>Legalización sujeta a CREG 174 de 2021 y resoluciones aplicables.</li>
-                <li>Los ahorros dependen de radiación, precio kWh y excedentes reconocidos por el OR.</li>
-                <li>No incluye adecuación de frontera comercial; se define tras visita del OR.</li>
-                <li>Validez de la oferta: 15 días calendario.</li>
-              </ol>
-            </Card>
+            {/* Condiciones comerciales (el PPA muestra las suyas arriba) */}
+            {modalidad !== 'ppa' && (
+              <Card title="Condiciones comerciales">
+                <ol className="condicionesComerciales">
+                  <li>La cantidad de paneles e inversores podrá variar dependiendo de la potencia disponible.</li>
+                  <li>Con la aceptación se aceptan políticas de servicio post y garantías.</li>
+                  <li>Incluye viáticos y desplazamiento técnico hasta el lugar de instalación.</li>
+                  <li>Tiempo de entrega: 120 días a RETIE desde el primer pago.</li>
+                  <li>Repuestos / reparaciones solo por el tiempo restante de garantía vigente.</li>
+                  <li>Puede haber costos adicionales tras visita técnica.</li>
+                  <li>El sistema no opera durante interrupciones de la red (si aplica al tipo de sistema).</li>
+                  <li>Capacidad de techo: losa 50 kg/m² y teja 15 kg/m².</li>
+                  <li>Garantías: Paneles 12 años · Inversores 5 años · Instalación 5 años *(sujeto a mantenimientos anuales)*</li>
+                  <li>Legalización sujeta a CREG 174 de 2021 y resoluciones aplicables.</li>
+                  <li>Los ahorros dependen de radiación, precio kWh y excedentes reconocidos por el OR.</li>
+                  <li>No incluye adecuación de frontera comercial; se define tras visita del OR.</li>
+                  <li>Validez de la oferta: 15 días calendario.</li>
+                </ol>
+              </Card>
+            )}
 
             {/* BLOQUE 5 — Firma del asesor */}
             {lead.vendedor && (() => {
@@ -764,9 +691,19 @@ export default function PropuestaPublica() {
               <SummaryRow label="Producción"    value={`${money(r?.produccionDeEnergia)} kWh/mes`} />
               <SummaryRow label="Cobertura"     value={`${r?.coberturaFactura ?? r?.porcentajeCoberturaProyecto ?? '—'}%`} />
               <div className="pp-divider" style={{ margin: '4px 0' }} />
-              <SummaryRow label="Total inversión" value={`$ ${money(r?.costoProyectoMasIva)}`} />
-              <SummaryRow label="Retorno"         value={`${tiempoRetorno ?? '—'} años`} />
-              <SummaryRow label="Ahorro anual"    value={`$ ${money(ahorroAnual)}`} />
+              {modalidad === 'ppa' && ppaHero ? (
+                <>
+                  <SummaryRow label="Modalidad"        value="PPA (sin inversión)" />
+                  <SummaryRow label="Tu tarifa"        value={`$ ${money(Math.round(ppaHero.tarifaPPA1))} / kWh`} />
+                  <SummaryRow label="Ahorro año 1"     value={`$ ${money(Math.round(ppaHero.ahorroAnual1))}`} />
+                </>
+              ) : (
+                <>
+                  <SummaryRow label="Total inversión" value={`$ ${money(r?.costoProyectoMasIva)}`} />
+                  <SummaryRow label="Retorno"         value={`${tiempoRetorno ?? '—'} años`} />
+                  <SummaryRow label="Ahorro anual"    value={`$ ${money(ahorroAnual)}`} />
+                </>
+              )}
               <div className="pp-divider" style={{ margin: '4px 0' }} />
               <SummaryRow label="Valorización propiedad" value="4% - 10% estimado" />
               <SummaryRow label="CO₂ evitado/año"        value={`${r?.co2EvitadoToneladas ?? '—'} ton`} />
@@ -862,61 +799,6 @@ function ChartSistemaSolar({ r }) {
   );
 }
 
-/* 2 ─── Análisis financiero */
-function ChartFinanciero({ r }) {
-  const ahorroAnual = Number(r?.ahorroAnual) || 0;
-  const inversion   = Number(r?.costoProyectoMasIva) || 0;
-  const retorno     = Number(r?.tiempoRetorno) || null;
-
-  if (!ahorroAnual || !inversion) return null;
-
-  const data = Array.from({ length: 26 }, (_, i) => ({
-    año: i,
-    'Ahorro acum.': ahorroAnual * i,
-  }));
-
-  const fmtM = (v) => `$${(v / 1_000_000).toFixed(1)}M`;
-
-  return (
-    <div className="chartBlock">
-      <p className="chartTitle">Ahorro acumulado vs inversión (25 años — vida útil del proyecto)</p>
-      <ResponsiveContainer width="100%" height={190}>
-        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="gradAhorroPub" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="#2ecc71" stopOpacity={0.35} />
-              <stop offset="95%" stopColor="#2ecc71" stopOpacity={0.03} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-          <XAxis
-            dataKey="año"
-            type="number"
-            domain={[0, 25]}
-            ticks={[0, 5, 10, 15, 20, 25]}
-            tickFormatter={(v) => `A${v}`}
-            tick={{ fontSize: 10, fill: '#888' }}
-          />
-          <YAxis tickFormatter={fmtM} tick={{ fontSize: 10, fill: '#888' }} width={42} />
-          <Tooltip
-            formatter={(v) => [`$${Number(v).toLocaleString('es-CO')}`, 'Ahorro acumulado']}
-            labelFormatter={(l) => `Año ${l}`}
-            contentStyle={{ fontSize: 12, borderRadius: 8 }}
-          />
-          <ReferenceLine y={inversion} stroke={C1} strokeDasharray="5 4"
-            label={{ value: 'Inversión', position: 'insideTopRight', fontSize: 10, fill: C1 }} />
-          <Area type="monotone" dataKey="Ahorro acum." stroke="#2ecc71"
-            fill="url(#gradAhorroPub)" strokeWidth={2.5} dot={false} />
-        </AreaChart>
-      </ResponsiveContainer>
-      {retorno && (
-        <p className="chartNote">
-          Punto de retorno estimado: <b>año {retorno}</b>
-        </p>
-      )}
-    </div>
-  );
-}
 
 /* Tooltip del gráfico Generación vs Consumo — traduce los kWh del mes a pesos */
 function TooltipGenConsumo({ active, payload, label, costoKwh }) {
@@ -1001,151 +883,7 @@ function ChartGeneracionConsumo({ r, ciudad }) {
   );
 }
 
-/* BLOQUE 2 ─── Simulador financiero what-if */
-function SimuladorFinanciero({
-  simTarifa, setSimTarifa, simHorizonte, setSimHorizonte, simInflacion, setSimInflacion,
-  simDeduccionRenta, setSimDeduccionRenta, simDepreciacion, setSimDepreciacion, simulador,
-}) {
-  if (simTarifa === null) return null;
 
-  return (
-    <Card title="Simulador financiero — ¿Qué pasa si...?">
-      <div className="pp-sim-grid">
-        <div className="pp-sim-controls">
-          <div className="pp-slider-group">
-            <div className="pp-slider-head">
-              <span className="pp-slider-label">Tarifa energía (COP/kWh)</span>
-              <span className="pp-slider-badge">${Number(simTarifa).toLocaleString('es-CO')} COP/kWh</span>
-            </div>
-            <input type="range" min={400} max={1500} step={50} value={simTarifa}
-              onChange={(e) => setSimTarifa(Number(e.target.value))} className="pp-slider" />
-          </div>
-
-          <div className="pp-slider-group">
-            <div className="pp-slider-head">
-              <span className="pp-slider-label">Horizonte de evaluación</span>
-              <span className="pp-slider-badge">{simHorizonte} años</span>
-            </div>
-            <input type="range" min={5} max={35} step={5} value={simHorizonte}
-              onChange={(e) => setSimHorizonte(Number(e.target.value))} className="pp-slider" />
-          </div>
-
-          <div className="pp-slider-group">
-            <div className="pp-slider-head">
-              <span className="pp-slider-label">Inflación anual estimada</span>
-              <span className="pp-slider-badge">{simInflacion}%</span>
-            </div>
-            <input type="range" min={0} max={15} step={0.5} value={simInflacion}
-              onChange={(e) => setSimInflacion(Number(e.target.value))} className="pp-slider" />
-          </div>
-
-          <label className="pp-toggle-row">
-            <div>
-              <span className="pp-toggle-label">Deducción de renta</span>
-              <span className="pp-toggle-sublabel">25% del valor sin IVA deducible de renta (Ley 1715, Art. 11) — ahorro ~11.5%</span>
-            </div>
-            <input type="checkbox" checked={simDeduccionRenta} onChange={(e) => setSimDeduccionRenta(e.target.checked)} />
-          </label>
-
-          <label className="pp-toggle-row">
-            <div>
-              <span className="pp-toggle-label">Depreciación acelerada</span>
-              <span className="pp-toggle-sublabel">Deprecia en 5 años (Ley 1715, Art. 14) en vez de 20 — escudo fiscal ~35% del valor sin IVA</span>
-            </div>
-            <input type="checkbox" checked={simDepreciacion} onChange={(e) => setSimDepreciacion(e.target.checked)} />
-          </label>
-        </div>
-
-        <div className="pp-sim-chart">
-          {simulador && (
-            <div className="pp-chart-responsive">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={simulador.cashflow} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                  <XAxis dataKey="year" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `A${v}`} />
-                  <YAxis tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `$${(v / 1_000_000).toFixed(0)}M`} width={44} />
-                  <Tooltip formatter={(v) => `$${Number(v).toLocaleString('es-CO')}`} labelFormatter={(l) => `Año ${l}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <ReferenceLine y={0} stroke="#888" strokeDasharray="4 4" label={{ value: 'Punto de equilibrio', position: 'insideBottomRight', fontSize: 10, fill: '#888' }} />
-                  <Line type="monotone" dataKey="Con solar" stroke="#2ecc71" strokeWidth={2.5} dot={false} />
-                  <Line type="monotone" dataKey="Sin solar" stroke={C1} strokeWidth={2.5} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {simulador && (
-            <div className="pp-sim-results-grid">
-              <Metric label="Inversión total" value={formatCOP(simulador.inversionTotal)} />
-              <Metric label="Ahorro anual" value={formatCOP(simulador.ahorroAnualBase)} isGreen />
-              <Metric label="Payback" value={`${simulador.payback ?? '—'} años`} />
-              <Metric label="TIR" value={`${simulador.tir ?? '—'}%`} />
-              <Metric label="VPN" value={formatCOP(simulador.vpn)} />
-              <Metric label="ROI" value={`${simulador.roi ?? '—'}%`} />
-            </div>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/* BLOQUE 3 ─── El costo de no hacer nada */
-function CostoNoHacerNada({ r }) {
-  const consumo = Number(r?.consumoKwh) || 0;   // consumo REAL del cliente (canónico)
-  const costoKwh = Number(r?.costoKwh) || 0;
-  const inversionTotal = Number(r?.costoProyectoMasIva) || 0;
-  // Ahorro anual CANÓNICO (mismo del backend, la hoja Resultado y el PDF): ya
-  // considera la cobertura y los excedentes, así que es la base correcta para el
-  // lado "con solar". Antes se usaba la factura completa asumiendo 100% de
-  // cobertura, lo que contradecía el retorno y la cobertura de la propuesta.
-  const ahorroAnualBase = Number(r?.ahorroAnual) || (Number(r?.ahorroMensual) || 0) * 12;
-  if (!consumo || !costoKwh || !inversionTotal || !ahorroAnualBase) return null;
-
-  const HORIZONTE = 10;                // años
-  const INCREMENTO_ANUAL = 0.08;       // alza promedio anual del kWh en Colombia
-  const facturaMensual = consumo * costoKwh;   // factura mensual sin solar
-
-  // Izquierda: lo que pagaría en facturas durante el horizonte, indexado por el alza anual.
-  let factorAcumulado = 0;
-  for (let t = 0; t < HORIZONTE; t++) factorAcumulado += Math.pow(1 + INCREMENTO_ANUAL, t);
-  const sinSolar = Math.round(facturaMensual * 12 * factorAcumulado);
-
-  // Derecha: (ahorro anual canónico × años) − valor del proyecto. Cruza cero en
-  // inversión / ahorroAnual años = el mismo "Retorno" que muestra la propuesta.
-  const conSolar = Math.round(ahorroAnualBase * HORIZONTE - inversionTotal);
-  const enGanancia = conSolar >= 0;
-
-  return (
-    <Card title="El costo de no hacer nada">
-      <p className="pp-chart-subtitle">
-        Comparación a {HORIZONTE} años: lo que pagarías en facturas vs lo que te dejaría el sistema solar
-      </p>
-      <div className="pp-cost-grid">
-        <div className="pp-cost-card pp-cost-card--red">
-          <span className="pp-cost-icon">📈</span>
-          <span className="pp-cost-label">Sin solar ({HORIZONTE} años)</span>
-          <span className="pp-cost-value pp-cost-value--red">~ {formatCOP(sinSolar)}</span>
-          <span className="pp-cost-sublabel">
-            Pagados en facturas, con alza anual del {INCREMENTO_ANUAL * 100}%
-          </span>
-        </div>
-        <div className="pp-cost-card pp-cost-card--green">
-          <span className="pp-cost-icon">☀️</span>
-          <span className="pp-cost-label">Con solar ({HORIZONTE} años)</span>
-          <span className={`pp-cost-value ${enGanancia ? 'pp-cost-value--green' : 'pp-cost-value--red'}`}>
-            {enGanancia ? '+' : '−'} {formatCOP(Math.abs(conSolar))}
-          </span>
-          <span className="pp-cost-sublabel">
-            {enGanancia
-              ? 'Ganancia neta acumulada después de la inversión'
-              : `Pendiente por recuperar de la inversión a ${HORIZONTE} años`}
-          </span>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 /* 3 ─── Propuesta económica */
 function ChartPropuesta({ r }) {

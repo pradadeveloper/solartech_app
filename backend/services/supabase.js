@@ -129,6 +129,9 @@ const CAMPOS = {
   pdfUrl:              ['propuesta_url', texto],
   codigoPublico:       ['codigo_publico', texto],
   opciones:            ['opciones', (v) => (Array.isArray(v) ? v : [])],
+  modalidad:           ['modalidad', (v) => (v === 'ppa' ? 'ppa' : 'recursos_propios')],
+  tipoDocumento:       ['tipo_documento', (v) => (['CC', 'NIT', 'CE', 'PH'].includes(String(v || '').toUpperCase()) ? String(v).toUpperCase() : null)],
+  contribucion:        ['contribucion', (v) => v === true || ['true', 'si', 'sí', '1'].includes(String(v).trim().toLowerCase())],
 };
 
 function aFila(lead) {
@@ -204,6 +207,9 @@ function aLead(r) {
     tiempoRetorno: r.payback_meses == null ? null : Math.round((Number(r.payback_meses) / 12) * 10) / 10,
     pdfUrl: r.propuesta_url,
     opciones: r.opciones || [],
+    modalidad: r.modalidad || 'recursos_propios',
+    tipoDocumento: r.tipo_documento || null,
+    contribucion: !!r.contribucion,
     // CRM
     fechaCierre: r.estado === 'ganado' ? r.cerrado_at : null,
     historialEstados: eventos.filter((e) => e.type === 'estado').map((e) => ({

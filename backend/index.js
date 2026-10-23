@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { calcularProyecto, toNumber } = require('./formulas');
+const { analizarRecursosPropios, calcularPPA, entradasDesde } = require('./finanzas');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -86,6 +87,12 @@ function tomarSiLibre(usuario, lead) {
 }
 
 async function savePDFStorage(fileName, pdfBytes) {
+  // Solo desarrollo: PDF_LOCAL_DIR guarda el PDF en disco en vez de subirlo al bucket.
+  if (process.env.PDF_LOCAL_DIR) {
+    const destino = path.join(process.env.PDF_LOCAL_DIR, fileName);
+    fs.writeFileSync(destino, pdfBytes);
+    return destino;
+  }
   return sb.subirPDF(fileName, pdfBytes);
 }
 
@@ -123,6 +130,8 @@ function textoWeb(value, max) {
 
 // ====== PDF ======
 async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
+  // Modalidad de negocio: el PPA no muestra precio, IVA ni formas de pago.
+  const esPPA = data.modalidad === 'ppa';
   const empresa = cfg.empresa || {};
   const empNombre  = empresa.nombre   || 'Solartech Energy Systems';
   const empTel     = empresa.telefono || '+57 300 000 0000';
@@ -405,7 +414,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     y -= 10;
   }
 
-  page.drawText('PROPUESTA TECNICA Y COMERCIAL', { x: margin, y, size: 15, font: fontBold, color: COLOR_ACCENT });
+  page.drawText(esPPA ? 'PROPUESTA DE ENERGIA SOLAR - MODALIDAD PPA' : 'PROPUESTA TECNICA Y COMERCIAL', { x: margin, y, size: 15, font: fontBold, color: COLOR_ACCENT });
   y -= 16;
   const fecha = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
   page.drawText(`Cotizacion N-${resultados?.numeroCotizacion ?? '-'}   |   Fecha: ${fecha}`, { x: margin, y, size: 9, font, color: COLOR_MUTED });
@@ -433,58 +442,148 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   infoRow2('Area disponible declarada', `${safe(data.areaDisponible)} m2`, 'Radiacion solar local', `${safe(resultados.radiacionSolar)} kWh/m2/dia`);
   gap(6);
 
-  // 4. ANALISIS FINANCIERO
-  newPage();
-  gap(4);
-  sectionHeader('ANALISIS FINANCIERO');
-  infoRow('Ahorro mensual estimado', cop(resultados.ahorroMensual));
-  infoRow('Ahorro anual estimado', cop(resultados.ahorroAnual));
-  infoRow('Ahorro proyectado a 10 anos', cop(resultados.ahorro10Anos));
-  infoRow('Tiempo de retorno de la inversion', `${safe(resultados.tiempoRetorno)} años`);
-  gap(6);
+  // 4-7. Análisis financiero y propuesta económica: dependen de la modalidad
+  // (recursos propios o PPA). Modelos en finanzas.js, los mismos de la propuesta web.
+  const entradasFin = entradasDesde({ ...resultados, tipoDocumento: data.tipoDocumento });
+  const anios = (v) => (v == null ? '-' : `${Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 })} anos`);
+  const pct = (v) => (v == null ? '-' : `${(v * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 })}%`);
 
-  // 5. PROPUESTA ECONOMICA
-  sectionHeader('PROPUESTA ECONOMICA');
-  infoRow('Costo del sistema (sin IVA)', cop(resultados.costoProyecto));
-  infoRow('IVA aplicable (5%)', cop(resultados.ivaProyecto));
-  infoRow('TOTAL CON IVA - PRECIO FINAL', cop(resultados.costoProyectoMasIva), true);
-  infoRow('Descuento declaracion de renta (Ley 1715)', cop(resultados.descuentoDeclaracion));
-  infoRow('Costo por kWp instalado', cop(resultados.valorKwp));
-  gap(6);
+  if (esPPA) {
+    const ppa = calcularPPA(entradasFin, cfg);
+    newPage();
+    gap(4);
+    sectionHeader('MODALIDAD PPA - ENERGIA SIN INVERSION');
+    para('Solartech instala, opera y mantiene el sistema solar en sus instalaciones sin que usted invierta. Usted paga solo la energia que el sistema genera, a una tarifa menor que la del operador de red.', 10, 9, COLOR_MUTED);
+    gap(6);
+    infoRow('Inversion del cliente', '$0', true);
+    infoRow('Tarifa actual del operador de red', `${cop(Math.round(ppa.tarifaRed1))} / kWh`);
+    infoRow(`Tarifa PPA Solartech (${pct(ppa.descuento)} de descuento)`, `${cop(Math.round(ppa.tarifaPPA1))} / kWh`, true);
+    infoRow('Plazo del contrato', `${ppa.plazo} anos`);
+    infoRow('Indexacion de la tarifa', `IPC (supuesto ${pct(ppa.indexacion)} anual)`);
+    infoRow('Al terminar el contrato', 'Los equipos pasan a ser suyos');
+    gap(6);
 
-  // 6. RESUMEN INVERSION
-  sectionHeader('RESUMEN DE LA INVERSION');
-  checkY(20);
-  page.drawText('Componentes e items incluidos en el proyecto:', { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_TITLE });
-  y -= 14;
-  const componentes = [
-    `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi Solar)`,
-    `1 inversor capacidad aprox. ${num2(resultados.kwp)} kW (Huawei / Growatt / GoodWe)`,
-    'Estructura de montaje (rieles, clamps, L-Foot y puesta a tierra)',
-    'Cableado solar AC/DC, protecciones electricas y fusibles',
-    'Instalacion, puesta en marcha y configuracion de monitoreo remoto',
-    'Capacitacion al usuario y entrega de manual de operacion',
-  ];
-  componentes.forEach((c) => bullet(c, 10));
-  gap(6);
+    sectionHeader('AHORRO PROYECTADO');
+    infoRow('Factura evitada al operador (mes 1)', cop(Math.round(ppa.facturaRedMensual1)));
+    infoRow('Pago estimado a Solartech (mes 1)', cop(Math.round(ppa.pagoMensual1)));
+    infoRow('Ahorro del primer mes', cop(Math.round(ppa.ahorroMensual1)), true);
+    infoRow('Ahorro acumulado a 5 anos', cop(Math.round(ppa.acumulado5)));
+    infoRow('Ahorro acumulado a 10 anos', cop(Math.round(ppa.acumulado10)));
+    infoRow(`Ahorro acumulado durante el contrato (${ppa.plazo} anos)`, cop(Math.round(ppa.ahorroContrato)), true);
+    infoRow('Ahorro acumulado a 25 anos (con equipos propios)', cop(Math.round(ppa.acumulado25)));
+    gap(6);
 
-  // 7. FORMAS DE PAGO
-  newPage();
-  gap(4);
-  sectionHeader('FORMAS DE PAGO');
-  const formasPago = [
-    { t: '1. Pago de contado', d: 'Pago total antes de iniciar la instalacion. Garantiza disponibilidad inmediata de equipos y posible descuento por pronto pago.' },
-    { t: '2. Credito bancario', d: 'Financiacion directa con su entidad bancaria. Solartech entrega la documentacion tecnica requerida para la solicitud.' },
-  ];
-  formasPago.forEach(({ t, d }) => {
-    checkY(42);
-    page.drawText(t, { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_ACCENT });
-    y -= 13;
-    para(d, 14, 8.5, COLOR_MUTED);
-    gap(3);
-  });
-  gap(6);
+    // Tabla año a año (años representativos)
+    checkY(18 * 10 + 60);   // título y tabla en la misma página
+    sectionHeader('PROYECCION ANO A ANO');
+    const cols = [
+      { t: 'Ano', w: 0.08 }, { t: 'Tarifa red $/kWh', w: 0.18 }, { t: 'Tarifa PPA $/kWh', w: 0.18 },
+      { t: 'Generacion kWh', w: 0.18 }, { t: 'Ahorro del ano', w: 0.19 }, { t: 'Acumulado', w: 0.19 },
+    ];
+    const filas = ppa.anios.filter((a) => [1, 2, 3, 5, 10, ppa.plazo, ppa.plazo + 1, 20, 25].includes(a.anio));
+    const rH = 18;
+    checkY(rH * (filas.length + 1) + 6);
+    let cx = margin;
+    page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_LIGHT });
+    cols.forEach((c) => {
+      page.drawText(c.t, { x: cx + 4, y: y - 12, size: 7.5, font: fontBold, color: COLOR_MUTED });
+      cx += c.w * cW;
+    });
+    y -= rH;
+    filas.forEach((a) => {
+      const vals = [
+        String(a.anio),
+        Math.round(a.tarifaRed).toLocaleString('es-CO'),
+        a.tarifaPPA ? Math.round(a.tarifaPPA).toLocaleString('es-CO') : 'Equipos suyos',
+        Math.round(a.kwh).toLocaleString('es-CO'),
+        cop(Math.round(a.ahorro)),
+        cop(Math.round(a.acumulado)),
+      ];
+      cx = margin;
+      page.drawLine({ start: { x: margin, y: y - rH }, end: { x: margin + cW, y: y - rH }, thickness: 0.5, color: COLOR_BORDER_INNER });
+      vals.forEach((v, i) => {
+        page.drawText(v, { x: cx + 4, y: y - 12, size: 8, font, color: COLOR_TEXT });
+        cx += cols[i].w * cW;
+      });
+      y -= rH;
+    });
+    gap(14);
+    para('Ahorro calculado con toda la generacion valorada a la tarifa del operador de red, indexacion anual igual para ambas tarifas y una perdida de rendimiento de los paneles de 0,55% por ano.', 10, 7.5, COLOR_MUTED);
+    gap(6);
 
+    sectionHeader('EL SISTEMA QUE INSTALAMOS');
+    [
+      `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi Solar)`,
+      `Inversor(es) de ${num2(resultados.potenciaAC)} kW AC (Huawei / Growatt / GoodWe)`,
+      'Estructura de montaje, cableado, protecciones y monitoreo remoto',
+      'Operacion y mantenimiento a cargo de Solartech durante el contrato',
+    ].forEach((c) => bullet(c, 10));
+    gap(6);
+  } else {
+    const rp = analizarRecursosPropios(entradasFin, cfg);
+    newPage();
+    gap(4);
+    sectionHeader('ANALISIS FINANCIERO');
+    infoRow('Ahorro mensual estimado (ano 1)', cop(resultados.ahorroMensual));
+    infoRow('Ahorro anual estimado (ano 1)', cop(resultados.ahorroAnual));
+    infoRow(rp.esEmpresa ? 'Retorno de la inversion (despues de impuestos)' : 'Retorno de la inversion', anios(rp.retornoAnios), true);
+    infoRow('Ganancia neta acumulada a 10 anos', cop(Math.round(rp.ganancia10)));
+    infoRow('Ganancia neta acumulada a 25 anos', cop(Math.round(rp.ganancia25)));
+    infoRow(`Valor presente neto a 25 anos (tasa ${pct(rp.supuestos.tasaDescuento)})`, cop(Math.round(rp.vpn25)));
+    infoRow('Tasa interna de retorno a 25 anos', pct(rp.tir25));
+    gap(14);
+    para(`Supuestos: alza de la tarifa ${pct(rp.supuestos.incrementoTarifa)} anual, perdida de rendimiento de los paneles ${(rp.supuestos.degradacion * 100).toLocaleString('es-CO', { maximumFractionDigits: 2 })}% anual, mantenimiento anual indexado y reposicion de inversores en el ano ${rp.supuestos.reposicionAnio}.${rp.esEmpresa ? ` Incluye el efecto en renta (${pct(rp.supuestos.tasaImpuesto)}).` : ''}`, 10, 7.5, COLOR_MUTED);
+    gap(6);
+
+    if (rp.beneficiosTributarios) {
+      sectionHeader('BENEFICIOS TRIBUTARIOS LEY 1715');
+      infoRow('Depreciacion acelerada (3 anos)', cop(Math.round(rp.beneficiosTributarios.depreciacion)));
+      infoRow('Deduccion especial del 50% en renta', cop(Math.round(rp.beneficiosTributarios.deduccion)));
+      infoRow('Menor impuesto de renta (total)', cop(Math.round(rp.beneficiosTributarios.total)), true);
+      gap(14);
+      para('Sujeto a la certificacion UPME del proyecto y a que la empresa tenga renta liquida suficiente para aplicar los beneficios. Ya estan incluidos en el retorno, el VPN y la TIR.', 10, 7.5, COLOR_MUTED);
+      gap(6);
+    }
+
+    // 5. PROPUESTA ECONOMICA
+    sectionHeader('PROPUESTA ECONOMICA');
+    infoRow('Costo del sistema (sin IVA)', cop(resultados.costoProyecto));
+    infoRow('IVA aplicable (5%)', cop(resultados.ivaProyecto));
+    infoRow('TOTAL CON IVA - PRECIO FINAL', cop(resultados.costoProyectoMasIva), true);
+    infoRow('Costo por kWp instalado', cop(resultados.valorKwp));
+    gap(6);
+
+    // 6. RESUMEN INVERSION
+    sectionHeader('RESUMEN DE LA INVERSION');
+    checkY(20);
+    page.drawText('Componentes e items incluidos en el proyecto:', { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_TITLE });
+    y -= 14;
+    [
+      `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi Solar)`,
+      `1 inversor capacidad aprox. ${num2(resultados.kwp)} kW (Huawei / Growatt / GoodWe)`,
+      'Estructura de montaje (rieles, clamps, L-Foot y puesta a tierra)',
+      'Cableado solar AC/DC, protecciones electricas y fusibles',
+      'Instalacion, puesta en marcha y configuracion de monitoreo remoto',
+      'Capacitacion al usuario y entrega de manual de operacion',
+    ].forEach((c) => bullet(c, 10));
+    gap(6);
+
+    // 7. FORMAS DE PAGO
+    newPage();
+    gap(4);
+    sectionHeader('FORMAS DE PAGO');
+    [
+      { t: '1. Pago de contado', d: 'Pago total antes de iniciar la instalacion. Garantiza disponibilidad inmediata de equipos y posible descuento por pronto pago.' },
+      { t: '2. Credito bancario', d: 'Financiacion directa con su entidad bancaria. Solartech entrega la documentacion tecnica requerida para la solicitud.' },
+    ].forEach(({ t, d }) => {
+      checkY(42);
+      page.drawText(t, { x: margin + 10, y, size: 9, font: fontBold, color: COLOR_ACCENT });
+      y -= 13;
+      para(d, 14, 8.5, COLOR_MUTED);
+      gap(3);
+    });
+    gap(6);
+  }
   // 8. IMPACTO AMBIENTAL
   gap(6);
   sectionHeader('IMPACTO AMBIENTAL');
@@ -784,8 +883,19 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   newPage(false);
   bannerSuprimido = true;
   gap(4);
-  sectionHeader('CONDICIONES COMERCIALES');
-  const condiciones = [
+  sectionHeader(esPPA ? 'CONDICIONES DEL CONTRATO PPA' : 'CONDICIONES COMERCIALES');
+  // Condiciones del PPA: hoja PPA del Cotizador WEB (B68:B73) más las de operación del contrato.
+  const condicionesPPA = [
+    'Las tarifas presentadas son de referencia y no son vinculantes hasta la firma del contrato de suministro de energia (PPA).',
+    `La tarifa PPA se indexa mensualmente con el IPC durante los ${calcularPPA(entradasDesde(resultados), cfg).plazo} anos del contrato. Al terminar el plazo, los equipos se ceden al cliente sin costo adicional.`,
+    'Solartech asume la inversion, la instalacion, la operacion y el mantenimiento del sistema durante la vigencia del contrato.',
+    'Los ahorros proyectados no incluyen la devolucion de excedentes a la red y dependen de la radiacion solar real, que varia segun las condiciones climaticas.',
+    'El proyecto no incluye lineas de vida, apantallamiento ni analisis estructural de la cubierta; estos se definen en la visita tecnica.',
+    'El proyecto no incluye la adecuacion de la frontera comercial. Este costo sera definido por el operador de red durante la legalizacion.',
+    'Si la cubierta tiene mas area util, el proyecto puede crecer y la tarifa PPA se mantiene.',
+    'Validez de la oferta: quince (15) dias calendario a partir de su emision.',
+  ];
+  const condiciones = esPPA ? condicionesPPA : [
     'La cantidad de paneles solares e inversores podra ajustarse de acuerdo con la potencia finalmente disponible y las condiciones tecnicas definitivas del proyecto.',
     'Con la aceptacion de la presente cotizacion, el cliente declara conocer y aceptar las politicas de servicio posventa y condiciones de garantia establecidas por la empresa.',
     'La cotizacion incluye los costos asociados a viaticos de instalacion y desplazamiento del personal tecnico hasta el sitio del proyecto.',
@@ -934,6 +1044,9 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       sistemaInteres: data.sistemaInteres,
       preferenciaContacto: data.preferenciaContacto,
       conociste: data.conociste,
+      modalidad: data.modalidad,
+      tipoDocumento: data.tipoDocumento,
+      contribucion: resultados.contribucion,
       // Técnico
       consumoKwh: resultados.consumoKwh,
       costoKwh: resultados.costoKwh,
@@ -969,7 +1082,12 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       catch (err) { console.error('[factura] No se pudo subir:', err.message); }
     }
 
-    res.json({ ...resultados, numeroCotizacion, codigoPublico, pdfUrl, leadId });
+    res.json({
+      ...resultados, numeroCotizacion, codigoPublico, pdfUrl, leadId,
+      modalidad: data.modalidad === 'ppa' ? 'ppa' : 'recursos_propios',
+      tipoDocumento: data.tipoDocumento || null,
+      ciudadSolar: data.ciudadSolar, departamentoSolar: data.departamentoSolar,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || "Error interno" });
@@ -1086,6 +1204,7 @@ app.post('/api/propuestas/guardar', express.json(), requiereUsuario, async (req,
       techo: datosCliente.tipoTecho || null,
       pdf_url: pdfUrl,
       estado: 'Enviada',
+      modalidad: datosCliente.modalidad === 'ppa' ? 'ppa' : 'recursos_propios',
     });
 
     const base = (process.env.FRONTEND_URL || 'https://solartech-app.vercel.app').replace(/\/$/, '');
@@ -1139,6 +1258,11 @@ app.get('/api/propuestas/:id', async (req, res) => {
       fecha: propuesta.created_at,
       pdfUrl: propuesta.pdf_url,
       estado: propuesta.estado,
+      modalidad: propuesta.modalidad || lead?.modalidad || 'recursos_propios',
+      tipoDocumento: lead?.tipoDocumento || null,
+      contribucion: lead?.contribucion || false,
+      costoKwh: lead?.costoKwh,
+      radiacionSolar: lead?.radiacionSolar,
       ...leadInfo,
       asesorInfo,
     });

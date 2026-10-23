@@ -1808,3 +1808,11 @@
   .cotizador--form .cotCalcular { width: 100%; }
   .cotizador--form .cotHerramientas { margin-top: 0; }
 }
+
+.cotizador--form .cotNotaModalidad { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+
+/* Las columnas del grid pueden encogerse: una tabla ancha se desplaza dentro de su marco */
+.cotGrid > .cotMain, .cotGrid > .cotSide { min-width: 0; }
+
+/* Montos en una sola linea; si no caben, la tabla se desplaza dentro de su marco */
+.cotizador .table td.num, .cotizador .table th.num { white-space: nowrap; }
