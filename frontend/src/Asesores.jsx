@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Dialogo from "./components/Dialogo";
 import "./dashboardAdmon.css";
 
 const ROL_BADGE = {
@@ -17,18 +18,17 @@ export default function Asesores() {
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
-  const isAdmin = (() => {
-    try {
-      const d = JSON.parse(atob(token.split(".")[1]));
-      return d.usuario === "admin" || (d.rol || "").toLowerCase() === "admin";
-    } catch { return false; }
-  })();
+  // El backend vuelve a validar el rol en cada cambio; esto solo oculta botones.
+  const isAdmin = localStorage.getItem("rolUsuario") === "Admin";
+  const miCorreo = localStorage.getItem("correoUsuario");
 
   const cargar = () => {
     setLoading(true);
-    fetch(`${process.env.REACT_APP_API_URL}/api/asesores`)
+    fetch(`${process.env.REACT_APP_API_URL}/api/asesores`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
       .then((r) => r.json())
-      .then((data) => { setAsesores(data); setLoading(false); })
+      .then((data) => { setAsesores(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   };
 
@@ -51,7 +51,7 @@ export default function Asesores() {
   const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const guardar = async () => {
-    if (!form.nombre || !form.usuario) { setError("Nombre y usuario son requeridos"); return; }
+    if (!form.nombre || !form.correo) { setError("Nombre y correo son requeridos"); return; }
     if (modal.mode === "add" && !form.password) { setError("La contraseña es requerida"); return; }
     setSaving(true);
     setError("");
@@ -76,7 +76,7 @@ export default function Asesores() {
   };
 
   const eliminar = async (a) => {
-    if (!window.confirm(`¿Eliminar al asesor ${a.nombre} ${a.apellido}?`)) return;
+    if (!window.confirm(`¿Desactivar al asesor ${a.nombre} ${a.apellido}? Ya no podrá entrar; sus leads e historial se conservan.`)) return;
     await fetch(`${process.env.REACT_APP_API_URL}/api/asesores/${a.id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -141,12 +141,11 @@ export default function Asesores() {
                   <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--muted)" }}>{a.cargo}</p>
                   {a.celular && <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "var(--muted2)" }}>📱 {a.celular}</p>}
                   {a.correo  && <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "var(--muted2)" }}>✉ {a.correo}</p>}
-                  <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "var(--muted2)" }}>@{a.usuario}</p>
                   {isAdmin && (
                     <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                       <button onClick={() => abrirEditar(a)} style={{ fontSize: "0.75rem", padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--text)" }}>Editar</button>
-                      {a.id !== 1 && (
-                        <button onClick={() => eliminar(a)} style={{ fontSize: "0.75rem", padding: "3px 10px", borderRadius: 6, border: "1px solid #e74c3c", background: "transparent", cursor: "pointer", color: "#e74c3c" }}>Eliminar</button>
+                      {a.correo !== miCorreo && (
+                        <button onClick={() => eliminar(a)} style={{ fontSize: "0.75rem", padding: "3px 10px", borderRadius: 6, border: "1px solid #e74c3c", background: "transparent", cursor: "pointer", color: "#e74c3c" }}>Desactivar</button>
                       )}
                     </div>
                   )}
@@ -159,8 +158,8 @@ export default function Asesores() {
 
       {/* MODAL */}
       {modal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 16 }} onClick={cerrar}>
-          <div style={{ background: "var(--panel)", borderRadius: 14, padding: 28, width: "100%", maxWidth: 480, boxShadow: "0 10px 30px rgba(0,0,0,0.3)" }} onClick={(e) => e.stopPropagation()}>
+        <Dialogo titulo={modal.mode === "add" ? "Agregar asesor" : "Editar asesor"} onCerrar={cerrar}>
+          <div style={{ padding: 24 }}>
             <h3 style={{ margin: "0 0 20px", color: "var(--text)" }}>{modal.mode === "add" ? "Agregar asesor" : "Editar asesor"}</h3>
 
             {[
@@ -168,8 +167,7 @@ export default function Asesores() {
               { label: "Apellido", name: "apellido", type: "text" },
               { label: "Cargo", name: "cargo", type: "text", placeholder: "Ej: Asesor Comercial" },
               { label: "Celular", name: "celular", type: "tel", placeholder: "Ej: +57 300 000 0000" },
-              { label: "Correo", name: "correo", type: "email", placeholder: "Ej: asesor@solartech.com.co" },
-              { label: "Usuario *", name: "usuario", type: "text" },
+              { label: "Correo (usuario de acceso) *", name: "correo", type: "email", placeholder: "Ej: asesor@solartech.com.co" },
               { label: modal.mode === "edit" ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña *", name: "password", type: "password" },
             ].map(({ label, name, type, placeholder }) => (
               <div key={name} style={{ marginBottom: 14 }}>
@@ -198,7 +196,7 @@ export default function Asesores() {
               </button>
             </div>
           </div>
-        </div>
+        </Dialogo>
       )}
     </div>
   );

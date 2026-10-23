@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from './assets/logo_solartech.webp';
 import './login.css';
+import { supabase, guardarPerfil, cerrarSesion } from './supabase';
+import VideoFondo from './components/VideoFondo';
 
 export default function Login() {
   const [usuario, setUsuario] = useState('');
@@ -16,26 +18,28 @@ export default function Login() {
     setError('');
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, password })
+      const { data: auth, error: authError } = await supabase.auth.signInWithPassword({
+        email: usuario.trim(),
+        password,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Error al iniciar sesión');
+      if (authError) {
+        setError('Correo o contraseña incorrectos');
         return;
       }
 
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('nombreUsuario', data.nombre);
-      localStorage.setItem('apellidoUsuario', data.apellido || '');
-      localStorage.setItem('cargoUsuario', data.cargo || '');
-      localStorage.setItem('celularUsuario', data.celular || '');
-      localStorage.setItem('correoUsuario', data.correo || '');
-      localStorage.setItem('rolUsuario', data.rol || 'Asesor');
+      // Perfil del asesor (nombre, cargo, rol) desde la tabla staff
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/me`, {
+        headers: { Authorization: `Bearer ${auth.session.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        await cerrarSesion();
+        setError('Tu usuario no está habilitado como asesor. Contacta al administrador.');
+        return;
+      }
+
+      localStorage.setItem('token', auth.session.access_token);
+      guardarPerfil(data);
       navigate('/');
     } catch (err) {
       setError('No se pudo conectar con el servidor. Verifica que el backend esté activo.');
@@ -44,12 +48,9 @@ export default function Login() {
     }
   };
 
-  const bgStyle = {
-    backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${process.env.PUBLIC_URL}/assets/banner_solartech.jpg)`,
-  };
-
   return (
-    <div className="login-bg" style={bgStyle}>
+    <div className="login-bg">
+      <VideoFondo />
       <div className="login-card">
         <img src={logo} alt="Logo Solartech" className="login-logo" />
         <h1 className="login-title">Bienvenido</h1>
@@ -57,10 +58,12 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <div className="login-field">
-            <label className="login-label">Usuario</label>
+            <label className="login-label" htmlFor="login-correo">Correo</label>
             <input
+              id="login-correo"
               className="login-input"
-              placeholder="Ej: admin"
+              type="email"
+              placeholder="Ej: asesor@solartech.com.co"
               value={usuario}
               onChange={e => setUsuario(e.target.value)}
               required
@@ -69,8 +72,9 @@ export default function Login() {
           </div>
 
           <div className="login-field">
-            <label className="login-label">Contraseña</label>
+            <label className="login-label" htmlFor="login-password">Contraseña</label>
             <input
+              id="login-password"
               className="login-input"
               type="password"
               placeholder="••••••••"
@@ -81,7 +85,7 @@ export default function Login() {
             />
           </div>
 
-          {error && <div className="login-error">{error}</div>}
+          {error && <div className="login-error" role="alert">{error}</div>}
 
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Ingresando...' : 'Ingresar'}

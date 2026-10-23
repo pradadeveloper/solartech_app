@@ -1,362 +1,290 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from "recharts";
-import KpiCard from "./components/KpiCard";
-import Panel from "./components/Panel";
-import PipelineTable from "./components/PipelineTable";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-const ACCENT = "#B03A22";
-const PIE_COLORS = ["#B03A22", "#3498db", "#2ecc71", "#9b59b6", "#e67e22", "#1abc9c", "#f39c12"];
+// Pregunta de la pantalla: ¿cuánto hay en juego en el embudo y qué hay que mover hoy?
+// El cobre (--accent) marca solo el dato principal: los leads por día y lo cerrado.
 
-const PIPELINE_STAGES = [
-  { key: "Nuevo",          color: "#3498db", icon: "✦" },
-  { key: "En negociación", color: "#f39c12", icon: "◈" },
-  { key: "Cotizado",       color: "#9b59b6", icon: "◉" },
-  { key: "Enviado",        color: "#1abc9c", icon: "▶" },
-  { key: "Cerrado",        color: "#2ecc71", icon: "✔" },
-  { key: "Perdido",        color: "#e74c3c", icon: "✖" },
-];
+const ETAPAS = ["Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado"];
+const ABIERTOS = ["Nuevo", "En negociación", "Cotizado", "Enviado"];
+const CLASE_ESTADO = {
+  "Nuevo": "estado",
+  "En negociación": "estado estado--progreso",
+  "Cotizado": "estado estado--progreso",
+  "Enviado": "estado estado--progreso",
+  "Cerrado": "estado estado--positivo",
+  "Perdido": "estado estado--negativo",
+};
 
-const formatCOP = (value) =>
-  new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(value);
+const cop = (v) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(v || 0);
+const millones = (v) => {
+  if (!v) return "$0";
+  return v >= 1e9
+    ? `$${(v / 1e9).toLocaleString("es-CO", { maximumFractionDigits: 2 })} mil M`
+    : `$${(v / 1e6).toLocaleString("es-CO", { maximumFractionDigits: 1 })} M`;
+};
+const kwp = (v) => (v ? `${Number(v).toLocaleString("es-CO", { maximumFractionDigits: 1 })} kWp` : "—");
+const plural = (n, uno, varios) => `${n.toLocaleString("es-CO")} ${n === 1 ? uno : varios}`;
 
-function isSameDay(date, ref) {
-  return (
-    date.getFullYear() === ref.getFullYear() &&
-    date.getMonth() === ref.getMonth() &&
-    date.getDate() === ref.getDate()
-  );
-}
+const mismoDia = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-// Últimos N días: devuelve array [{ dia: "Lun 31", leads: 0 }, ...]
-function buildLeadsPorDia(leads, dias = 14) {
+function leadsPorDia(leads, dias = 14) {
   const hoy = new Date();
   return Array.from({ length: dias }, (_, i) => {
     const ref = new Date(hoy);
     ref.setDate(hoy.getDate() - (dias - 1 - i));
-    const count = leads.filter((l) => isSameDay(new Date(l.fecha), ref)).length;
-    const label = ref.toLocaleDateString("es-CO", { weekday: "short", day: "numeric" });
-    return { dia: label, leads: count };
+    return {
+      dia: ref.toLocaleDateString("es-CO", { day: "numeric", month: "short" }).replace(".", ""),
+      leads: leads.filter((l) => mismoDia(new Date(l.fecha), ref)).length,
+    };
   });
 }
 
-// Distribución por tipoSolicitud
-function buildFuentes(leads) {
-  const map = {};
-  leads.forEach((l) => {
-    const key = l.tipoSolicitud || "Sin especificar";
-    map[key] = (map[key] || 0) + 1;
-  });
-  return Object.entries(map)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-}
-
-const TooltipLeads = ({ active, payload, label }) => {
+const TooltipDia = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: "0.82rem" }}>
-      <p style={{ margin: 0, color: "var(--muted)" }}>{label}</p>
-      <p style={{ margin: "2px 0 0", fontWeight: 700, color: ACCENT }}>{payload[0].value} lead{payload[0].value !== 1 ? "s" : ""}</p>
-    </div>
-  );
-};
-
-const TooltipFuente = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  const { name, value } = payload[0];
-  return (
-    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: "0.82rem" }}>
-      <p style={{ margin: 0, fontWeight: 700, color: "var(--text)" }}>{name}</p>
-      <p style={{ margin: "2px 0 0", color: ACCENT }}>{value} lead{value !== 1 ? "s" : ""}</p>
+    <div className="grafica-tip">
+      {label}: <strong>{plural(payload[0].value, "lead", "leads")}</strong>
     </div>
   );
 };
 
 export default function DashboardResumen() {
   const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [estado, setEstado] = useState("cargando"); // cargando | listo | error
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch(`${process.env.REACT_APP_API_URL}/api/leads`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => r.json())
-      .then((data) => { setLeads(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const cargar = () => {
+    setEstado("cargando");
+    const token = localStorage.getItem("token");
+    fetch(`${process.env.REACT_APP_API_URL}/api/leads`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((r) => {
+        if (r.status === 401) { navigate("/login", { replace: true }); return null; }
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => { if (data) { setLeads(Array.isArray(data) ? data : []); setEstado("listo"); } })
+      .catch(() => setEstado("error"));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(cargar, []);
 
-  const kpis = useMemo(() => {
+  // Las versiones (83_2) son copias de una cotización: no cuentan como leads nuevos.
+  const base = useMemo(() => leads.filter((l) => !String(l.numeroCotizacion).includes("_")), [leads]);
+
+  const datos = useMemo(() => {
     const ahora = new Date();
     const hace30 = new Date(ahora); hace30.setDate(ahora.getDate() - 30);
-    const isUltimos30 = (fecha) => { const d = new Date(fecha); return d >= hace30 && d <= ahora; };
+    const mes = base.filter((l) => new Date(l.fecha) >= hace30);
+    const cerrados = base.filter((l) => l.estado === "Cerrado");
+    const conValor = base.filter((l) => l.costoProyectoMasIva > 0);
+    const valorMes = mes.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0);
+    const sinAsesor = base.filter((l) => (l.estado || "Nuevo") === "Nuevo" && (!l.vendedor || l.vendedor === "Sin asignar"));
 
-    const leadsHoy = leads.filter((l) => isSameDay(new Date(l.fecha), ahora)).length;
-    const leadsMes = leads.filter((l) => isUltimos30(l.fecha)).length;
-    const cotizacionesMes = leads.filter((l) => isUltimos30(l.fecha) && l.kwp).length;
-    const cerrados = leads.filter((l) => l.estado === "Cerrado").length;
-    const tasaCierre = leads.length > 0
-      ? Number((cerrados / leads.length * 100).toFixed(1))
-      : 0;
-    const totalValor = leads.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0);
-    const ticketPromedio = leads.length > 0 ? Math.round(totalValor / leads.length) : 0;
-    const kwpProyectadosMes = leads
-      .filter((l) => isUltimos30(l.fecha))
-      .reduce((s, l) => s + (l.kwp || 0), 0);
-
-    const valorCotizadoMes = leads
-      .filter((l) => isUltimos30(l.fecha))
-      .reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0);
-
-    // Principal fuente de leads (campo conociste)
-    const fuenteMap = {};
-    leads.forEach(l => {
-      const f = l.conociste || "";
-      if (f) fuenteMap[f] = (fuenteMap[f] || 0) + 1;
+    const etapas = ETAPAS.map((e) => {
+      const items = base.filter((l) => (l.estado || "Nuevo") === e);
+      return { estado: e, cuenta: items.length, valor: items.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0) };
     });
-    const topFuenteEntry = Object.entries(fuenteMap).sort((a, b) => b[1] - a[1])[0];
-    const topFuente      = topFuenteEntry ? topFuenteEntry[0] : "—";
-    const topFuenteCount = topFuenteEntry ? topFuenteEntry[1] : 0;
+    const perdidos = base.filter((l) => l.estado === "Perdido");
+    const maxEtapa = Math.max(1, ...etapas.map((e) => e.cuenta), perdidos.length);
 
-    return { leadsHoy, leadsMes, cotizacionesMes, tasaCierre, ticketPromedio, kwpProyectadosMes, valorCotizadoMes, topFuente, topFuenteCount };
-  }, [leads]);
+    const canales = Object.entries(
+      base.reduce((m, l) => { const k = l.conociste || "Sin dato"; m[k] = (m[k] || 0) + 1; return m; }, {})
+    ).map(([nombre, cuenta]) => ({ nombre, cuenta })).sort((a, b) => b.cuenta - a.cuenta).slice(0, 5);
 
-  const leadsPorDia = useMemo(() => buildLeadsPorDia(leads, 14), [leads]);
-  const fuentes = useMemo(() => buildFuentes(leads), [leads]);
+    const abiertos = base
+      .filter((l) => ABIERTOS.includes(l.estado || "Nuevo"))
+      .sort((a, b) => (b.costoProyectoMasIva || 0) - (a.costoProyectoMasIva || 0));
 
-  const pipelineData = useMemo(() =>
-    PIPELINE_STAGES.map(({ key, color, icon }) => {
-      const items = leads.filter(l => (l.estado || "Nuevo") === key);
-      return {
-        estado: key, color, icon,
-        count: items.length,
-        valor: items.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0),
-      };
-    }),
-  [leads]);
+    return {
+      valorMes,
+      cotizadosMes: mes.filter((l) => l.kwp).length,
+      leadsMes: mes.length,
+      leadsHoy: base.filter((l) => mismoDia(new Date(l.fecha), ahora)).length,
+      cerrados: cerrados.length,
+      tasaCierre: base.length ? (cerrados.length / base.length) * 100 : 0,
+      ticket: conValor.length ? conValor.reduce((s, l) => s + l.costoProyectoMasIva, 0) / conValor.length : 0,
+      sinAsesor: sinAsesor.length,
+      etapas,
+      perdidos: { cuenta: perdidos.length, valor: perdidos.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0) },
+      maxEtapa,
+      canales,
+      abiertos: abiertos.slice(0, 5),
+      totalAbiertos: abiertos.length,
+      valorAbierto: abiertos.reduce((s, l) => s + (l.costoProyectoMasIva || 0), 0),
+    };
+  }, [base]);
 
-  const pipelineRows = useMemo(() =>
-    [...leads]
-      .sort((a, b) => (b.costoProyectoMasIva || 0) - (a.costoProyectoMasIva || 0))
-      .slice(0, 5)
-      .map((l) => ({
-        id: `N-${l.numeroCotizacion}`,
-        cliente: l.nombre,
-        ciudad: l.ubicacion,
-        kwh: l.consumoKwh,
-        sistema: l.kwp ? `${l.kwp} kWp` : "—",
-        valorCOP: l.costoProyectoMasIva || 0,
-        estado: l.estado || "Nuevo",
-        pdfUrl: l.pdfUrl || null,
-        _lead: l,
-      })),
-  [leads]);
+  const porDia = useMemo(() => leadsPorDia(base, 14), [base]);
+  const maxCanal = datos.canales[0]?.cuenta || 1;
+  const cargando = estado === "cargando";
+  const v = (x) => (cargando ? <span className="esqueleto" /> : x);
+
+  if (estado === "error") {
+    return (
+      <div className="panel">
+        <div className="panel__body bloque-error">
+          No se pudieron cargar los leads.
+          <button className="boton boton--texto" onClick={cargar}>Reintentar</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      {/* ── PIPELINE FULL WIDTH — primero ── */}
-      <Panel title="Pipeline de Leads">
-        {loading ? (
-          <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>Cargando…</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ display: "flex", alignItems: "stretch", gap: 0, minWidth: 520 }}>
-              {/* Etapas principales (sin Perdido) */}
-              {pipelineData.slice(0, 5).map((stage, i) => {
-                const total = leads.length - (pipelineData[5]?.count || 0);
-                const pct = total > 0 ? Math.round((stage.count / total) * 100) : 0;
-                return (
-                  <React.Fragment key={stage.estado}>
-                    <div style={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      padding: "14px 8px 12px",
-                      borderTop: `3px solid ${stage.color}`,
-                      background: `linear-gradient(180deg, ${stage.color}14 0%, transparent 100%)`,
-                      borderRadius: i === 0 ? "10px 0 0 10px" : i === 4 ? "0 10px 10px 0" : 0,
-                      borderRight: i < 4 ? "1px solid var(--border)" : "none",
-                      position: "relative",
-                      minWidth: 80,
-                    }}>
-                      {i < 4 && (
-                        <div style={{
-                          position: "absolute",
-                          right: -13,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          zIndex: 2,
-                          width: 24,
-                          height: 24,
-                          borderRadius: "50%",
-                          background: "var(--panel)",
-                          border: "1px solid var(--border)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 11,
-                          color: "var(--muted)",
-                          fontWeight: 700,
-                        }}>›</div>
-                      )}
-                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: stage.color, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6, textAlign: "center" }}>
-                        {stage.estado}
-                      </span>
-                      <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
-                        {stage.count}
-                      </span>
-                      <span style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 2, marginBottom: 8 }}>
-                        lead{stage.count !== 1 ? "s" : ""}
-                      </span>
-                      <div style={{ width: "80%", height: 4, borderRadius: 4, background: "var(--border)", marginBottom: 6, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: stage.color, borderRadius: 4, transition: "width .5s" }} />
-                      </div>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text)", opacity: 0.8, textAlign: "center" }}>
-                        {stage.valor > 0 ? formatCOP(stage.valor) : "—"}
-                      </span>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
+      {datos.sinAsesor > 0 && !cargando && (
+        <div className="hallazgo">
+          <span>
+            <strong>{plural(datos.sinAsesor, "lead nuevo", "leads nuevos")} sin asesor.</strong>{" "}
+            Llegaron por la web o sin asignar y nadie los está atendiendo.
+          </span>
+          <button className="boton boton--chico" onClick={() => navigate("/leads", { state: { asesor: "Sin asignar" } })}>
+            Ver y asignar
+          </button>
+        </div>
+      )}
 
-              {/* Separador + Perdido */}
-              <div style={{ display: "flex", alignItems: "stretch", marginLeft: 10 }}>
-                <div style={{ width: 2, background: "var(--border)", borderRadius: 2, margin: "8px 0" }} />
-                {(() => {
-                  const stage = pipelineData[5];
-                  if (!stage) return null;
-                  return (
-                    <div style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      padding: "14px 14px 12px",
-                      borderTop: `3px solid ${stage.color}`,
-                      background: `linear-gradient(180deg, ${stage.color}14 0%, transparent 100%)`,
-                      borderRadius: "0 10px 10px 0",
-                      minWidth: 90,
-                      marginLeft: 10,
-                    }}>
-                      <span style={{ fontSize: "0.68rem", fontWeight: 600, color: stage.color, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>
-                        {stage.estado}
-                      </span>
-                      <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
-                        {stage.count}
-                      </span>
-                      <span style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 2, marginBottom: 8 }}>
-                        lead{stage.count !== 1 ? "s" : ""}
-                      </span>
-                      <div style={{ width: "80%", height: 4, borderRadius: 4, background: "var(--border)", marginBottom: 6, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: leads.length > 0 ? `${Math.round((stage.count / leads.length) * 100)}%` : "0%", background: stage.color, borderRadius: 4 }} />
-                      </div>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text)", opacity: 0.8 }}>
-                        {stage.valor > 0 ? formatCOP(stage.valor) : "—"}
-                      </span>
-                    </div>
-                  );
-                })()}
+      <section className="kpis" aria-label="Indicadores de los últimos 30 días">
+        <div className="kpi kpi--lider">
+          <div className="kpi__label">Valor cotizado · 30 días</div>
+          <div className="kpi__valor">{v(cop(datos.valorMes))}</div>
+          <div className="kpi__nota">{v(plural(datos.cotizadosMes, "cotización", "cotizaciones"))}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi__label">Leads · 30 días</div>
+          <div className="kpi__valor">{v(datos.leadsMes.toLocaleString("es-CO"))}</div>
+          <div className="kpi__nota">{v(`${datos.leadsHoy.toLocaleString("es-CO")} hoy`)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi__label">Tasa de cierre</div>
+          <div className="kpi__valor">{v(<>{datos.tasaCierre.toLocaleString("es-CO", { maximumFractionDigits: 1 })}<span className="kpi__unidad">%</span></>)}</div>
+          <div className="kpi__nota">{v(`${datos.cerrados} cerrados de ${base.length}`)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi__label">Ticket promedio</div>
+          <div className="kpi__valor" title={cop(datos.ticket)}>{v(millones(datos.ticket))}</div>
+          <div className="kpi__nota">Por proyecto cotizado</div>
+        </div>
+      </section>
+
+      <section className="panel" aria-labelledby="t-embudo">
+        <div className="panel__head">
+          <h2 id="t-embudo">Embudo</h2>
+          <span className="panel__meta">
+            {cargando ? "" : `${plural(datos.totalAbiertos, "oportunidad abierta", "oportunidades abiertas")} · ${millones(datos.valorAbierto)}`}
+          </span>
+        </div>
+        <div className="panel__body">
+          <div className="embudo">
+            {datos.etapas.map((e) => (
+              <div key={e.estado} className={`etapa${e.estado === "Cerrado" ? " etapa--cerrado" : ""}`}>
+                <div className="etapa__nombre">{e.estado}</div>
+                <div className="etapa__cuenta">{v(e.cuenta)}</div>
+                <div className="etapa__valor">{cargando ? "" : e.valor ? millones(e.valor) : "—"}</div>
+                <div className="etapa__barra"><span style={{ width: `${(e.cuenta / datos.maxEtapa) * 100}%` }} /></div>
               </div>
+            ))}
+            <div className="embudo__corte" aria-hidden="true" />
+            <div className="etapa etapa--perdido">
+              <div className="etapa__nombre">Perdido</div>
+              <div className="etapa__cuenta">{v(datos.perdidos.cuenta)}</div>
+              <div className="etapa__valor">{cargando ? "" : datos.perdidos.valor ? millones(datos.perdidos.valor) : "—"}</div>
+              <div className="etapa__barra"><span style={{ width: `${(datos.perdidos.cuenta / datos.maxEtapa) * 100}%` }} /></div>
             </div>
           </div>
-        )}
-      </Panel>
+        </div>
+      </section>
 
-      <div className="grid kpiGrid">
-        <KpiCard
-          title="Valor cotizado mes"
-          value={loading ? "—" : formatCOP(kpis.valorCotizadoMes)}
-          hint="Últimos 30 días"
-          highlight
-          hero
-        />
-        <KpiCard title="Leads hoy" value={loading ? "—" : kpis.leadsHoy} hint="Últimas 24h" />
-        <KpiCard title="Leads" value={loading ? "—" : kpis.leadsMes} hint="Últimos 30 días" />
-        <KpiCard title="Cotizaciones" value={loading ? "—" : kpis.cotizacionesMes} hint="Últimos 30 días" />
-        <KpiCard title="Tasa de cierre" value={loading ? "—" : `${kpis.tasaCierre}%`} hint="Sobre total leads" />
-        <KpiCard title="Ticket promedio" value={loading ? "—" : formatCOP(kpis.ticketPromedio)} hint="COP" />
-        <KpiCard title="kWp proyectados" value={loading ? "—" : Number(kpis.kwpProyectadosMes.toFixed(1))} hint="Últimos 30 días" />
-        <KpiCard title="Principal fuente" value={loading ? "—" : kpis.topFuente} hint={loading ? "" : `${kpis.topFuenteCount} lead${kpis.topFuenteCount !== 1 ? "s" : ""}`} />
-      </div>
-
-      <div className="grid chartsGrid">
-        {/* Gráfico 1: Leads por día (últimos 14 días) */}
-        <Panel title="Leads por día — últimos 14 días">
-          {loading ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>Cargando…</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={leadsPorDia} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="dia"
-                  tick={{ fontSize: 11, fill: "var(--muted)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval={1}
-                />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fontSize: 11, fill: "var(--muted)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<TooltipLeads />} cursor={{ fill: "rgba(245,197,24,.08)" }} />
-                <Bar dataKey="leads" fill={ACCENT} radius={[4, 4, 0, 0]} maxBarSize={32} />
+      <div className="fila-2-1">
+        <section className="panel" aria-labelledby="t-dias">
+          <div className="panel__head">
+            <h2 id="t-dias">Leads por día</h2>
+            <span className="panel__meta">Últimos 14 días</span>
+          </div>
+          <div className="panel__body">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={porDia} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
+                <CartesianGrid stroke="var(--rule)" vertical={false} />
+                <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "var(--faint)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} interval={2} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--faint)" }} axisLine={false} tickLine={false} width={40} />
+                <Tooltip content={<TooltipDia />} cursor={{ fill: "var(--raised)" }} />
+                <Bar dataKey="leads" fill="var(--accent)" maxBarSize={28} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
-          )}
-        </Panel>
+          </div>
+        </section>
 
-        {/* Gráfico 2: Distribución por tipo de solicitud */}
-        <Panel title="Tipos de solicitud">
-          {loading ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>Cargando…</p>
-          ) : fuentes.length === 0 ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>Sin datos aún.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={fuentes}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {fuentes.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<TooltipFuente />} />
-                <Legend
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ fontSize: 12, color: "var(--muted)" }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </Panel>
+        <section className="panel" aria-labelledby="t-canal">
+          <div className="panel__head">
+            <h2 id="t-canal">Por dónde llegan</h2>
+            <span className="panel__meta">Todos los leads</span>
+          </div>
+          <div className="panel__body">
+            {!cargando && datos.canales.length === 0 ? (
+              <p className="vacio">Todavía no hay leads con canal registrado.</p>
+            ) : (
+              <ul className="barras">
+                {datos.canales.map((c) => (
+                  <li key={c.nombre} className="barras__fila">
+                    <div className="barras__texto">
+                      <span>{c.nombre}</span>
+                      <span className="barras__valor">{plural(c.cuenta, "lead", "leads")}</span>
+                    </div>
+                    <div className="barras__pista"><span style={{ width: `${(c.cuenta / maxCanal) * 100}%` }} /></div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
       </div>
 
-      <PipelineTable
-        title="Últimos leads — Pipeline"
-        rows={pipelineRows}
-        onView={(row) => navigate("/resultado", { state: { resultado: row._lead } })}
-        onVerTodos={() => navigate("/leads")}
-      />
+      <section className="panel" aria-labelledby="t-abiertas">
+        <div className="panel__head">
+          <h2 id="t-abiertas">Oportunidades abiertas de mayor valor</h2>
+          <button className="boton boton--chico" onClick={() => navigate("/leads")}>
+            Ver todos los leads
+          </button>
+        </div>
+        <div className="panel__body">
+          {!cargando && datos.abiertos.length === 0 ? (
+            <p className="vacio">No hay oportunidades abiertas. Los leads nuevos aparecerán aquí.</p>
+          ) : (
+            <div className="tableWrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th className="col-hide-mobile">Ciudad</th>
+                    <th className="num col-hide-mobile">Sistema</th>
+                    <th className="num">Valor</th>
+                    <th className="col-hide-mobile">Estado</th>
+                    <th className="col-hide-mobile">Asesor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos.abiertos.map((l) => (
+                    <tr key={l.id} onClick={() => navigate("/resultado", { state: { resultado: l } })} style={{ cursor: "pointer" }}>
+                      <td className="identidad">
+                        <button className="enlace-fila" onClick={(e) => { e.stopPropagation(); navigate("/resultado", { state: { resultado: l } }); }}>
+                          {l.nombre}
+                        </button>
+                        <span className="sub-movil">{l.estado || "Nuevo"} · {l.ubicacion || "—"}</span>
+                      </td>
+                      <td className="tenue col-hide-mobile">{l.ubicacion || "—"}</td>
+                      <td className="num col-hide-mobile">{kwp(l.kwp)}</td>
+                      <td className="num">{cop(l.costoProyectoMasIva)}</td>
+                      <td className="col-hide-mobile"><span className={CLASE_ESTADO[l.estado || "Nuevo"]}>{l.estado || "Nuevo"}</span></td>
+                      <td className="tenue col-hide-mobile">{l.vendedor || "Sin asignar"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
     </>
   );
 }

@@ -1,146 +1,149 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./dashboardAdmon.css";
 import LeadCRMDrawer from "./LeadCRMDrawer";
+import { avisar } from "./components/Avisos";
 
-const ESTADOS = ["", "Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado", "Perdido"];
-
-const BADGE = {
-  "Nuevo":          { bg: "rgba(52,152,219,.18)", color: "#3498db" },
-  "En negociación": { bg: "rgba(243,156,18,.18)",  color: "#f39c12" },
-  "Cotizado":       { bg: "rgba(155,89,182,.18)",  color: "#9b59b6" },
-  "Enviado":        { bg: "rgba(26,188,156,.18)",  color: "#1abc9c" },
-  "Cerrado":        { bg: "rgba(46,204,113,.18)",  color: "#2ecc71" },
-  "Perdido":        { bg: "rgba(231,76,60,.18)",   color: "#e74c3c" },
+const ESTADOS = ["Nuevo", "En negociación", "Cotizado", "Enviado", "Cerrado", "Perdido"];
+const CLASE_ESTADO = {
+  "Nuevo": "estado",
+  "En negociación": "estado estado--progreso",
+  "Cotizado": "estado estado--progreso",
+  "Enviado": "estado estado--progreso",
+  "Cerrado": "estado estado--positivo",
+  "Perdido": "estado estado--negativo",
 };
 
-const money = (v) =>
-  typeof v === "number" ? `$${v.toLocaleString("es-CO")}` : (v ?? "—");
-
-const safeDate = (str) => {
-  if (!str) return "—";
+const money = (v) => (typeof v === "number" && v > 0 ? `$${v.toLocaleString("es-CO")}` : "—");
+const numero = (v, dec = 0) => (v || v === 0 ? Number(v).toLocaleString("es-CO", { maximumFractionDigits: dec }) : "—");
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"];
+// "23 oct" este año; "23 oct 2025" si es de otro año.
+const fechaCorta = (str) => {
   const d = new Date(str);
-  return isNaN(d.getTime()) ? str : d.toLocaleDateString("es-CO");
+  if (isNaN(d.getTime())) return "—";
+  const base = `${d.getDate()} ${MESES[d.getMonth()]}`;
+  return d.getFullYear() === new Date().getFullYear() ? base : `${base} ${d.getFullYear()}`;
 };
 
 const FILTRO_INIT = {
-  cot: "", fechaOrden: "desc",
-  cliente: "", ciudad: "", kwhMin: "", kwhMax: "",
-  kwpMin: "", sistema: "", valorMin: "", estado: "", asesor: "",
+  q: "", estado: "", asesor: "", ciudad: "", sistema: "",
+  kwhMin: "", kwhMax: "", valorMin: "", orden: "reciente",
 };
 
-const inputStyle = {
-  width: "100%", background: "var(--bg)", border: "1px solid var(--border)",
-  borderRadius: 6, padding: "4px 6px", color: "var(--text)",
-  fontSize: "0.75rem", boxSizing: "border-box",
-};
-
-const selectStyle = { ...{ width: "100%", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 6px", color: "var(--text)", fontSize: "0.75rem", boxSizing: "border-box" } };
+const IconoBuscar = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+  </svg>
+);
 
 export default function LeadsCotizaciones() {
+  const location = useLocation();
   const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [f, setF] = useState(FILTRO_INIT);
+  const [carga, setCarga] = useState("cargando"); // cargando | listo | error
+  const [f, setF] = useState(() => ({ ...FILTRO_INIT, ...(location.state?.asesor ? { asesor: location.state.asesor } : {}) }));
+  const [masFiltros, setMasFiltros] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState({});
-  const [leadActivoNum, setLeadActivoNum] = useState(null);   // numeroCotizacion del drawer abierto
+  const [leadActivoNum, setLeadActivoNum] = useState(null);
   const [guardandoEstado, setGuardandoEstado] = useState(false);
   const navigate = useNavigate();
 
-  const rol = localStorage.getItem('rolUsuario') || 'Asesor';
-  const isAdmin = rol === 'Admin';
+  const isAdmin = (localStorage.getItem("rolUsuario") || "Asesor") === "Admin";
+  const token = () => localStorage.getItem("token");
+  const auth = () => (token() ? { Authorization: `Bearer ${token()}` } : {});
+
+  const cargar = () => {
+    setCarga("cargando");
+    fetch(`${process.env.REACT_APP_API_URL}/api/leads`, { headers: auth() })
+      .then((r) => {
+        if (r.status === 401) { navigate("/login", { replace: true }); return null; }
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => { if (data) { setLeads(Array.isArray(data) ? data : []); setCarga("listo"); } })
+      .catch(() => setCarga("error"));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(cargar, []);
 
   const generarPdfLead = async (lead) => {
     const num = String(lead.numeroCotizacion);
-    setGenerandoPdf(prev => ({ ...prev, [num]: true }));
+    setGenerandoPdf((prev) => ({ ...prev, [num]: true }));
     try {
-      const token = localStorage.getItem('token');
       const payload = {
         ...lead,
         consumoKwh: lead.consumoKwh || 0,
-        costoKwh: lead.costoKwh ||
-          (lead.ahorroMensual > 0 && lead.consumoKwh > 0
-            ? Math.round(lead.ahorroMensual / lead.consumoKwh)
-            : 0),
+        costoKwh: lead.costoKwh || (lead.ahorroMensual > 0 && lead.consumoKwh > 0 ? Math.round(lead.ahorroMensual / lead.consumoKwh) : 0),
       };
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/generar-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth() },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.pdfUrl) {
-        setLeads(prev => prev.map(l =>
-          String(l.numeroCotizacion) === num ? { ...l, pdfUrl: data.pdfUrl } : l
-        ));
+        setLeads((prev) => prev.map((l) => (String(l.numeroCotizacion) === num ? { ...l, pdfUrl: data.pdfUrl } : l)));
+        avisar(`PDF de la cotización N-${num} listo.`);
       } else {
-        alert(data.error || 'No se pudo generar el PDF');
+        avisar(data.error || "No se pudo generar el PDF.", "error");
       }
     } catch {
-      alert('Error generando PDF');
+      avisar("No se pudo generar el PDF. Revisa la conexión e inténtalo de nuevo.", "error");
     } finally {
-      setGenerandoPdf(prev => ({ ...prev, [num]: false }));
+      setGenerandoPdf((prev) => ({ ...prev, [num]: false }));
     }
   };
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch(`${process.env.REACT_APP_API_URL}/api/leads`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => r.json())
-      .then((data) => { setLeads(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
-
   const set = (campo) => (e) => setF((prev) => ({ ...prev, [campo]: e.target.value }));
 
-  const ciudades = useMemo(() => ["", ...new Set(leads.map((l) => l.ubicacion).filter(Boolean)).keys()].sort(), [leads]);
-  const sistemas = useMemo(() => ["", ...new Set(leads.map((l) => l.tipoSolicitud).filter(Boolean)).keys()].sort(), [leads]);
-  const asesores = useMemo(() => ["", ...new Set(leads.map((l) => l.vendedor).filter(Boolean)).keys()].sort(), [leads]);
+  const opciones = (campo) => [...new Set(leads.map((l) => l[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const ciudades = useMemo(() => opciones("ubicacion"), [leads]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sistemas = useMemo(() => opciones("tipoSolicitud"), [leads]); // eslint-disable-line react-hooks/exhaustive-deps
+  const asesores = useMemo(() => opciones("vendedor"), [leads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtrados = useMemo(() => {
+    const q = f.q.trim().toLowerCase();
     const lista = leads.filter((l) => {
-      if (f.cot && !String(l.numeroCotizacion).includes(f.cot)) return false;
-      if (f.cliente && !l.nombre?.toLowerCase().includes(f.cliente.toLowerCase())) return false;
-      if (f.ciudad && l.ubicacion !== f.ciudad) return false;
-      if (f.kwhMin && (l.consumoKwh ?? 0) < Number(f.kwhMin)) return false;
-      if (f.kwhMax && (l.consumoKwh ?? 0) > Number(f.kwhMax)) return false;
-      if (f.kwpMin && (l.kwp ?? 0) < Number(f.kwpMin)) return false;
-      if (f.sistema && l.tipoSolicitud !== f.sistema) return false;
-      if (f.valorMin && (l.costoProyectoMasIva ?? 0) < Number(f.valorMin)) return false;
+      if (q && ![l.nombre, l.ubicacion, `n-${l.numeroCotizacion}`, String(l.numeroCotizacion)].some((t) => String(t || "").toLowerCase().includes(q))) return false;
       if (f.estado && (l.estado ?? "Nuevo") !== f.estado) return false;
       if (f.asesor && l.vendedor !== f.asesor) return false;
+      if (f.ciudad && l.ubicacion !== f.ciudad) return false;
+      if (f.sistema && l.tipoSolicitud !== f.sistema) return false;
+      if (f.kwhMin && (l.consumoKwh ?? 0) < Number(f.kwhMin)) return false;
+      if (f.kwhMax && (l.consumoKwh ?? 0) > Number(f.kwhMax)) return false;
+      if (f.valorMin && (l.costoProyectoMasIva ?? 0) < Number(f.valorMin)) return false;
       return true;
     });
-    lista.sort((a, b) => {
-      const da = new Date(a.fecha), db = new Date(b.fecha);
-      return f.fechaOrden === "asc" ? da - db : db - da;
-    });
-    return lista;
+    const orden = {
+      reciente: (a, b) => new Date(b.fecha) - new Date(a.fecha),
+      antiguo: (a, b) => new Date(a.fecha) - new Date(b.fecha),
+      valor: (a, b) => (b.costoProyectoMasIva || 0) - (a.costoProyectoMasIva || 0),
+      cliente: (a, b) => String(a.nombre || "").localeCompare(String(b.nombre || "")),
+    }[f.orden];
+    return lista.sort(orden);
   }, [leads, f]);
 
   const matchLead = (l, lead) => String(l.numeroCotizacion) === String(lead.numeroCotizacion);
 
   const actualizarEstado = async (lead, estado) => {
+    const anterior = lead.estado;
     setGuardandoEstado(true);
-    // Optimista: cambia estado ya.
-    setLeads((prev) => prev.map((l) => matchLead(l, lead) ? { ...l, estado } : l));
+    setLeads((prev) => prev.map((l) => (matchLead(l, lead) ? { ...l, estado } : l)));
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${lead.numeroCotizacion}/estado`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { "Content-Type": "application/json", ...auth() },
         body: JSON.stringify({ estado }),
       });
       const data = await res.json();
-      // El backend devuelve el historial actualizado y (si cerró) la fecha de cierre.
+      if (!res.ok) throw new Error(data.error);
       if (data.historialEstados) {
-        setLeads((prev) => prev.map((l) => matchLead(l, lead)
+        setLeads((prev) => prev.map((l) => (matchLead(l, lead)
           ? { ...l, estado, historialEstados: data.historialEstados, ...(estado === "Cerrado" && !l.fechaCierre ? { fechaCierre: new Date().toISOString() } : {}) }
-          : l));
+          : l)));
       }
-    } catch {
-      alert("No se pudo actualizar el estado.");
+    } catch (err) {
+      setLeads((prev) => prev.map((l) => (matchLead(l, lead) ? { ...l, estado: anterior } : l)));
+      avisar(err?.message || "No se pudo actualizar el estado.", "error");
     } finally {
       setGuardandoEstado(false);
     }
@@ -148,33 +151,29 @@ export default function LeadsCotizaciones() {
 
   const agregarActividad = async (lead, tipo, texto) => {
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/leads/${lead.numeroCotizacion}/actividad`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { "Content-Type": "application/json", ...auth() },
         body: JSON.stringify({ tipo, texto }),
       });
       const data = await res.json();
       if (data.actividad) {
-        setLeads((prev) => prev.map((l) => matchLead(l, lead)
-          ? { ...l, actividades: [...(l.actividades || []), data.actividad] }
-          : l));
+        setLeads((prev) => prev.map((l) => (matchLead(l, lead) ? { ...l, actividades: [...(l.actividades || []), data.actividad] } : l)));
       } else {
-        alert(data.error || "No se pudo guardar la nota.");
+        avisar(data.error || "No se pudo guardar la nota.", "error");
       }
     } catch {
-      alert("No se pudo guardar la nota.");
+      avisar("No se pudo guardar la nota.", "error");
     }
   };
 
-  const leadActivo = leadActivoNum != null
-    ? leads.find((l) => String(l.numeroCotizacion) === String(leadActivoNum)) || null
-    : null;
+  const leadActivo = leadActivoNum != null ? leads.find((l) => String(l.numeroCotizacion) === String(leadActivoNum)) || null : null;
 
   const opcionPrincipal = (lead) => lead.opciones?.find((o) => o.seleccionada) ?? null;
   const pdfPrincipal = (lead) => {
-    const op = opcionPrincipal(lead);
-    return op?.pdfUrl ?? lead.pdfUrl ?? null;
+    const pdf = opcionPrincipal(lead)?.pdfUrl ?? lead.pdfUrl ?? null;
+    if (!pdf) return null;
+    return pdf.startsWith("http") ? pdf : `${process.env.REACT_APP_API_URL}${pdf}`;
   };
 
   const exportarCSV = () => {
@@ -196,7 +195,7 @@ export default function LeadsCotizaciones() {
       ];
     });
     const csv = [headers, ...filas].map((r) => r.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -205,344 +204,191 @@ export default function LeadsCotizaciones() {
     URL.revokeObjectURL(url);
   };
 
-  const verLead = (lead) => {
-    navigate("/resultado", { state: { resultado: { ...lead, numeroCotizacion: lead.numeroCotizacion } } });
+  const verLead = (lead) => navigate("/resultado", { state: { resultado: { ...lead } } });
+
+  const hayFiltros = Object.entries(f).some(([k, v]) => k !== "orden" && v !== "");
+  const filtrosOcultos = ["ciudad", "sistema", "kwhMin", "kwhMax", "valorMin"].filter((k) => f[k]).length + (f.orden !== "reciente" ? 1 : 0);
+
+  const selectEstado = (lead) => (
+    <select
+      className={CLASE_ESTADO[lead.estado ?? "Nuevo"]}
+      value={lead.estado ?? "Nuevo"}
+      onChange={(e) => actualizarEstado(lead, e.target.value)}
+      disabled={guardandoEstado}
+      aria-label={`Estado de ${lead.nombre}`}
+    >
+      {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+    </select>
+  );
+
+  const accionPdf = (lead) => {
+    const pdf = pdfPrincipal(lead);
+    const num = String(lead.numeroCotizacion);
+    return pdf ? (
+      <a className="boton boton--chico" href={pdf} target="_blank" rel="noreferrer">PDF</a>
+    ) : (
+      <button className="boton boton--chico" onClick={() => generarPdfLead(lead)} disabled={generandoPdf[num]}>
+        {generandoPdf[num] ? "Generando…" : "Crear PDF"}
+      </button>
+    );
   };
 
-  const limpiarFiltros = () => setF(FILTRO_INIT);
-  const hayFiltros = Object.entries(f).some(([k, v]) => k !== "fechaOrden" && v !== "");
-
   return (
-    <div style={{ padding: "0 4px", minWidth: 0, overflow: "hidden" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--text)" }}>Leads y Cotizaciones</h2>
-          <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--muted)" }}>
-            {filtrados.length} de {leads.length} registros
-            {hayFiltros && (
-              <button
-                onClick={limpiarFiltros}
-                style={{ marginLeft: 10, background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: "0.82rem", padding: 0 }}
-              >
-                × Limpiar filtros
-              </button>
-            )}
-          </p>
+    <div className="panel lista-leads">
+      <div className="panel__body">
+        {/* Barra: búsqueda y filtros principales, visible en todas las pantallas */}
+        <div className="leads-barra" role="search">
+          <div className="buscar">
+            <IconoBuscar />
+            <label className="sr-only" htmlFor="leads-q">Buscar</label>
+            <input id="leads-q" className="control" type="search" placeholder="Cliente, ciudad o N.º de cotización" value={f.q} onChange={set("q")} />
+          </div>
+          <label className="sr-only" htmlFor="leads-estado">Estado</label>
+          <select id="leads-estado" className="control" value={f.estado} onChange={set("estado")}>
+            <option value="">Estado: todos</option>
+            {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          {isAdmin && (
+            <>
+              <label className="sr-only" htmlFor="leads-asesor">Asesor</label>
+              <select id="leads-asesor" className="control" value={f.asesor} onChange={set("asesor")}>
+                <option value="">Asesor: todos</option>
+                {asesores.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </>
+          )}
+          <button className="boton" onClick={() => setMasFiltros((v) => !v)} aria-expanded={masFiltros} aria-controls="leads-mas">
+            Más filtros{filtrosOcultos ? ` (${filtrosOcultos})` : ""}
+          </button>
+          <div className="leads-barra__fin">
+            <span className="leads-cuenta">
+              {carga === "listo" ? (hayFiltros ? `${filtrados.length} de ${leads.length} leads` : `${leads.length} leads`) : ""}
+            </span>
+            {hayFiltros && <button className="boton boton--texto" onClick={() => setF(FILTRO_INIT)}>Limpiar</button>}
+            <button className="boton" onClick={exportarCSV} disabled={!filtrados.length}>Exportar CSV</button>
+          </div>
         </div>
-        <button
-          onClick={exportarCSV}
-          style={{
-            background: "var(--accent)", color: "#fff", border: "none",
-            borderRadius: 8, padding: "8px 18px", fontSize: "0.85rem",
-            fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-          }}
-        >
-          ↓ Exportar CSV {hayFiltros ? `(${filtrados.length})` : ""}
-        </button>
-      </div>
 
-      {loading ? (
-        <p style={{ color: "var(--muted)", textAlign: "center", marginTop: 60 }}>Cargando leads…</p>
-      ) : (
-        <>
-        {/* ── Vista tarjetas (mobile) ── */}
-        <div className="leads-cards-wrap">
-          {filtrados.length === 0 ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "40px 0" }}>No hay registros con esos filtros.</p>
-          ) : filtrados.map((lead) => {
-            const pdf = pdfPrincipal(lead);
-            const badge = BADGE[lead.estado] ?? BADGE["Nuevo"];
-            return (
-              <div key={lead.id} className="lead-card">
-                <div className="lead-card__top">
-                  <button
-                    className="lead-card__nombre"
-                    onClick={() => setLeadActivoNum(lead.numeroCotizacion)}
-                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}
-                    title="Abrir gestión CRM"
-                  >
-                    {lead.nombre}
-                  </button>
-                  <span className="lead-card__fecha">{safeDate(lead.fecha)}</span>
-                </div>
-                <div className="lead-card__valor">{money(lead.costoProyectoMasIva)}</div>
-                <div className="lead-card__bottom">
-                  <select
-                    value={lead.estado ?? "Nuevo"}
-                    onChange={(e) => actualizarEstado(lead, e.target.value)}
-                    style={{
-                      background: badge.bg, color: badge.color,
-                      border: `1px solid ${badge.color}`,
-                      borderRadius: 20, padding: "4px 12px", fontSize: "0.8rem",
-                      fontWeight: 600, cursor: "pointer",
-                    }}
-                  >
-                    {ESTADOS.filter(Boolean).map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <div className="lead-card__actions">
-                    <button
-                      onClick={() => verLead(lead)}
-                      style={{
-                        background: "var(--bg)", color: "var(--text)",
-                        border: "1px solid var(--border)",
-                        padding: "5px 14px", borderRadius: 8,
-                        fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
-                      }}
-                    >
-                      Ver
-                    </button>
-                    {pdf ? (
-                      <a
-                        href={pdf?.startsWith('http') ? pdf : `${process.env.REACT_APP_API_URL}${pdf}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          background: "var(--accent)", color: "#fff",
-                          padding: "5px 14px", borderRadius: 8,
-                          fontSize: "0.8rem", fontWeight: 700,
-                          textDecoration: "none",
-                        }}
-                      >
-                        ↓ PDF
-                      </a>
-                    ) : (
-                      <button
-                        onClick={() => generarPdfLead(lead)}
-                        disabled={generandoPdf[String(lead.numeroCotizacion)]}
-                        style={{
-                          background: "var(--panel2)", color: "var(--muted)",
-                          border: "1px solid var(--border)",
-                          padding: "5px 14px", borderRadius: 8,
-                          fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
-                        }}
-                      >
-                        {generandoPdf[String(lead.numeroCotizacion)] ? '...' : '+ PDF'}
-                      </button>
-                    )}
-                  </div>
-                </div>
+        {masFiltros && (
+          <div className="leads-mas" id="leads-mas">
+            <div className="campo">
+              <label htmlFor="f-ciudad">Ciudad</label>
+              <select id="f-ciudad" className="control" value={f.ciudad} onChange={set("ciudad")}>
+                <option value="">Todas</option>
+                {ciudades.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="campo">
+              <label htmlFor="f-sistema">Tipo de proyecto</label>
+              <select id="f-sistema" className="control" value={f.sistema} onChange={set("sistema")}>
+                <option value="">Todos</option>
+                {sistemas.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="campo">
+              <span className="campo__label" id="f-kwh">Consumo (kWh/mes)</span>
+              <div className="rango" role="group" aria-labelledby="f-kwh">
+                <input className="control" type="number" min="0" inputMode="numeric" placeholder="Desde" aria-label="Consumo desde" value={f.kwhMin} onChange={set("kwhMin")} />
+                <input className="control" type="number" min="0" inputMode="numeric" placeholder="Hasta" aria-label="Consumo hasta" value={f.kwhMax} onChange={set("kwhMax")} />
               </div>
-            );
-          })}
-        </div>
+            </div>
+            <div className="campo">
+              <label htmlFor="f-valor">Valor desde (COP)</label>
+              <input id="f-valor" className="control" type="number" min="0" inputMode="numeric" placeholder="Ej: 50000000" value={f.valorMin} onChange={set("valorMin")} />
+            </div>
+            <div className="campo">
+              <label htmlFor="f-orden">Ordenar por</label>
+              <select id="f-orden" className="control" value={f.orden} onChange={set("orden")}>
+                <option value="reciente">Más reciente</option>
+                <option value="antiguo">Más antiguo</option>
+                <option value="valor">Mayor valor</option>
+                <option value="cliente">Cliente A–Z</option>
+              </select>
+            </div>
+          </div>
+        )}
 
-        {/* ── Vista tabla (desktop) ── */}
-        <div className="leads-table-wrap" style={{ overflowX: "auto", width: "100%" }}>
-          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: "0.83rem" }}>
-            <thead>
-              {/* Fila de encabezados */}
-              <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted)", textAlign: "left" }}>
-                {[
-                  { label: "Cot.",             hide: true,      adminOnly: false },
-                  { label: "Fecha",            hide: false,     adminOnly: false },
-                  { label: "Cliente",          hide: false,     adminOnly: false },
-                  { label: "Ciudad",           hide: true,      adminOnly: false },
-                  { label: "kWh",              hide: true,      adminOnly: false },
-                  { label: "kWp",              hide: true,      adminOnly: false },
-                  { label: "Sistema",          hide: true,      adminOnly: false },
-                  { label: "Valor",            hide: false,     adminOnly: false },
-                  { label: "",                 hide: true,      adminOnly: false },
-                  { label: "Estado",           hide: false,     adminOnly: false },
-                  { label: "Asesor",           hide: true,      adminOnly: true  },
-                  { label: "Acciones",         hide: false,     adminOnly: false },
-                ].filter(col => !col.adminOnly || isAdmin).map(({ label, hide }) => (
-                  <th key={label} className={hide ? "col-hide-mobile" : ""} style={{ padding: "10px 12px", fontWeight: 600, whiteSpace: "nowrap" }}>{label}</th>
-                ))}
-              </tr>
-
-              {/* Fila de filtros por columna */}
-              <tr style={{ borderBottom: "2px solid var(--accent)", background: "rgba(245,197,24,.04)" }}>
-                {/* Cot. */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
-                  <input style={inputStyle} placeholder="Nº" value={f.cot} onChange={set("cot")} />
-                </td>
-
-                {/* Fecha: orden */}
-                <td style={{ padding: "6px 8px", minWidth: 90 }}>
-                  <select style={selectStyle} value={f.fechaOrden} onChange={set("fechaOrden")}>
-                    <option value="desc">Más reciente</option>
-                    <option value="asc">Más antiguo</option>
-                  </select>
-                </td>
-
-                {/* Cliente */}
-                <td style={{ padding: "6px 8px", minWidth: 120 }}>
-                  <input style={inputStyle} placeholder="Buscar…" value={f.cliente} onChange={set("cliente")} />
-                </td>
-
-                {/* Ciudad */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
-                  <select style={selectStyle} value={f.ciudad} onChange={set("ciudad")}>
-                    {ciudades.map((c) => <option key={c} value={c}>{c || "Todas"}</option>)}
-                  </select>
-                </td>
-
-                {/* kWh min / max */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px", minWidth: 100 }}>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <input style={{ ...inputStyle, width: "50%" }} type="number" placeholder="Min" value={f.kwhMin} onChange={set("kwhMin")} min="0" />
-                    <input style={{ ...inputStyle, width: "50%" }} type="number" placeholder="Max" value={f.kwhMax} onChange={set("kwhMax")} min="0" />
+        {carga === "error" ? (
+          <div className="bloque-error" style={{ paddingTop: 16 }}>
+            No se pudieron cargar los leads.
+            <button className="boton boton--texto" onClick={cargar}>Reintentar</button>
+          </div>
+        ) : carga === "cargando" ? (
+          <p className="vacio" style={{ marginTop: 16 }}>Cargando leads…</p>
+        ) : filtrados.length === 0 ? (
+          <p className="vacio" style={{ marginTop: 16 }}>
+            {leads.length ? "Ningún lead coincide con estos filtros." : "Todavía no hay leads. Las cotizaciones nuevas y los formularios de la web aparecerán aquí."}
+          </p>
+        ) : (
+          <>
+            {/* Celular: filas de dos líneas */}
+            <div className="leads-cards-wrap">
+              {filtrados.map((lead) => (
+                <div key={lead.id} className="lead-card">
+                  <button className="lead-card__nombre" onClick={() => setLeadActivoNum(lead.numeroCotizacion)}>{lead.nombre}</button>
+                  <span className="lead-card__valor">{money(lead.costoProyectoMasIva)}</span>
+                  <span className="lead-card__meta">
+                    N-{lead.numeroCotizacion} · {lead.ubicacion || "—"}{lead.kwp ? ` · ${numero(lead.kwp, 1)} kWp` : ""}
+                  </span>
+                  <span className="lead-card__meta" style={{ textAlign: "right" }}>{fechaCorta(lead.fecha)}</span>
+                  <div className="lead-card__pie">
+                    {selectEstado(lead)}
+                    <div className="lead-card__acciones">
+                      <button className="boton boton--chico boton--texto" onClick={() => verLead(lead)}>Ver</button>
+                      {accionPdf(lead)}
+                    </div>
                   </div>
-                </td>
+                </div>
+              ))}
+            </div>
 
-                {/* kWp min */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px", minWidth: 70 }}>
-                  <input style={inputStyle} type="number" placeholder="Min" value={f.kwpMin} onChange={set("kwpMin")} min="0" />
-                </td>
-
-                {/* Sistema */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
-                  <select style={selectStyle} value={f.sistema} onChange={set("sistema")}>
-                    {sistemas.map((s) => <option key={s} value={s}>{s || "Todos"}</option>)}
-                  </select>
-                </td>
-
-                {/* Valor min */}
-                <td style={{ padding: "6px 8px", minWidth: 100 }}>
-                  <input style={inputStyle} type="number" placeholder="Valor mín" value={f.valorMin} onChange={set("valorMin")} min="0" />
-                </td>
-
-                {/* Espaciador */}
-                <td className="col-hide-mobile" style={{ padding: "6px 8px" }} />
-
-                {/* Estado */}
-                <td style={{ padding: "6px 8px" }}>
-                  <select style={selectStyle} value={f.estado} onChange={set("estado")}>
-                    {ESTADOS.map((s) => <option key={s} value={s}>{s || "Todos"}</option>)}
-                  </select>
-                </td>
-
-                {/* Asesor — solo admin */}
-                {isAdmin && (
-                  <td className="col-hide-mobile" style={{ padding: "6px 8px" }}>
-                    <select style={selectStyle} value={f.asesor} onChange={set("asesor")}>
-                      {asesores.map((a) => <option key={a} value={a}>{a || "Todos"}</option>)}
-                    </select>
-                  </td>
-                )}
-
-                {/* Acciones — sin filtro */}
-                <td style={{ padding: "6px 8px" }} />
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtrados.length === 0 ? (
-                <tr>
-                  <td colSpan={12} style={{ padding: "40px 12px", textAlign: "center", color: "var(--muted)" }}>
-                    No hay registros con esos filtros.
-                  </td>
-                </tr>
-              ) : (
-                filtrados.map((lead) => {
-                  const pdf = pdfPrincipal(lead);
-                  const badge = BADGE[lead.estado] ?? BADGE["Nuevo"];
-                  return (
-                    <tr
-                      key={lead.id}
-                      style={{ borderBottom: "1px solid var(--border)", transition: "background .15s" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--accent)", fontWeight: 700 }}>
-                        N-{lead.numeroCotizacion}
-                      </td>
-                      <td style={{ padding: "10px 12px", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        {safeDate(lead.fecha)}
-                      </td>
-                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>
-                        <button
-                          onClick={() => setLeadActivoNum(lead.numeroCotizacion)}
-                          style={{ background: "none", border: "none", padding: 0, font: "inherit", fontWeight: 600, color: "var(--text)", cursor: "pointer", textAlign: "left" }}
-                          title="Abrir gestión CRM"
-                        >
+            {/* Escritorio: tabla */}
+            <div className="leads-table-wrap tableWrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Cot.</th>
+                    <th>Cliente</th>
+                    <th>Ciudad</th>
+                    <th className="num">kWh/mes</th>
+                    <th className="num">kWp</th>
+                    <th className="num">Valor</th>
+                    <th>Estado</th>
+                    {isAdmin && <th>Asesor</th>}
+                    <th className="num">Fecha</th>
+                    <th><span className="sr-only">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtrados.map((lead) => (
+                    <tr key={lead.id}>
+                      <td className="cot-id num">N-{lead.numeroCotizacion}</td>
+                      <td className="identidad">
+                        <button className="enlace-fila" onClick={() => setLeadActivoNum(lead.numeroCotizacion)} title="Abrir ficha del lead">
                           {lead.nombre}
                         </button>
                       </td>
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.ubicacion}</td>
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right" }}>{lead.consumoKwh ?? "—"}</td>
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px", textAlign: "right", color: "var(--accent)" }}>{lead.kwp ?? "—"}</td>
-                      <td className="col-hide-mobile" style={{ padding: "10px 12px" }}>{lead.tipoSolicitud}</td>
-                      <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-                        {money(lead.costoProyectoMasIva)}
-                      </td>
-
-                      <td className="col-hide-mobile" />
-
-                      <td style={{ padding: "10px 12px" }}>
-                        <select
-                          value={lead.estado ?? "Nuevo"}
-                          onChange={(e) => actualizarEstado(lead, e.target.value)}
-                          style={{
-                            background: badge.bg, color: badge.color,
-                            border: `1px solid ${badge.color}`,
-                            borderRadius: 20, padding: "3px 10px", fontSize: "0.78rem",
-                            fontWeight: 600, cursor: "pointer",
-                          }}
-                        >
-                          {ESTADOS.filter(Boolean).map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
-
-                      {isAdmin && (
-                        <td className="col-hide-mobile" style={{ padding: "10px 12px", color: "var(--muted)" }}>{lead.vendedor}</td>
-                      )}
-
-                      <td style={{ padding: "10px 12px" }}>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <button
-                            onClick={() => verLead(lead)}
-                            style={{
-                              background: "var(--panel)", color: "var(--text)",
-                              border: "1px solid var(--border)",
-                              padding: "4px 10px", borderRadius: 6,
-                              fontSize: "0.78rem", fontWeight: 600,
-                              cursor: "pointer", whiteSpace: "nowrap",
-                            }}
-                          >
-                            Ver
-                          </button>
-                          {pdf ? (
-                            <a
-                              href={pdf?.startsWith('http') ? pdf : `${process.env.REACT_APP_API_URL}${pdf}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                background: "var(--accent)", color: "#fff",
-                                padding: "4px 10px", borderRadius: 6,
-                                fontSize: "0.78rem", fontWeight: 700,
-                                textDecoration: "none", whiteSpace: "nowrap",
-                              }}
-                            >
-                              ↓ PDF
-                            </a>
-                          ) : (
-                            <button
-                              onClick={() => generarPdfLead(lead)}
-                              disabled={generandoPdf[String(lead.numeroCotizacion)]}
-                              style={{
-                                background: "var(--panel2)", color: "var(--muted)",
-                                border: "1px solid var(--border)",
-                                padding: "4px 10px", borderRadius: 6,
-                                fontSize: "0.78rem", fontWeight: 600,
-                                cursor: "pointer", whiteSpace: "nowrap",
-                              }}
-                            >
-                              {generandoPdf[String(lead.numeroCotizacion)] ? '...' : '+ PDF'}
-                            </button>
-                          )}
+                      <td className="tenue">{lead.ubicacion || "—"}</td>
+                      <td className="num">{numero(lead.consumoKwh)}</td>
+                      <td className="num">{numero(lead.kwp, 1)}</td>
+                      <td className="num">{money(lead.costoProyectoMasIva)}</td>
+                      <td className="estado-celda">{selectEstado(lead)}</td>
+                      {isAdmin && <td className="tenue">{lead.vendedor || "Sin asignar"}</td>}
+                      <td className="num tenue">{fechaCorta(lead.fecha)}</td>
+                      <td>
+                        <div className="fila-acciones">
+                          <button className="boton boton--chico boton--texto" onClick={() => verLead(lead)}>Ver</button>
+                          {accionPdf(lead)}
                         </div>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        </>
-      )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
 
       {leadActivo && (
         <LeadCRMDrawer

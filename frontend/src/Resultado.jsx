@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { avisar } from "./components/Avisos";
 import logo from "./assets/logo_solartech.webp";
 import { useMemo, useState, useEffect, useRef } from "react";
 import "./cotizadorSolar.css";
@@ -388,7 +389,7 @@ export default function Resultado() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'No se pudo guardar la propuesta'); return; }
+      if (!res.ok) { avisar(data.error || 'No se pudo guardar la propuesta.', 'error'); return; }
       setOpcionSeleccionada(idx);
       setPropuestaGuardada({
         propuestaId: data.propuestaId,
@@ -396,7 +397,7 @@ export default function Resultado() {
         shareUrl: `${window.location.origin}/propuesta/${data.propuestaId}`,
       });
     } catch (e) {
-      alert('Error guardando la propuesta');
+      avisar('No se pudo guardar la propuesta. Revisa la conexión e inténtalo de nuevo.', 'error');
     } finally {
       setGuardandoPropuesta(null);
     }
@@ -431,10 +432,10 @@ export default function Resultado() {
         const u = data.pdfUrl;
         window.open(u?.startsWith('http') ? u : `${process.env.REACT_APP_API_URL}${u}`, '_blank');
       } else if (data.error) {
-        alert(`No se pudo generar el PDF: ${data.error}`);
+        avisar(`No se pudo generar el PDF: ${data.error}`, 'error');
       }
     } catch (e) {
-      alert('Error generando PDF');
+      avisar('No se pudo generar el PDF. Inténtalo de nuevo.', 'error');
     } finally {
       setGenerandoPdfVersion(null);
     }

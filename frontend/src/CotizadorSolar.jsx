@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useId, cloneElement, isValidElement } from "react";
 import "./cotizadorSolar.css";
-import logo from "./assets/logo_solartech.webp";
+import { avisar } from "./components/Avisos";
 import { useNavigate } from "react-router-dom";
 import departamentos from "./data/colombiaMunicipios";
 
@@ -136,8 +136,7 @@ export default function CotizadorSolar() {
     if (clienteExistente) {
       list.push({
         id: "cedula",
-        icon: "🔒",
-        variant: "cotAlertYellow",
+                variant: "cotAlertYellow",
         title: `Cédula ${formData.identificacion} ya registrada`,
         body: (
           <>
@@ -152,8 +151,7 @@ export default function CotizadorSolar() {
     if (areaInsuficiente && !dismissed.area) {
       list.push({
         id: "area",
-        icon: "⚠️",
-        variant: "cotAlertOrange",
+                variant: "cotAlertOrange",
         title: "Área insuficiente",
         body: (
           <>
@@ -168,8 +166,7 @@ export default function CotizadorSolar() {
     if (formData.radiacionSolar && formData.ciudadSolar && !dismissed.radiacion) {
       list.push({
         id: "radiacion",
-        icon: "☀️",
-        variant: "cotAlertBlue",
+                variant: "cotAlertBlue",
         title: `Radiación solar: ${formData.radiacionSolar} kWh/m²/día`,
         body: <>Ciudad: <b>{formData.ciudadSolar}</b></>,
         onClose: () => setDismissed((d) => ({ ...d, radiacion: true })),
@@ -216,31 +213,21 @@ export default function CotizadorSolar() {
       const msg = (err instanceof TypeError && err.message.includes("fetch"))
         ? "No se pudo conectar con el servidor. Verifica que el backend esté corriendo e intenta de nuevo."
         : `Error al calcular: ${err.message}`;
-      alert(msg);
+      avisar(msg, "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="cotizador">
+    <div className="cotizador cotizador--form">
       <div className="cotizadorShell">
-        {/* Header */}
-        <header className="cotHeader">
-          <div className="cotBrand">
-            <img src={logo} alt="Logo Solartech" className="cotLogo" />
-            <div className="cotHeaderText">
-              <h1 className="cotTitle">Nuevo Cliente — Cotizador Solar</h1>
-              <p className="cotSubtitle">Completa los datos y genera la cotización en segundos.</p>
-            </div>
-          </div>
-
-          <div className="cotHeaderRight">
-            <button type="button" className="cotBtnRandom" onClick={fillRandomData} title="Llenar el formulario con datos de prueba">
-              🎲 Datos aleatorios
-            </button>
-          </div>
-        </header>
+        {/* El título de la pantalla está en la barra superior; aquí solo la ayuda de pruebas */}
+        <div className="cotHerramientas">
+          <button type="button" className="boton boton--chico boton--texto" onClick={fillRandomData} title="Llenar el formulario con datos de prueba">
+            Llenar con datos de prueba
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="cotGrid">
           {/* Formulario único */}
@@ -412,8 +399,8 @@ export default function CotizadorSolar() {
             )}
 
             <div className="cotActions">
-              <button type="submit" className="cotBtn cotBtnPrimary" disabled={loading || !canSubmit}>
-                {loading ? "Calculando..." : "Calcular cotización"}
+              <button type="submit" className="boton boton--primario cotCalcular" disabled={loading || !canSubmit}>
+                {loading ? "Calculando…" : "Calcular cotización"}
               </button>
             </div>
           </section>
@@ -426,7 +413,7 @@ export default function CotizadorSolar() {
               onClick={() => setMobileSummaryOpen((o) => !o)}
               aria-expanded={mobileSummaryOpen}
             >
-              Ver resumen del cliente {mobileSummaryOpen ? "▲" : "▼"}
+              {mobileSummaryOpen ? "Ocultar resumen del cliente" : "Ver resumen del cliente"}
             </button>
 
             <div className={`cotSummaryCollapsible${mobileSummaryOpen ? " isOpen" : ""}`}>
@@ -461,7 +448,7 @@ export default function CotizadorSolar() {
 /* ---------- mini componentes UI ---------- */
 
 // ── Input con formato visual (muestra unidades/$ al perder foco) ──────────
-function FormattedInput({ name, value, onChange, required, prefix, suffix }) {
+function FormattedInput({ id, name, value, onChange, required, prefix, suffix }) {
   const [focused, setFocused] = useState(false);
 
   const display = (() => {
@@ -474,6 +461,7 @@ function FormattedInput({ name, value, onChange, required, prefix, suffix }) {
 
   return (
     <input
+      id={id}
       name={name}
       value={focused ? value : display}
       onChange={(e) => {
@@ -501,10 +489,16 @@ function Card({ title, children }) {
 }
 
 function Field({ label, children }) {
+  const id = useId();
+  const hijos = Array.isArray(children) ? children : [children];
+  const [control, ...resto] = hijos;
+  // Un checkbox ya viene envuelto en su propia <label>: no se le asigna id.
+  const conecta = isValidElement(control) && control.type !== "label";
   return (
     <div className="cotField">
-      <label className="cotLabel">{label}</label>
-      {children}
+      {conecta ? <label className="cotLabel" htmlFor={id}>{label}</label> : <span className="cotLabel">{label}</span>}
+      {conecta ? cloneElement(control, { id }) : control}
+      {resto}
     </div>
   );
 }
@@ -513,15 +507,14 @@ function SummaryRow({ label, value }) {
   return (
     <div className="cotSummaryRow">
       <span className="cotSummaryLabel">{label}</span>
-      <span className="cotSummaryValue">{String(value ?? "—")}</span>
+      <span className="cotSummaryValue">{value === undefined || value === null || value === "" ? "—" : String(value)}</span>
     </div>
   );
 }
 
-function Alert({ icon, title, body, variant, onClose }) {
+function Alert({ title, body, variant, onClose }) {
   return (
-    <div className={`cotAlert ${variant}`}>
-      <span className="cotAlertIcon">{icon}</span>
+    <div className={`cotAlert ${variant}`} role="status">
       <div className="cotAlertBody">
         <div className="cotAlertTitle">{title}</div>
         <div className="cotAlertText">{body}</div>

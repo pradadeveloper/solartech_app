@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { avisar } from "./components/Avisos";
 import { useMemo, useState, useEffect, useRef } from "react";
 import logo from "./assets/logo_solartech.webp";
 import "./cotizadorSolar.css";
@@ -418,10 +419,10 @@ export default function PropuestaPublica() {
         setPdfUrlLocal(data.pdfUrl);
         window.open(data.pdfUrl.startsWith('http') ? data.pdfUrl : `${API}${data.pdfUrl}`, '_blank');
       } else if (data.error) {
-        alert(`No se pudo generar el PDF: ${data.error}`);
+        avisar(`No se pudo generar el PDF: ${data.error}`, 'error');
       }
     } catch (e) {
-      alert('No se pudo generar el PDF. Intenta de nuevo.');
+      avisar('No se pudo generar el PDF. Inténtalo de nuevo.', 'error');
     } finally {
       setGenerandoPdf(false);
     }

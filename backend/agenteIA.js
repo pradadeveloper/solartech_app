@@ -242,22 +242,15 @@ ${CONTEXTO_TECNICO}`,
 // ── Handler Express ──────────────────────────────────────────
 // Streaming vía SSE: el asesor ve la respuesta aparecer en vivo en vez
 // de esperar en blanco a que termine.
-function crearHandler({ getAllLeads, jwt, JWT_SECRET }) {
+function crearHandler({ autenticar, listarLeads }) {
   return async function handlerAgenteIA(req, res) {
     // 1. Autenticación — obligatoria, y antes que cualquier otra cosa: un
     //    usuario no autenticado no debe conocer el estado de configuración.
-    const auth = req.headers['authorization'];
-    if (!auth || !auth.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No autorizado' });
-    }
     let usuario;
     try {
-      const d = jwt.verify(auth.slice(7), JWT_SECRET);
-      usuario = {
-        nombre: d.nombre || d.usuario,
-        esAdmin: String(d.rol || '').toLowerCase() === 'admin',
-      };
-    } catch (_) {
+      usuario = await autenticar(req);
+    } catch (_) { /* tratado abajo como sesión inválida */ }
+    if (!usuario) {
       return res.status(401).json({ error: 'Sesión inválida o expirada' });
     }
 
@@ -281,11 +274,8 @@ function crearHandler({ getAllLeads, jwt, JWT_SECRET }) {
       content: String(m.content || '').slice(0, 8000),
     }));
 
-    // 3. Dataset con el MISMO filtro por rol que GET /api/leads
-    let leads = await getAllLeads();
-    if (!usuario.esAdmin) {
-      leads = leads.filter((l) => l.vendedor === usuario.nombre);
-    }
+    // 3. Dataset con el MISMO alcance que GET /api/leads (lo filtra RLS)
+    const leads = await listarLeads(usuario.db);
     const agregados = construirAgregados(leads);
     const dataset = formatearDataset(leads, agregados);
 

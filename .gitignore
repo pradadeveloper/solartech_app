@@ -19,3 +19,6 @@ yarn-error.log*
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Archivos de trabajo de la skill de dise?o (taste-skill)
+.taste-skill/

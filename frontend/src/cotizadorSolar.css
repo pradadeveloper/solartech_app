@@ -1718,3 +1718,93 @@
   .chartStatRow  { gap: 12px; }
   .chartBreakLegend { flex-direction: column; gap: 8px; }
 }
+
+/* =========================================================
+   FORMULARIO DE NUEVA COTIZACIÓN — sistema de diseño de la app
+   (tokens.css). Solo .cotizador--form: el resultado y la propuesta
+   pública conservan sus estilos.
+   ========================================================= */
+.cotizador--form {
+  background: none;
+  min-height: 0;
+  font-family: var(--font);
+  color: var(--text);
+}
+.cotizador--form .cotizadorShell { max-width: none; padding: 0; }
+
+.cotizador--form .cotHerramientas { display: flex; justify-content: flex-end; margin: -8px 0 8px; }
+
+.cotizador--form .cotGrid { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: var(--gap); }
+.cotizador--form .cotMain, .cotizador--form .cotSide { gap: var(--gap); }
+.cotizador--form .cotSide { top: 24px; max-height: none; overflow: visible; }
+
+.cotizador--form .cotCard {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
+  backdrop-filter: none; overflow: visible;
+}
+.cotizador--form .cotCardHead { padding: 16px var(--card-pad) 0; border-bottom: 0; }
+.cotizador--form .cotCardHead h2 { color: var(--text); font-size: var(--fs-section); font-weight: 600; }
+.cotizador--form .cotCardBody { padding: 16px var(--card-pad) var(--card-pad); }
+
+.cotizador--form .cotTwoCol { gap: 16px; }
+.cotizador--form .cotField { gap: 6px; min-width: 0; }
+.cotizador--form .cotLabel { color: var(--muted); font-size: 13px; font-weight: 500; margin: 0; }
+
+.cotizador--form .cotCard input:not([type="checkbox"]),
+.cotizador--form .cotCard select {
+  height: 40px; padding: 0 12px; margin: 0;
+  border: 1px solid var(--control); border-radius: var(--radius-control);
+  background-color: var(--surface); color: var(--text); font-size: var(--fs-body);
+}
+.cotizador--form .cotCard select {
+  appearance: none; -webkit-appearance: none; padding-right: 30px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%2357504c' stroke-width='1.5'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.cotizador--form .cotCard select option { background: var(--surface); color: var(--text); }
+.cotizador--form .cotCard select:disabled { background-color: var(--raised); color: var(--faint); cursor: not-allowed; }
+.cotizador--form .cotCard input::placeholder { color: var(--faint); }
+.cotizador--form .cotCard input:focus-visible,
+.cotizador--form .cotCard select:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+
+.cotizador--form .cotCheckField {
+  display: flex; align-items: center;
+  height: 40px; padding: 0 12px; gap: 10px; margin: 0;
+  border: 1px solid var(--control); border-radius: var(--radius-control);
+  background: var(--surface); color: var(--text); font-size: var(--fs-body);
+}
+.cotizador--form .cotCheckField input[type="checkbox"] { accent-color: var(--text); width: 16px; height: 16px; }
+
+.cotizador--form .cotInlineWarning { color: var(--pill-warning-ink); font-size: 12px; }
+.cotizador--form .cotHint { color: var(--muted); opacity: 1; font-size: 13px; margin: 0; }
+
+.cotizador--form .cotActions { justify-content: flex-start; padding-top: 0; }
+.cotizador--form .cotCalcular { height: 44px; padding: 0 28px; font-size: 15px; }
+.cotizador--form .cotCalcular:disabled { background: var(--raised); border-color: var(--border); color: var(--faint); }
+
+/* Resumen lateral */
+.cotizador--form .cotSummaryRow { padding: 9px 0; border-bottom: 1px solid var(--rule); }
+.cotizador--form .cotSummaryRow:last-child { border-bottom: 0; }
+.cotizador--form .cotSummaryLabel { color: var(--muted); opacity: 1; font-size: 13px; }
+.cotizador--form .cotSummaryValue { color: var(--text); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.cotizador--form .cotDivider { background: var(--border); margin: 6px 0; }
+.cotizador--form .cotSummaryToggle {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
+  color: var(--text); font-weight: 500; font-size: var(--fs-body);
+}
+
+/* Avisos del asesor: tintes pálidos con texto oscuro del mismo tono */
+.cotizador--form .cotAlertsPanelTitle { color: var(--muted); opacity: 1; font-size: 13px; font-weight: 500; }
+.cotizador--form .cotAlert { border-radius: var(--radius-card); padding: 12px 14px; animation: none; border: 0; }
+.cotizador--form .cotAlertTitle { color: inherit; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.cotizador--form .cotAlertText { color: inherit; font-size: 13px; }
+.cotizador--form .cotAlertClose { color: inherit; opacity: .7; }
+.cotizador--form .cotAlertYellow { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
+.cotizador--form .cotAlertOrange { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
+.cotizador--form .cotAlertBlue { background: var(--raised); color: var(--text); }
+
+@media (max-width: 768px) {
+  .cotizador--form .cotGrid { grid-template-columns: minmax(0, 1fr); }
+  .cotizador--form .cotCalcular { width: 100%; }
+  .cotizador--form .cotHerramientas { margin-top: 0; }
+}

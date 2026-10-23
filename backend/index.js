@@ -9,59 +9,8 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { PDFDocument, rgb } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
-const jwt = require('jsonwebtoken');
-const saPath = path.join(__dirname, 'service-account.json');
-const USE_GOOGLE = !!process.env.GOOGLE_SERVICE_ACCOUNT || fs.existsSync(saPath);
-const gAdapter = USE_GOOGLE ? require('./services/googleAdapter') : null;
-if (USE_GOOGLE) console.log('[storage] Google Sheets + Drive activado');
-const contadorPath = path.join(__dirname, 'contador.json');
-const leadsPath = path.join(__dirname, 'leads.json');
-const configPath = path.join(__dirname, 'config.json');
-const usuariosPath = path.join(__dirname, 'usuarios.json');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'solartech_clave_secreta_2024';
-
-const USUARIOS_DEFAULT = [
-  { id: 1, nombre: 'Administrador', apellido: '',      cargo: 'Administrador',    usuario: 'admin',     password: 'solartech2026', rol: 'Admin',  celular: '', correo: '' },
-  { id: 2, nombre: 'Vendedor',      apellido: 'Uno',   cargo: 'Asesor Comercial', usuario: 'vendedor1', password: 'vendedor123',   rol: 'Asesor', celular: '', correo: '' },
-  { id: 3, nombre: 'Vendedor',      apellido: 'Dos',   cargo: 'Asesor Comercial', usuario: 'vendedor2', password: 'vendedor456',   rol: 'Asesor', celular: '', correo: '' },
-];
-
-function cargarUsuarios() {
-  try {
-    if (fs.existsSync(usuariosPath)) return JSON.parse(fs.readFileSync(usuariosPath, 'utf-8'));
-  } catch (_) {}
-  return [...USUARIOS_DEFAULT];
-}
-
-function guardarUsuarios(lista) {
-  fs.writeFileSync(usuariosPath, JSON.stringify(lista, null, 2));
-  if (USE_GOOGLE) {
-    gAdapter.saveAllAsesores(lista).catch(err =>
-      console.error('[asesores] Error sincronizando con Sheets:', err.message)
-    );
-  }
-}
-
-async function inicializarUsuarios() {
-  if (USE_GOOGLE) {
-    try {
-      const remoto = await gAdapter.getAsesores();
-      if (remoto.length > 0) {
-        usuarios = remoto;
-        fs.writeFileSync(usuariosPath, JSON.stringify(usuarios, null, 2));
-        console.log(`[asesores] ${usuarios.length} asesores cargados desde Google Sheets`);
-        return;
-      }
-    } catch (err) {
-      console.error('[asesores] Error cargando desde Sheets:', err.message);
-    }
-  }
-  usuarios = cargarUsuarios();
-}
-
-let usuarios = cargarUsuarios();
-inicializarUsuarios();
+// Leads, asesores, propuestas y config viven en Supabase (base compartida con la web).
+const sb = require('./services/supabase');
 
 const app = express();
 const PORT = 4000;
@@ -92,105 +41,52 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use('/cotizaciones', express.static(path.join(__dirname, 'public', 'cotizaciones')));
 
 // ====== Multer (uploads) ======
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// En memoria: la factura adjunta se sube al bucket "facturas" de Supabase.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
-});
-const upload = multer({ storage });
-
-// ====== Almacenamiento unificado (local o Google Sheets/Drive) ======
-async function getAllLeads() {
-  if (USE_GOOGLE) return gAdapter.getAllLeads();
-  if (!fs.existsSync(leadsPath)) return [];
-  try { const raw = fs.readFileSync(leadsPath, 'utf-8').trim(); return raw ? JSON.parse(raw) : []; } catch { return []; }
-}
-
-async function saveLeadStorage(lead) {
-  if (USE_GOOGLE) return gAdapter.saveLead(lead);
-  const leads = await getAllLeads();
-  leads.push(lead);
-  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
-}
-
-function generarCodigoPublico(leadsExistentes = []) {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sin 0,1,I,O,L para evitar confusión
-  let code;
-  do {
-    code = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  } while (leadsExistentes.some(l => l.codigoPublico === code));
-  return code;
-}
-
-// ====== Propuestas guardadas (una por opción elegida por el asesor) ======
-const propuestasPath = path.join(__dirname, 'propuestas.json');
-
-async function getAllPropuestas() {
-  if (USE_GOOGLE) return gAdapter.getAllPropuestas();
-  if (!fs.existsSync(propuestasPath)) return [];
-  try { const raw = fs.readFileSync(propuestasPath, 'utf-8').trim(); return raw ? JSON.parse(raw) : []; } catch { return []; }
-}
-
-async function savePropuestaStorage(propuesta) {
-  if (USE_GOOGLE) return gAdapter.savePropuesta(propuesta);
-  const propuestas = await getAllPropuestas();
-  propuestas.push(propuesta);
-  fs.writeFileSync(propuestasPath, JSON.stringify(propuestas, null, 2));
-}
-
-function generarPropuestaId(existentes = []) {
-  let id;
-  do {
-    id = `ST-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
-  } while (existentes.some(p => p.id === id));
-  return id;
-}
-
-async function updateLeadField(numeroCotizacion, fields) {
-  if (USE_GOOGLE) return gAdapter.updateLead(numeroCotizacion, fields);
-  const leads = await getAllLeads();
-  // Comparación por string: los leads base guardan numeroCotizacion como número
-  // y los params de ruta llegan como string ("83" !== 83 rompía el match).
-  const idx = leads.findIndex(l => String(l.numeroCotizacion) === String(numeroCotizacion));
-  if (idx === -1) throw new Error('Lead no encontrado');
-  Object.assign(leads[idx], fields);
-  fs.writeFileSync(leadsPath, JSON.stringify(leads, null, 2));
-}
-
-// Devuelve un lead por numeroCotizacion (match por string), o null.
-async function getLead(numeroCotizacion) {
-  const leads = await getAllLeads();
-  return leads.find(l => String(l.numeroCotizacion) === String(numeroCotizacion)) || null;
-}
-
-// Extrae { nombre, usuario, rol } del Bearer token, o null si no hay/está mal.
-function getUsuarioDeReq(req) {
-  const auth = req.headers['authorization'];
-  if (!auth || !auth.startsWith('Bearer ')) return null;
+// ====== Sesión ======
+// El login lo hace el frontend contra Supabase Auth; el backend valida el token
+// y trabaja con un cliente del propio usuario, así RLS decide qué leads ve.
+async function requiereUsuario(req, res, next) {
   try {
-    const d = jwt.verify(auth.slice(7), JWT_SECRET);
-    return { nombre: d.nombre || d.usuario, usuario: d.usuario, rol: d.rol || 'Asesor' };
-  } catch (_) { return null; }
+    const usuario = await sb.autenticar(req);
+    if (!usuario) return res.status(401).json({ error: 'No autorizado' });
+    req.usuario = usuario;
+    next();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
 
-async function getNextContador() {
-  if (USE_GOOGLE) return gAdapter.incrementContador();
-  if (!fs.existsSync(contadorPath)) fs.writeFileSync(contadorPath, JSON.stringify({ numero: 0 }, null, 2));
-  const raw = fs.readFileSync(contadorPath, 'utf-8');
-  const json = JSON.parse(raw);
-  json.numero += 1;
-  fs.writeFileSync(contadorPath, JSON.stringify(json, null, 2));
-  return json.numero;
+function requiereAdmin(req, res, next) {
+  if (!req.usuario?.esAdmin) return res.status(403).json({ error: 'Solo administradores' });
+  next();
+}
+
+// Datos del asesor que van en la firma del PDF.
+function firmaDe(a) {
+  if (!a) return {};
+  return { nombre: a.nombre, apellido: a.apellido, cargo: a.cargo, usuario: a.usuario, celular: a.celular, correo: a.correo };
+}
+
+// Sin token, el PDF se firma con el asesor que venga en data.vendedor (si existe).
+async function firmaPorVendedor(vendedor) {
+  if (!vendedor) return {};
+  const asesores = await sb.getAsesores();
+  const a = asesores.find(u =>
+    `${u.nombre} ${u.apellido}`.trim() === vendedor || u.nombre === vendedor || u.usuario === vendedor
+  );
+  return firmaDe(a);
+}
+
+// Un asesor que trabaja un lead sin asignar queda como su dueño:
+// RLS no le deja guardar cambios en un lead que no es suyo.
+function tomarSiLibre(usuario, lead) {
+  return !usuario.esAdmin && !lead.asesorId ? { asesor_id: usuario.id } : {};
 }
 
 async function savePDFStorage(fileName, pdfBytes) {
-  const cotizDir = path.join(__dirname, 'public', 'cotizaciones');
-  if (!fs.existsSync(cotizDir)) fs.mkdirSync(cotizDir, { recursive: true });
-  fs.writeFileSync(path.join(cotizDir, fileName), pdfBytes);
-  const base = (process.env.BACKEND_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-  return `${base}/cotizaciones/${fileName}`;
+  return sb.subirPDF(fileName, pdfBytes);
 }
 
 // ====== Config ======
@@ -205,32 +101,15 @@ const CONFIG_DEFAULT = {
 };
 
 async function leerConfig() {
-  if (USE_GOOGLE) {
-    try {
-      const remote = await gAdapter.getConfig();
-      return { ...CONFIG_DEFAULT, ...remote };
-    } catch (_) {}
-  }
   try {
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    return { ...CONFIG_DEFAULT, ...JSON.parse(raw) };
-  } catch (_) {
+    const remoto = await sb.getConfig();
+    return { ...CONFIG_DEFAULT, ...remoto, empresa: { ...CONFIG_DEFAULT.empresa, ...(remoto.empresa || {}) } };
+  } catch (err) {
+    console.error('[config] Error leyendo de Supabase:', err.message);
     return { ...CONFIG_DEFAULT };
   }
 }
 
-async function guardarConfig(cfg) {
-  fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
-  if (USE_GOOGLE) {
-    try {
-      await gAdapter.saveConfig(cfg);
-    } catch (err) {
-      console.error('[config] Error sincronizando con Sheets:', err.message);
-    }
-  }
-}
-
-// ====== Helpers ======
 function requireFields(data, fields) {
   const missing = fields.filter((k) => String(data?.[k] ?? "").trim() === "");
   return missing;
@@ -980,30 +859,14 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   return savePDFStorage(fileName, pdfBytes);
 }
 
-// LOGIN
-app.post('/api/login', (req, res) => {
-  const { usuario, password } = req.body;
-
-  if (!usuario || !password) {
-    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
-  }
-
-  const user = usuarios.find(u => u.usuario === usuario && u.password === password);
-
-  if (!user) {
-    return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
-  }
-
-  const token = jwt.sign(
-    { id: user.id, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, usuario: user.usuario, celular: user.celular || '', correo: user.correo || '', rol: user.rol || 'Asesor' },
-    JWT_SECRET,
-    { expiresIn: '30d' }
-  );
-
-  res.json({ token, nombre: user.nombre, apellido: user.apellido, cargo: user.cargo, celular: user.celular || '', correo: user.correo || '', rol: user.rol || 'Asesor' });
+// ====== GET /api/me — perfil del asesor con sesión de Supabase ======
+app.get('/api/me', requiereUsuario, (req, res) => {
+  const { db, ...perfil } = req.usuario;
+  res.json(perfil);
 });
 
-// ====== Endpoint ======
+// ====== POST /api/calcular-proyecto ======
+// Lo usan el asesor (con token) y la página web (servidor a servidor, sin token).
 app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, res) => {
   try {
     const data = req.body || {};
@@ -1026,81 +889,51 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       return res.status(400).json({ error: "Faltan datos requeridos", missing });
     }
 
+    const usuario = await sb.autenticar(req);
+    // La web guarda primero el lead en Supabase y manda su id: aquí se completa ese
+    // mismo registro en vez de crear otro. Solo se acepta con la llave compartida.
+    const esWeb = !!process.env.WEB_SYNC_KEY && req.headers['x-solartech-web-key'] === process.env.WEB_SYNC_KEY;
+    const leadIdWeb = esWeb && data.leadIdWeb ? String(data.leadIdWeb) : null;
+
     // ====== Validar lead duplicado (solo por cédula/NIT) ======
     if (data.identificacion) {
-      const todosLeads = await getAllLeads();
-      const leadExistente = todosLeads.find(l =>
-        l.identificacion && String(l.identificacion).trim() === String(data.identificacion).trim()
-      ) || null;
-      if (leadExistente) {
+      const existente = await sb.buscarPorIdentificacion(data.identificacion, leadIdWeb);
+      if (existente) {
         return res.status(409).json({
           error: 'lead_duplicado',
-          mensaje: `La Cédula/NIT ${data.identificacion} ya está registrada y la está atendiendo el asesor ${leadExistente.vendedor}.`,
-          vendedor: leadExistente.vendedor,
-          cotizacion: leadExistente.numeroCotizacion,
+          mensaje: `La Cédula/NIT ${data.identificacion} ya está registrada y la está atendiendo el asesor ${existente.vendedor}.`,
+          vendedor: existente.vendedor,
+          cotizacion: existente.numeroCotizacion,
           campoClave: 'Cédula/NIT',
         });
       }
     }
 
-    const numeroCotizacion = await getNextContador();
-    const todosLeads       = await getAllLeads();
-    const codigoPublico    = generarCodigoPublico(todosLeads);
-
-    // Extraer vendedor del token JWT (si viene)
-    let vendedor = 'Sin asignar';
-    let asesorPDF = {};
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
-        vendedor = decoded.nombre || decoded.usuario;
-        // Buscar asesor actualizado en memoria para tener celular/correo frescos
-        const asesorVivo = usuarios.find(u => u.usuario === decoded.usuario) || {};
-        asesorPDF = {
-          nombre:   asesorVivo.nombre   || decoded.nombre,
-          apellido: asesorVivo.apellido || decoded.apellido,
-          cargo:    asesorVivo.cargo    || decoded.cargo,
-          usuario:  decoded.usuario,
-          celular:  asesorVivo.celular  || decoded.celular || '',
-          correo:   asesorVivo.correo   || decoded.correo  || '',
-        };
-      } catch (_) {}
-    }
-    // Fallback: si el token no dio nombre, buscar por vendedor en usuarios
-    if (!asesorPDF.nombre && data.vendedor) {
-      const av = usuarios.find(u =>
-        `${u.nombre} ${u.apellido}`.trim() === data.vendedor ||
-        u.usuario === data.vendedor
-      ) || {};
-      if (av.nombre) asesorPDF = { nombre: av.nombre, apellido: av.apellido || '', cargo: av.cargo || '', usuario: av.usuario || '', celular: av.celular || '', correo: av.correo || '' };
-    }
+    const numeroCotizacion = await sb.siguienteNumero();
+    const codigoPublico    = await sb.codigoPublicoLibre();
+    const asesorPDF = usuario ? firmaDe(usuario) : await firmaPorVendedor(data.vendedor);
 
     const cfg = await leerConfig();
     const resultados = calcularProyecto(data, cfg);
     const pdfUrl = await generarPDF(data, { ...resultados, numeroCotizacion }, asesorPDF, cfg);
 
-    // ====== Guardar lead ======
-    await saveLeadStorage({
-      id: uuidv4(),
-      numeroCotizacion,
+    const lead = {
       codigoPublico,
-      vendedor,
       estado: 'Nuevo',
-      fecha: new Date().toISOString(),
       // Cliente
       nombre: data.nombre,
-      identificacion: data.identificacion || null,
+      identificacion: data.identificacion,
       correo: data.correo,
       telefono: data.telefono,
       ubicacion: data.ubicacion,
-      ciudadSolar: data.ciudadSolar || null,
+      ciudadSolar: data.ciudadSolar,
+      departamentoSolar: data.departamentoSolar,
       // Proyecto
       tipoSolicitud: data.tipoSolicitud,
-      tipoTecho: data.tipoTecho || null,
-      sistemaInteres: data.sistemaInteres || null,
-      preferenciaContacto: data.preferenciaContacto || null,
-      conociste: data.conociste || null,
+      tipoTecho: data.tipoTecho,
+      sistemaInteres: data.sistemaInteres,
+      preferenciaContacto: data.preferenciaContacto,
+      conociste: data.conociste,
       // Técnico
       consumoKwh: resultados.consumoKwh,
       costoKwh: resultados.costoKwh,
@@ -1116,15 +949,27 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       ahorroAnual: resultados.ahorroAnual,
       tiempoRetorno: resultados.tiempoRetorno,
       pdfUrl,
-      // Página web: datos que el cotizador interno no pide
-      empresa: textoWeb(data.empresa, 160),
-      mensaje: textoWeb(data.mensaje, 2000),
-      modeloInteres: textoWeb(data.modeloInteres, 60),
-      origenWeb: textoWeb(data.origenWeb, 60),
-      opciones: [],
-    });
+    };
 
-    res.json({ ...resultados, numeroCotizacion, codigoPublico, pdfUrl });
+    let leadId;
+    if (leadIdWeb) {
+      await sb.completarLeadWeb(leadIdWeb, lead, { numero_cotizacion: numeroCotizacion });
+      leadId = leadIdWeb;
+    } else if (usuario) {
+      leadId = await sb.crearLead(usuario.db, lead, {
+        source: 'solartech_app', numero_cotizacion: numeroCotizacion, asesor_id: usuario.id,
+      });
+    } else {
+      leadId = await sb.crearLead(sb.admin, lead, { source: 'solartech_app', numero_cotizacion: numeroCotizacion });
+    }
+
+    // La web ya subió la factura por su lado.
+    if (req.file && !leadIdWeb) {
+      try { await sb.subirFactura(leadId, req.file); }
+      catch (err) { console.error('[factura] No se pudo subir:', err.message); }
+    }
+
+    res.json({ ...resultados, numeroCotizacion, codigoPublico, pdfUrl, leadId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || "Error interno" });
@@ -1132,62 +977,50 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
 });
 
 // ====== GET /api/ciudades ======
-app.get('/api/ciudades', async (req, res) => {
-  if (!USE_GOOGLE) return res.json([]);
-  try {
-    const ciudades = await gAdapter.getCiudades();
-    res.json(ciudades);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// La radiación por municipio sale de frontend/src/data/colombiaMunicipios.js.
+app.get('/api/ciudades', (_req, res) => res.json([]));
 
 // ====== GET /api/config ======
 app.get('/api/config', async (req, res) => {
   res.json(await leerConfig());
 });
 
-// ====== PUT /api/config ======
-app.put('/api/config', express.json(), async (req, res) => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
+// ====== PUT /api/config (solo admin) ======
+app.put('/api/config', express.json(), requiereUsuario, requiereAdmin, async (req, res) => {
   try {
-    jwt.verify(authHeader.slice(7), JWT_SECRET);
-  } catch (_) {
-    return res.status(401).json({ error: 'Token inválido' });
+    const actual = await leerConfig();
+    const nueva = { ...actual, ...req.body };
+    if (req.body.empresa) nueva.empresa = { ...actual.empresa, ...req.body.empresa };
+    await sb.guardarConfig(req.usuario, nueva);
+    res.json({ ok: true, config: nueva });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  const actual = await leerConfig();
-  const nueva = { ...actual, ...req.body };
-  if (req.body.empresa) nueva.empresa = { ...actual.empresa, ...req.body.empresa };
-  await guardarConfig(nueva);
-  res.json({ ok: true, config: nueva });
 });
+
+// Datos del asesor que ve el cliente en la propuesta pública.
+async function asesorInfoDe(asesorId) {
+  if (!asesorId) return null;
+  const a = (await sb.getAsesores()).find(x => x.id === asesorId);
+  if (!a) return null;
+  return { nombre: a.nombre, apellido: a.apellido, cargo: a.cargo, celular: a.celular, correo: a.correo };
+}
 
 // ====== GET /api/propuesta/:num (público — sin auth, para compartir con cliente) ======
 app.get('/api/propuesta/:num', async (req, res) => {
   try {
-    const [leads, asesores] = await Promise.all([getAllLeads(), gAdapter.getAsesores()]);
     const param = String(req.params.num);
-    const lead  = leads.find(l => l.codigoPublico === param)
-               || leads.find(l => String(l.numeroCotizacion) === param); // fallback propuestas antiguas
-    if (!lead) return res.status(404).json({ error: 'Propuesta no encontrada' });
-    const { id, estado, ...pub } = lead;
-    const asesor = asesores.find(a =>
-      a.nombre === pub.vendedor ||
-      `${a.nombre} ${a.apellido}`.trim() === pub.vendedor ||
-      a.usuario === pub.vendedor
-    );
-    if (asesor) {
-      pub.asesorInfo = {
-        nombre:   asesor.nombre,
-        apellido: asesor.apellido || '',
-        cargo:    asesor.cargo   || 'Asesor Comercial',
-        celular:  asesor.celular || '',
-        correo:   asesor.correo  || '',
-      };
+    let lead = await sb.getLeadPorCodigo(param);
+    // Fallback: links antiguos por número, solo para leads que nunca tuvieron código.
+    if (!lead && /^\d+(_\d+)?$/.test(param)) {
+      const viejo = await sb.getLead(sb.admin, param);
+      if (viejo && !viejo.codigoPublico) lead = viejo;
     }
+    if (!lead) return res.status(404).json({ error: 'Propuesta no encontrada' });
+    // Fuera lo interno del CRM: notas del asesor, historial, ids.
+    const { id, estado, asesorId, actividades, historialEstados, fuente, mensaje, ...pub } = lead;
+    const asesorInfo = await asesorInfoDe(asesorId);
+    if (asesorInfo) pub.asesorInfo = asesorInfo;
     res.json(pub);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1197,8 +1030,9 @@ app.get('/api/propuesta/:num', async (req, res) => {
 // ====== POST /api/propuestas/guardar — guarda la opción elegida por el asesor ======
 // Este es el único punto donde se genera un ID de propuesta y su PDF. La vista
 // /resultado ya NO genera PDF ni link antes de este paso.
-app.post('/api/propuestas/guardar', express.json(), async (req, res) => {
+app.post('/api/propuestas/guardar', express.json(), requiereUsuario, async (req, res) => {
   try {
+    const usuario = req.usuario;
     const { leadId, opcionSeleccionada, datosOpcion = {}, datosCliente = {} } = req.body || {};
 
     // Redondeamos a 2 decimales antes de persistir: evita guardar valores como
@@ -1225,50 +1059,31 @@ app.post('/api/propuestas/guardar', express.json(), async (req, res) => {
       return res.status(400).json({ error: 'Datos insuficientes para guardar la propuesta (falta kWp, consumo o costo por kWh).' });
     }
 
-    // Asesor desde el token JWT (si viene)
-    let asesorPDF = {};
-    let vendedor = datosCliente.vendedor || '';
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
-        vendedor = decoded.nombre || decoded.usuario || vendedor;
-        const asesorVivo = usuarios.find(u => u.usuario === decoded.usuario) || {};
-        asesorPDF = {
-          nombre:   asesorVivo.nombre   || decoded.nombre,
-          apellido: asesorVivo.apellido || decoded.apellido,
-          cargo:    asesorVivo.cargo    || decoded.cargo,
-          usuario:  decoded.usuario,
-          celular:  asesorVivo.celular  || decoded.celular || '',
-          correo:   asesorVivo.correo   || decoded.correo  || '',
-        };
-      } catch (_) {}
-    }
-
     const cfgForCalc = Number(datosOpcion.costokWp) > 0 ? { ...cfg, costokWp: Number(datosOpcion.costokWp) } : cfg;
     const dataWithFix = { ...datosCliente, consumoKwh, costoKwh };
     const resultados = calcularProyecto(dataWithFix, cfgForCalc);
 
-    const propuestasExistentes = await getAllPropuestas();
-    const propuestaId = generarPropuestaId(propuestasExistentes);
+    const propuestaId = await sb.propuestaIdLibre();
+    const pdfUrl = await generarPDF(dataWithFix, { ...resultados, numeroCotizacion: propuestaId }, firmaDe(usuario), cfg);
 
-    const pdfUrl = await generarPDF(dataWithFix, { ...resultados, numeroCotizacion: propuestaId }, asesorPDF, cfg);
+    // leadId llega como número de cotización ("83" o "83_2").
+    const lead = leadId != null && leadId !== '' ? await sb.getLead(usuario.db, leadId) : null;
 
-    await savePropuestaStorage({
+    await sb.crearPropuesta(usuario.db, {
       id: propuestaId,
-      leadId: leadId ?? '',
-      opcion: opcionSeleccionada ?? '',
-      kWp: resultados.kwp,
-      paneles: resultados.npaneles,
+      lead_id: lead?.id ?? null,
+      created_by: usuario.id,
+      opcion: opcionSeleccionada != null ? String(opcionSeleccionada) : null,
+      kwp: resultados.kwp,
+      paneles: Math.round(Number(resultados.npaneles) || 0),
       inversion_cop: resultados.costoProyectoMasIva,
-      ahorro_mensual: resultados.ahorroMensual,
+      ahorro_mensual_cop: resultados.ahorroMensual,
       roi_anios: resultados.tiempoRetorno,
-      nombre_cliente: datosCliente.nombre || '',
-      ciudad: datosCliente.ubicacion || datosCliente.ciudadSolar || '',
+      nombre_cliente: datosCliente.nombre || null,
+      ciudad: datosCliente.ubicacion || datosCliente.ciudadSolar || null,
       consumo_kwh: resultados.consumoKwh,
-      sistema: datosCliente.sistemaInteres || datosCliente.tipoSolicitud || '',
-      techo: datosCliente.tipoTecho || '',
-      fecha: new Date().toISOString(),
+      sistema: datosCliente.sistemaInteres || datosCliente.tipoSolicitud || null,
+      techo: datosCliente.tipoTecho || null,
       pdf_url: pdfUrl,
       estado: 'Enviada',
     });
@@ -1286,60 +1101,42 @@ app.post('/api/propuestas/guardar', express.json(), async (req, res) => {
 // ====== GET /api/propuestas/:id (público — sin auth, para compartir con cliente) ======
 app.get('/api/propuestas/:id', async (req, res) => {
   try {
-    const id = String(req.params.id);
-    const propuestas = await getAllPropuestas();
-    const propuesta = propuestas.find(p => String(p.id).trim() === id);
+    const propuesta = await sb.getPropuesta(String(req.params.id).trim());
     if (!propuesta) return res.status(404).json({ error: 'Propuesta no encontrada' });
 
     // Enriquecer con datos de contacto y asesor del lead original, si existe
     let leadInfo = {};
     let asesorInfo = null;
-    if (propuesta.leadId) {
-      const leads = await getAllLeads();
-      const lead = leads.find(l => String(l.numeroCotizacion) === String(propuesta.leadId));
-      if (lead) {
-        leadInfo = {
-          correo: lead.correo,
-          telefono: lead.telefono,
-          preferenciaContacto: lead.preferenciaContacto,
-          radiacionSolar: lead.radiacionSolar,
-          areaDisponible: lead.areaDisponible,
-          vendedor: lead.vendedor,
-        };
-        const asesor = usuarios.find(u =>
-          u.nombre === lead.vendedor ||
-          `${u.nombre} ${u.apellido}`.trim() === lead.vendedor ||
-          u.usuario === lead.vendedor
-        );
-        if (asesor) {
-          asesorInfo = {
-            nombre:   asesor.nombre,
-            apellido: asesor.apellido || '',
-            cargo:    asesor.cargo   || 'Asesor Comercial',
-            celular:  asesor.celular || '',
-            correo:   asesor.correo  || '',
-          };
-        }
-      }
+    const lead = propuesta.lead_id ? await sb.getLeadPorId(propuesta.lead_id) : null;
+    if (lead) {
+      leadInfo = {
+        correo: lead.correo,
+        telefono: lead.telefono,
+        preferenciaContacto: lead.preferenciaContacto,
+        radiacionSolar: lead.radiacionSolar,
+        areaDisponible: lead.areaDisponible,
+        vendedor: lead.vendedor,
+      };
+      asesorInfo = await asesorInfoDe(lead.asesorId);
     }
 
     res.json({
       numeroCotizacion: propuesta.id,
       codigoPublico: propuesta.id,
-      leadId: propuesta.leadId,
+      leadId: lead?.numeroCotizacion ?? '',
       opcion: propuesta.opcion,
       nombre: propuesta.nombre_cliente,
       ubicacion: propuesta.ciudad,
-      kwp: Number(propuesta.kWp) || 0,
+      kwp: Number(propuesta.kwp) || 0,
       npaneles: Number(propuesta.paneles) || 0,
       costoProyectoMasIva: Number(propuesta.inversion_cop) || 0,
-      ahorroMensual: Number(propuesta.ahorro_mensual) || 0,
-      tiempoRetorno: propuesta.roi_anios !== '' ? Number(propuesta.roi_anios) : null,
+      ahorroMensual: Number(propuesta.ahorro_mensual_cop) || 0,
+      tiempoRetorno: propuesta.roi_anios != null ? Number(propuesta.roi_anios) : null,
       consumoKwh: Number(propuesta.consumo_kwh) || 0,
       tipoSolicitud: propuesta.sistema,
       sistemaInteres: propuesta.sistema,
       tipoTecho: propuesta.techo,
-      fecha: propuesta.fecha,
+      fecha: propuesta.created_at,
       pdfUrl: propuesta.pdf_url,
       estado: propuesta.estado,
       ...leadInfo,
@@ -1351,40 +1148,24 @@ app.get('/api/propuestas/:id', async (req, res) => {
 });
 
 // ====== GET /api/leads/:num/versiones — lista versiones de una cotización ======
-app.get('/api/leads/:numeroCotizacion/versiones', async (req, res) => {
+app.get('/api/leads/:numeroCotizacion/versiones', requiereUsuario, async (req, res) => {
   try {
-    const base = String(req.params.numeroCotizacion);
-    const leads = await getAllLeads();
-    const regex = new RegExp(`^${base}_\\d+$`);
-    const versiones = leads
-      .filter(l => regex.test(String(l.numeroCotizacion)))
-      .map(({ id, ...pub }) => pub);
-    res.json(versiones);
+    const versiones = await sb.listarVersiones(req.usuario.db, String(req.params.numeroCotizacion));
+    res.json(versiones.map(({ id, ...pub }) => pub));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // ====== POST /api/leads/:num/version — guarda una opción como nueva versión ======
-app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res) => {
+app.post('/api/leads/:numeroCotizacion/version', express.json(), requiereUsuario, async (req, res) => {
   try {
+    const usuario = req.usuario;
     const base = String(req.params.numeroCotizacion);
-    const leads = await getAllLeads();
-    const baseLead = leads.find(l => String(l.numeroCotizacion) === base);
+    const baseLead = await sb.getLead(usuario.db, base);
     if (!baseLead) return res.status(404).json({ error: 'Propuesta base no encontrada' });
 
-    const regex = new RegExp(`^${base}_\\d+$`);
-    const nextNum = leads.filter(l => regex.test(String(l.numeroCotizacion))).length + 1;
-    const versionId = `${base}_${nextNum}`;
-
-    const newLead = {
-      ...baseLead,
-      ...req.body,
-      numeroCotizacion: versionId,
-      id: require('crypto').randomUUID(),
-      pdfUrl: '',
-      opciones: [],
-    };
+    const newLead = { ...baseLead, ...req.body };
 
     // Garantizar que consumoKwh y kwp estén siempre poblados en la versión.
     const cfg = await leerConfig();
@@ -1412,7 +1193,9 @@ app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res
       newLead.kwp = Number((wProm / (rad * margen * 1000)).toFixed(1));
     }
 
-    await saveLeadStorage(newLead);
+    const versionId = await sb.crearVersion(usuario, base, {
+      ...req.body, kwp: newLead.kwp, consumoKwh: newLead.consumoKwh, pdfUrl: '',
+    });
     res.json({ ok: true, versionId });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1420,22 +1203,10 @@ app.post('/api/leads/:numeroCotizacion/version', express.json(), async (req, res
 });
 
 // ====== GET /api/leads ======
-app.get('/api/leads', async (req, res) => {
+// RLS filtra: el admin ve todo; el asesor, sus leads y los que están sin asignar.
+app.get('/api/leads', requiereUsuario, async (req, res) => {
   try {
-    let leads = await getAllLeads();
-    // Filtrar por vendedor para usuarios no-admin
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const decoded = jwt.verify(authHeader.slice(7), JWT_SECRET);
-        const esAdmin = (decoded.rol || '').toLowerCase() === 'admin';
-        if (!esAdmin) {
-          const nombre = decoded.nombre || decoded.usuario;
-          leads = leads.filter(l => l.vendedor === nombre);
-        }
-      } catch (_) { /* token inválido → devolver todo (fallback seguro) */ }
-    }
-    res.json(leads);
+    res.json(await sb.listarLeads(req.usuario.db));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1444,10 +1215,7 @@ app.get('/api/leads/buscar', async (req, res) => {
   const { identificacion } = req.query;
   if (!identificacion) return res.json({ encontrado: false });
   try {
-    const leads = await getAllLeads();
-    const lead = leads.find(l =>
-      l.identificacion && String(l.identificacion).trim() === String(identificacion).trim()
-    );
+    const lead = await sb.buscarPorIdentificacion(identificacion);
     if (lead) return res.json({ encontrado: true, vendedor: lead.vendedor, numeroCotizacion: lead.numeroCotizacion, nombre: lead.nombre, campoClave: 'Cédula/NIT' });
     res.json({ encontrado: false });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1458,134 +1226,114 @@ app.get('/api/leads/check-cedula/:cedula', async (req, res) => {
   const { cedula } = req.params;
   if (!cedula) return res.json({ exists: false });
   try {
-    const leads = await getAllLeads();
-    const lead = leads.find(l =>
-      l.identificacion && String(l.identificacion).trim() === String(cedula).trim()
-    );
+    const lead = await sb.buscarPorIdentificacion(cedula);
     if (lead) return res.json({ exists: true, asesor: lead.vendedor, cotNum: lead.numeroCotizacion });
     res.json({ exists: false });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ====== GET /api/asesores ======
-app.get('/api/asesores', (_req, res) => {
-  res.json(usuarios.map(u => ({
-    id: u.id, nombre: u.nombre, apellido: u.apellido, cargo: u.cargo,
-    usuario: u.usuario, rol: u.rol || (u.usuario === 'admin' ? 'Admin' : 'Asesor'),
-    celular: u.celular || '', correo: u.correo || '',
-  })));
+// ====== Asesores (usuarios de Supabase Auth + tabla staff) ======
+app.get('/api/asesores', requiereUsuario, async (_req, res) => {
+  try {
+    res.json(await sb.getAsesores());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const filaStaff = ({ nombre, apellido, cargo, rol, celular }) => ({
+  ...(nombre && { name: nombre }),
+  ...(apellido !== undefined && { apellido }),
+  ...(cargo && { cargo }),
+  ...(rol && { role: String(rol).toLowerCase() === 'admin' ? 'admin' : 'asesor' }),
+  ...(celular !== undefined && { celular }),
 });
 
 // ====== POST /api/asesores (solo admin) ======
-app.post('/api/asesores', express.json(), (req, res) => {
-  const auth = req.headers['authorization'];
-  if (!auth) return res.status(401).json({ error: 'No autorizado' });
-  try {
-    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
-    if (decoded.usuario !== 'admin' && (decoded.rol || '').toLowerCase() !== 'admin')
-      return res.status(403).json({ error: 'Solo administradores pueden agregar asesores' });
-  } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
+// El correo es el usuario de acceso.
+app.post('/api/asesores', express.json(), requiereUsuario, requiereAdmin, async (req, res) => {
+  const { nombre, password } = req.body;
+  const correo = String(req.body.correo || req.body.usuario || '').trim().toLowerCase();
+  if (!nombre || !correo || !password) return res.status(400).json({ error: 'Nombre, correo y contraseña son requeridos' });
+  if (!correo.includes('@')) return res.status(400).json({ error: 'El usuario de acceso debe ser un correo' });
 
-  const { nombre, apellido, cargo, usuario, password, rol, celular, correo } = req.body;
-  if (!nombre || !usuario || !password) return res.status(400).json({ error: 'nombre, usuario y password son requeridos' });
-  if (usuarios.find(u => u.usuario === usuario)) return res.status(409).json({ error: 'El usuario ya existe' });
-
-  const newUser = { id: Date.now(), nombre, apellido: apellido || '', cargo: cargo || 'Asesor Comercial', usuario, password, rol: rol || 'Asesor', celular: celular || '', correo: correo || '' };
-  usuarios.push(newUser);
-  guardarUsuarios(usuarios);
-  res.status(201).json({ ok: true, id: newUser.id });
+  const { data, error } = await sb.admin.auth.admin.createUser({ email: correo, password, email_confirm: true });
+  if (error) {
+    const yaExiste = /already|registered|exists/i.test(error.message);
+    return res.status(yaExiste ? 409 : 400).json({ error: yaExiste ? 'Ya existe un usuario con ese correo' : error.message });
+  }
+  const { error: errStaff } = await sb.admin.from('staff').insert({
+    user_id: data.user.id, email: correo, cargo: 'Asesor Comercial', role: 'asesor', ...filaStaff(req.body),
+  });
+  if (errStaff) {
+    await sb.admin.auth.admin.deleteUser(data.user.id);
+    return res.status(500).json({ error: errStaff.message });
+  }
+  res.status(201).json({ ok: true, id: data.user.id });
 });
 
 // ====== PUT /api/asesores/:id (solo admin) ======
-app.put('/api/asesores/:id', express.json(), (req, res) => {
-  const auth = req.headers['authorization'];
-  if (!auth) return res.status(401).json({ error: 'No autorizado' });
-  try {
-    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
-    if (decoded.usuario !== 'admin' && (decoded.rol || '').toLowerCase() !== 'admin')
-      return res.status(403).json({ error: 'Solo administradores' });
-  } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
-
-  const id = Number(req.params.id);
-  const idx = usuarios.findIndex(u => u.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Asesor no encontrado' });
-
-  const { nombre, apellido, cargo, usuario, password, rol, celular, correo } = req.body;
-  if (usuario && usuario !== usuarios[idx].usuario && usuarios.find(u => u.usuario === usuario))
-    return res.status(409).json({ error: 'El usuario ya existe' });
-
-  usuarios[idx] = { ...usuarios[idx], ...(nombre && { nombre }), ...(apellido !== undefined && { apellido }), ...(cargo && { cargo }), ...(usuario && { usuario }), ...(password && { password }), ...(rol && { rol }), ...(celular !== undefined && { celular }), ...(correo !== undefined && { correo }) };
-  guardarUsuarios(usuarios);
+app.put('/api/asesores/:id', express.json(), requiereUsuario, requiereAdmin, async (req, res) => {
+  const id = String(req.params.id);
+  const correo = req.body.correo ? String(req.body.correo).trim().toLowerCase() : null;
+  const cambiosAuth = {
+    ...(correo && { email: correo, email_confirm: true }),
+    ...(req.body.password && { password: req.body.password }),
+  };
+  if (Object.keys(cambiosAuth).length) {
+    const { error } = await sb.admin.auth.admin.updateUserById(id, cambiosAuth);
+    if (error) return res.status(400).json({ error: error.message });
+  }
+  const { data, error } = await sb.admin.from('staff')
+    .update({ ...filaStaff(req.body), ...(correo && { email: correo }) })
+    .eq('user_id', id).select('user_id');
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data.length) return res.status(404).json({ error: 'Asesor no encontrado' });
   res.json({ ok: true });
 });
 
 // ====== DELETE /api/asesores/:id (solo admin) ======
-app.delete('/api/asesores/:id', (req, res) => {
-  const auth = req.headers['authorization'];
-  if (!auth) return res.status(401).json({ error: 'No autorizado' });
-  try {
-    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
-    if (decoded.usuario !== 'admin' && (decoded.rol || '').toLowerCase() !== 'admin')
-      return res.status(403).json({ error: 'Solo administradores' });
-  } catch (_) { return res.status(401).json({ error: 'Token inválido' }); }
-
-  const id = Number(req.params.id);
-  if (id === 1) return res.status(403).json({ error: 'No se puede eliminar el administrador principal' });
-  const antes = usuarios.length;
-  usuarios = usuarios.filter(u => u.id !== id);
-  if (usuarios.length === antes) return res.status(404).json({ error: 'Asesor no encontrado' });
-  guardarUsuarios(usuarios);
+// Se desactiva en vez de borrar: sus leads e historial siguen apuntando a él.
+app.delete('/api/asesores/:id', requiereUsuario, requiereAdmin, async (req, res) => {
+  const id = String(req.params.id);
+  if (id === req.usuario.id) return res.status(403).json({ error: 'No puedes desactivar tu propio usuario' });
+  const { data, error } = await sb.admin.from('staff').update({ activo: false }).eq('user_id', id).select('user_id');
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data.length) return res.status(404).json({ error: 'Asesor no encontrado' });
   res.json({ ok: true });
 });
 
 // ====== PATCH /api/leads/:numeroCotizacion/estado ======
-app.patch('/api/leads/:numeroCotizacion/estado', express.json(), async (req, res) => {
+// La bitácora (historial de estados) y la fecha de cierre las llevan los triggers de Supabase.
+app.patch('/api/leads/:numeroCotizacion/estado', express.json(), requiereUsuario, async (req, res) => {
   const num = String(req.params.numeroCotizacion);
   const { estado } = req.body;
+  if (!sb.APP_A_ESTADO[estado]) return res.status(400).json({ error: 'Estado no válido' });
   try {
-    const lead = await getLead(num);
+    const usuario = req.usuario;
+    const lead = await sb.getLead(usuario.db, num);
     if (!lead) throw new Error('Lead no encontrado');
-
-    const usuario = getUsuarioDeReq(req);
-    const fecha = new Date().toISOString();
-    const estadoAnterior = lead.estado || 'Nuevo';
-
-    // Ciclo de vida: registramos el cambio solo si el estado realmente cambia.
-    const historial = Array.isArray(lead.historialEstados) ? lead.historialEstados.slice() : [];
-    const campos = { estado };
-    if (estado !== estadoAnterior) {
-      historial.push({ de: estadoAnterior, a: estado, fecha, usuario: usuario?.nombre || lead.vendedor || 'Sistema' });
-      campos.historialEstados = historial;
-      // fechaCierre: se fija al primer paso a "Cerrado" (base del forecast de equipos).
-      if (estado === 'Cerrado' && !lead.fechaCierre) campos.fechaCierre = fecha;
-    }
-
-    await updateLeadField(num, campos);
-    res.json({ ok: true, historialEstados: campos.historialEstados || historial });
+    await sb.actualizarLead(usuario.db, num, { estado }, tomarSiLibre(usuario, lead));
+    const actualizado = await sb.getLead(usuario.db, num);
+    res.json({ ok: true, historialEstados: actualizado?.historialEstados || [] });
   } catch (err) {
     res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
   }
 });
 
 // ====== POST /api/leads/:numeroCotizacion/actividad — nota/gestión del asesor ======
-app.post('/api/leads/:numeroCotizacion/actividad', express.json(), async (req, res) => {
+const TIPOS_ACTIVIDAD = ['nota', 'llamada', 'correo', 'reunion', 'whatsapp'];
+app.post('/api/leads/:numeroCotizacion/actividad', express.json(), requiereUsuario, async (req, res) => {
   const num = String(req.params.numeroCotizacion);
   const { tipo, texto } = req.body || {};
   if (!texto || !String(texto).trim()) return res.status(400).json({ error: 'La nota no puede estar vacía.' });
   try {
-    const lead = await getLead(num);
+    const usuario = req.usuario;
+    const lead = await sb.getLead(usuario.db, num);
     if (!lead) throw new Error('Lead no encontrado');
-    const usuario = getUsuarioDeReq(req);
-    const actividad = {
-      id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      tipo: tipo || 'nota',           // 'nota' | 'llamada' | 'correo' | 'reunion' | 'whatsapp'
-      texto: String(texto).trim(),
-      fecha: new Date().toISOString(),
-      usuario: usuario?.nombre || lead.vendedor || 'Sistema',
-    };
-    const actividades = Array.isArray(lead.actividades) ? lead.actividades.slice() : [];
-    actividades.push(actividad);
-    await updateLeadField(num, { actividades });
+    const tomar = tomarSiLibre(usuario, lead);
+    if (tomar.asesor_id) await sb.actualizarLead(usuario.db, num, {}, tomar);
+    const actividad = await sb.registrarActividad(
+      usuario, lead.id, TIPOS_ACTIVIDAD.includes(tipo) ? tipo : 'nota', String(texto).trim()
+    );
     res.json({ ok: true, actividad });
   } catch (err) {
     res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
@@ -1593,11 +1341,14 @@ app.post('/api/leads/:numeroCotizacion/actividad', express.json(), async (req, r
 });
 
 // ====== PATCH /api/leads/:numeroCotizacion/opciones ======
-app.patch('/api/leads/:numeroCotizacion/opciones', express.json(), async (req, res) => {
+app.patch('/api/leads/:numeroCotizacion/opciones', express.json(), requiereUsuario, async (req, res) => {
   const num = String(req.params.numeroCotizacion);
   const { opciones } = req.body;
   try {
-    await updateLeadField(num, { opciones });
+    const usuario = req.usuario;
+    const lead = await sb.getLead(usuario.db, num);
+    if (!lead) throw new Error('Lead no encontrado');
+    await sb.actualizarLead(usuario.db, num, { opciones }, tomarSiLibre(usuario, lead));
     res.json({ ok: true });
   } catch (err) {
     res.status(err.message === 'Lead no encontrado' ? 404 : 500).json({ error: err.message });
@@ -1605,6 +1356,7 @@ app.patch('/api/leads/:numeroCotizacion/opciones', express.json(), async (req, r
 });
 
 // ====== POST /api/generar-pdf (solo PDF, sin guardar lead) ======
+// También lo usa la propuesta pública (sin token).
 app.post('/api/generar-pdf', express.json(), async (req, res) => {
   try {
     const data = req.body || {};
@@ -1632,30 +1384,8 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
       return res.status(400).json({ error: 'No se pudieron determinar consumoKwh y costoKwh. Verifica los datos de la propuesta.' });
     }
 
-    let asesorPDF = {};
-    const authPDF = req.headers['authorization'];
-    if (authPDF && authPDF.startsWith('Bearer ')) {
-      try {
-        const decoded = jwt.verify(authPDF.slice(7), JWT_SECRET);
-        const asesorVivo = usuarios.find(u => u.usuario === decoded.usuario) || {};
-        asesorPDF = {
-          nombre:   asesorVivo.nombre   || decoded.nombre,
-          apellido: asesorVivo.apellido || decoded.apellido,
-          cargo:    asesorVivo.cargo    || decoded.cargo,
-          usuario:  decoded.usuario,
-          celular:  asesorVivo.celular  || decoded.celular || '',
-          correo:   asesorVivo.correo   || decoded.correo  || '',
-        };
-      } catch (_) {}
-    }
-    // Fallback: si el token no dio nombre, buscar por vendedor en usuarios
-    if (!asesorPDF.nombre && data.vendedor) {
-      const av = usuarios.find(u =>
-        `${u.nombre} ${u.apellido}`.trim() === data.vendedor ||
-        u.usuario === data.vendedor
-      ) || {};
-      if (av.nombre) asesorPDF = { nombre: av.nombre, apellido: av.apellido || '', cargo: av.cargo || '', usuario: av.usuario || '', celular: av.celular || '', correo: av.correo || '' };
-    }
+    const usuario = await sb.autenticar(req);
+    const asesorPDF = usuario ? firmaDe(usuario) : await firmaPorVendedor(data.vendedor);
 
     // For versioned proposals, respect the version's costokWp
     const cfgForCalc = Number(data.costokWp) > 0
@@ -1666,10 +1396,10 @@ app.post('/api/generar-pdf', express.json(), async (req, res) => {
     const resultados = calcularProyecto(dataWithFix, cfgForCalc);
     const pdfUrl = await generarPDF(dataWithFix, { ...resultados, numeroCotizacion: data.numeroCotizacion ?? '-' }, asesorPDF, cfgForCalc);
 
-    // Persistir pdfUrl en el registro del lead (si se conoce la cotización)
-    if (data.numeroCotizacion) {
+    // Persistir pdfUrl en el lead: solo un asesor con sesión, nunca desde la vista pública.
+    if (usuario && data.numeroCotizacion) {
       try {
-        await updateLeadField(String(data.numeroCotizacion), { pdfUrl });
+        await sb.actualizarLead(usuario.db, String(data.numeroCotizacion), { pdfUrl });
       } catch (_) { /* no crítico: el PDF igual se devuelve */ }
     }
 
@@ -1687,7 +1417,7 @@ const { crearHandler: crearHandlerAgenteIA } = require('./agenteIA');
 app.post(
   '/api/agente-ia',
   express.json(),
-  crearHandlerAgenteIA({ getAllLeads, jwt, JWT_SECRET })
+  crearHandlerAgenteIA({ autenticar: sb.autenticar, listarLeads: sb.listarLeads })
 );
 
 // Indica al frontend si el módulo está configurado (para ocultarlo si no).
