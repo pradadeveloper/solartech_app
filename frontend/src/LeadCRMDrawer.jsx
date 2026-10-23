@@ -115,6 +115,22 @@ export default function LeadCRMDrawer({ lead, onClose, onEstado, onActividad, on
           </div>
         </div>
 
+        {/* Datos que trae el lead desde la página web */}
+        {(lead.origenWeb || lead.empresa || lead.modeloInteres || lead.mensaje) && (
+          <div className="crm-section">
+            <div className="crm-label">Desde la página web</div>
+            <div className="crm-grid">
+              <Dato k="Formulario" v={lead.origenWeb || "—"} />
+              <Dato k="Empresa" v={lead.empresa || "—"} />
+              <Dato k="Modelo de interés" v={lead.modeloInteres || "—"} />
+              <Dato k="Prefiere contacto" v={lead.preferenciaContacto || "—"} />
+            </div>
+            {lead.mensaje && (
+              <p style={{ margin: "10px 0 0", fontSize: "0.85rem", color: "var(--muted)", whiteSpace: "pre-line" }}>“{lead.mensaje}”</p>
+            )}
+          </div>
+        )}
+
         {/* Gestión / Actividades */}
         <div className="crm-section">
           <div className="crm-label">Registrar gestión</div>

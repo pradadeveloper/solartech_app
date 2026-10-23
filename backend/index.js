@@ -236,6 +236,12 @@ function requireFields(data, fields) {
   return missing;
 }
 
+// Texto libre que llega del endpoint público: recortado y null si viene vacío.
+function textoWeb(value, max) {
+  const s = String(value ?? "").trim().slice(0, max);
+  return s || null;
+}
+
 // ====== PDF ======
 async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   const empresa = cfg.empresa || {};
@@ -1110,6 +1116,11 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       ahorroAnual: resultados.ahorroAnual,
       tiempoRetorno: resultados.tiempoRetorno,
       pdfUrl,
+      // Página web: datos que el cotizador interno no pide
+      empresa: textoWeb(data.empresa, 160),
+      mensaje: textoWeb(data.mensaje, 2000),
+      modeloInteres: textoWeb(data.modeloInteres, 60),
+      origenWeb: textoWeb(data.origenWeb, 60),
       opciones: [],
     });
 

@@ -51,7 +51,16 @@ const SHEET_TO_LEAD = {
   // ── Misc ──
   pdf_url:         'pdfUrl',
   kwh:             'id',
+  // ── Página web (solartechenergy.co) ──
+  empresa:         'empresa',
+  mensaje:         'mensaje',
+  modelo_interes:  'modeloInteres',
+  origen_web:      'origenWeb',
 };
+
+// Última columna leída/escrita de la hoja leads. Con las columnas de la web la hoja
+// pasa de AH; se deja margen para no perder datos al agregar más.
+const LEADS_LAST_COL = 'AZ';
 
 // Columnas del Sheets en el orden exacto de la hoja
 const SHEETS_COLS = Object.keys(SHEET_TO_LEAD);
@@ -152,7 +161,7 @@ async function getAllLeads() {
     const sheets = google.sheets({ version: 'v4', auth });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.SHEET_ID,
-      range: 'leads!A1:AH',
+      range: `leads!A1:${LEADS_LAST_COL}`,
     });
     const [rawHeaders, ...rows] = res.data.values || [[]];
     if (!rawHeaders || !rawHeaders.length) return [];
@@ -247,7 +256,7 @@ async function updateLead(numeroCotizacion, fields) {
   const sheets = google.sheets({ version: 'v4', auth });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'leads!A1:AH',
+    range: `leads!A1:${LEADS_LAST_COL}`,
   });
   const [rawHeaders, ...rows] = res.data.values || [[]];
   const headers = (rawHeaders || []).map(resolveHeader);
@@ -273,7 +282,7 @@ async function updateLead(numeroCotizacion, fields) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.SHEET_ID,
-    range: `leads!A${sheetRow}:AH${sheetRow}`,
+    range: `leads!A${sheetRow}:${LEADS_LAST_COL}${sheetRow}`,
     valueInputOption: 'RAW',
     requestBody: { values: [updatedRow] },
   });
@@ -287,7 +296,7 @@ async function incrementContador() {
   const sheets = google.sheets({ version: 'v4', auth });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'leads!A1:AH',
+    range: `leads!A1:${LEADS_LAST_COL}`,
   });
   const [rawHdr, ...rows] = res.data.values || [[]];
   if (!rawHdr || !rawHdr.length) return 1;
