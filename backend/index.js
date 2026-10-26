@@ -297,8 +297,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     }
   }
 
+  // Salto automático sin banner: la foto de 155 px en una página que solo
+  // continúa una sección la dejaba casi vacía.
   function checkY(needed) {
-    if (y - needed < footerH + 16) newPage();
+    if (y - needed < footerH + 16) newPage(false);
   }
 
   const safe = (v) => (v == null || v === '' ? '-' : String(v));
@@ -426,9 +428,13 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   // 1. CLIENTE
   sectionHeader('DATOS DEL CLIENTE');
-  infoRow2('Nombre completo', safe(data.nombre), 'Identificacion', safe(data.identificacion));
+  // Identificación con su tipo ("NIT 900123456"); el municipio sin el departamento pegado.
+  const tipoDoc = { CC: 'C.C.', NIT: 'NIT', CE: 'C.E.', PH: 'P.H.' }[String(data.tipoDocumento || '').toUpperCase()] || '';
+  const identificacion = [tipoDoc, data.identificacion].filter(Boolean).join(' ');
+  const municipio = data.ciudadSolar || String(data.ubicacion || '').split(',')[0];
+  infoRow2('Nombre completo', safe(data.nombre), 'Identificacion', safe(identificacion));
   infoRow2('Correo electronico', safe(data.correo), 'Telefono', safe(data.telefono));
-  infoRow2('Municipio / Ubicacion', safe(data.ubicacion), 'Ciudad solar', safe(data.ciudadSolar));
+  infoRow2('Municipio', safe(municipio), 'Departamento', safe(data.departamentoSolar));
   infoRow2('Tipo de solicitud', safe(data.tipoSolicitud), 'Tipo de techo', safe(data.tipoTecho));
   infoRow2('Como nos conocio', safe(data.conociste), 'Sistema de interes', safe(data.sistemaInteres));
   gap(6);
@@ -473,44 +479,11 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     infoRow('Ahorro acumulado a 25 anos (con equipos propios)', cop(Math.round(ppa.acumulado25)));
     gap(6);
 
-    // Tabla año a año (años representativos)
-    checkY(18 * 10 + 60);   // título y tabla en la misma página
-    sectionHeader('PROYECCION ANO A ANO');
-    const cols = [
-      { t: 'Ano', w: 0.08 }, { t: 'Tarifa red $/kWh', w: 0.18 }, { t: 'Tarifa PPA $/kWh', w: 0.18 },
-      { t: 'Generacion kWh', w: 0.18 }, { t: 'Ahorro del ano', w: 0.19 }, { t: 'Acumulado', w: 0.19 },
-    ];
-    const filas = ppa.anios.filter((a) => [1, 2, 3, 5, 10, ppa.plazo, ppa.plazo + 1, 20, 25].includes(a.anio));
-    const rH = 18;
-    checkY(rH * (filas.length + 1) + 6);
-    let cx = margin;
-    page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_LIGHT });
-    cols.forEach((c) => {
-      page.drawText(c.t, { x: cx + 4, y: y - 12, size: 7.5, font: fontBold, color: COLOR_MUTED });
-      cx += c.w * cW;
-    });
-    y -= rH;
-    filas.forEach((a) => {
-      const vals = [
-        String(a.anio),
-        Math.round(a.tarifaRed).toLocaleString('es-CO'),
-        a.tarifaPPA ? Math.round(a.tarifaPPA).toLocaleString('es-CO') : 'Equipos suyos',
-        Math.round(a.kwh).toLocaleString('es-CO'),
-        cop(Math.round(a.ahorro)),
-        cop(Math.round(a.acumulado)),
-      ];
-      cx = margin;
-      page.drawLine({ start: { x: margin, y: y - rH }, end: { x: margin + cW, y: y - rH }, thickness: 0.5, color: COLOR_BORDER_INNER });
-      vals.forEach((v, i) => {
-        page.drawText(v, { x: cx + 4, y: y - 12, size: 8, font, color: COLOR_TEXT });
-        cx += cols[i].w * cW;
-      });
-      y -= rH;
-    });
-    gap(14);
+    gap(8);
     para('Ahorro calculado con toda la generacion valorada a la tarifa del operador de red, indexacion anual igual para ambas tarifas y una perdida de rendimiento de los paneles de 0,55% por ano.', 10, 7.5, COLOR_MUTED);
     gap(6);
 
+    checkY(46 + 4 * 18 + 10);   // la lista completa en una sola página
     sectionHeader('EL SISTEMA QUE INSTALAMOS');
     [
       `${resultados.npaneles} paneles solares de ${resultados.potenciaPanel} W (LONGi Solar)`,
@@ -586,6 +559,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   }
   // 8. IMPACTO AMBIENTAL
   gap(6);
+  // Título, tarjetas y texto en la misma página: el texto solo en una página nueva la dejaba vacía.
+  checkY(46 + 64 + 44);
   sectionHeader('IMPACTO AMBIENTAL');
 
   // Tarjetas visuales para los 3 indicadores ambientales
@@ -619,8 +594,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   //   y -= bH + 12;
   // }
 
-  // 9. ETAPAS DEL PROYECTO — página 4 (forzada), 2 columnas de 3 + Garantías al final
-  newPage(false);
+  // 9. ETAPAS DEL PROYECTO — 2 columnas de 3 + Garantías al final. Página nueva solo si no cabe:
+  // forzarla dejaba la página anterior medio vacía.
+  checkY(320);
   gap(4);
   sectionHeader('ETAPAS DEL PROYECTO');
   const etapas = [
@@ -680,6 +656,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   // 10. GARANTIAS — misma página que Etapas
   gap(8);
+  checkY(46 + 150);   // título y garantías juntos
   sectionHeader('GARANTIAS');
   {
     const col1Items = [
@@ -735,8 +712,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     gap(10);
   }
 
-  // PROYECTOS INSTALADOS — página 5 (forzada)
-  newPage(false);
+  // PROYECTOS INSTALADOS — dos filas de tarjetas; página nueva solo si no caben.
+  checkY(2 * (115 + 78 + 8) + 60);
   gap(4);
   sectionHeader('PROYECTOS INSTALADOS');
   {
@@ -825,8 +802,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   }
   gap(6);
 
-  // 11. CASOS DE EXITO + MARCAS ALIADAS + CONDICIONES — página sin banner
-  newPage(false);
+  // 11. CASOS DE EXITO + MARCAS ALIADAS — página nueva solo si la imagen de casos no cabe.
+  checkY(46 + 280 + 16);
   gap(4);
 
   if (casosExitoImg) {
@@ -879,11 +856,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   // 12. CONDICIONES COMERCIALES — arranca en página propia y, si el listado se
   // desborda, las páginas siguientes van sin banner: una foto a media lista parte
-  // la numeración y es justo lo que se veía antes.
-  newPage(false);
+  // la numeración y es justo lo que se veía antes. Los saltos automáticos ya van sin
+  // banner, así que basta con que el título y las primeras condiciones quepan.
   bannerSuprimido = true;
   gap(4);
-  sectionHeader(esPPA ? 'CONDICIONES DEL CONTRATO PPA' : 'CONDICIONES COMERCIALES');
   // Condiciones del PPA: hoja PPA del Cotizador WEB (B68:B73) más las de operación del contrato.
   const condicionesPPA = [
     'Las tarifas presentadas son de referencia y no son vinculantes hasta la firma del contrato de suministro de energia (PPA).',
@@ -913,6 +889,10 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     'El proyecto no incluye el suministro del medidor bidireccional. Este podra ser adquirido directamente por el cliente con el operador de red o, si la normativa lo permite, podra ser suministrado por la empresa como un item adicional.',
     'Validez de la oferta: quince (15) dias calendario a partir de su emision.',
   ];
+  // Todas juntas si caben en una página; si no, al menos el título con las primeras.
+  const altoCondiciones = condiciones.reduce((h, c) => h + wrapWords(c, cW - 30, 8.5).length * 12.5 + 8, 46);
+  checkY(Math.min(altoCondiciones, H - headerH - footerH - 60));
+  sectionHeader(esPPA ? 'CONDICIONES DEL CONTRATO PPA' : 'CONDICIONES COMERCIALES');
   condiciones.forEach((c, i) => {
     // Reservamos el alto real del item (numero + todas sus lineas) antes de
     // dibujarlo. Con un checkY fijo, un item de 3 lineas podia partirse y dejar
@@ -926,8 +906,8 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   bannerSuprimido = false;   // el resto del documento vuelve a llevar banner
   gap(8);
 
-  // 13. DATOS DEL ASESOR COMERCIAL — última página
-  newPage();
+  // 13. DATOS DEL ASESOR COMERCIAL — sigue a las condiciones si cabe (asesor + cierre ≈ 340 px)
+  checkY(340);
   gap(4);
   sectionHeader('DATOS DEL ASESOR COMERCIAL');
   infoRow2('Nombre del asesor', asesorNombre, 'Cargo', safe(asesor.cargo));
@@ -1086,7 +1066,11 @@ app.post("/api/calcular-proyecto", upload.single("facturaAdjunta"), async (req, 
       ...resultados, numeroCotizacion, codigoPublico, pdfUrl, leadId,
       modalidad: data.modalidad === 'ppa' ? 'ppa' : 'recursos_propios',
       tipoDocumento: data.tipoDocumento || null,
+      // Datos del cliente que calcularProyecto no devuelve y el PDF de la propuesta necesita
+      identificacion: data.identificacion || null,
+      conociste: data.conociste || null,
       ciudadSolar: data.ciudadSolar, departamentoSolar: data.departamentoSolar,
+      areaDisponible: data.areaDisponible,
     });
   } catch (err) {
     console.error(err);

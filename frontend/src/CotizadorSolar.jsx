@@ -67,7 +67,7 @@ export default function CotizadorSolar() {
   const requiredFields = [
     "nombre", "identificacion", "correo", "telefono",
     "departamentoSolar", "ciudadSolar", "tipoSolicitud",
-    "consumoKwh", "costoKwh", "areaDisponible", "tipoTecho", "tipoDocumento",
+    "consumoKwh", "costoKwh", "areaDisponible", "tipoTecho", "tipoDocumento", "conociste",
   ];
   const canSubmit = useMemo(
     () => requiredFields.every((k) => String(formData[k] ?? "").trim().length > 0),
@@ -404,7 +404,7 @@ export default function CotizadorSolar() {
                 </Field>
 
                 <Field label="¿Cómo nos conociste?">
-                  <select name="conociste" value={formData.conociste} onChange={handleChange}>
+                  <select name="conociste" value={formData.conociste} onChange={handleChange} required>
                     <option value="">Selecciona</option>
                     <option>Instagram</option>
                     <option>Facebook</option>

@@ -967,7 +967,7 @@
 
 /* ── 23e. CTA final (BLOQUE 6) ───────────────────────────── */
 .pp-cta-final {
-  background: #1a1a2e;
+  background: var(--text, #1d1512);   /* tinta de la marca (tokens.css) */
   padding: 56px 24px;
   margin-top: 8px;
 }
@@ -985,9 +985,10 @@
   margin: 0 0 10px;
 }
 
-.pp-cta-subtitle {
+/* Doble clase: `.cotizador--light p` pinta los párrafos de oscuro y lo dejaba ilegible */
+.pp-cta-final .pp-cta-subtitle {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.78);
   margin: 0 0 28px;
   line-height: 1.6;
 }

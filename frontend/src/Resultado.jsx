@@ -655,10 +655,12 @@ export default function Resultado() {
             <Card title="Información del cliente">
               <div className="cotTwoCol">
                 <SummaryRow label="Nombre"             value={resultado.nombre} />
+                <SummaryRow label="Identificación"     value={[{ CC: 'C.C.', NIT: 'NIT', CE: 'C.E.' }[resultado.tipoDocumento], resultado.identificacion].filter(Boolean).join(' ') || '—'} />
                 <SummaryRow label="Correo"             value={resultado.correo} />
                 <SummaryRow label="Teléfono"           value={resultado.telefono} />
-                <SummaryRow label="Ciudad"             value={resultado.ubicacion} />
-                <SummaryRow label="Ciudad solar"       value={resultado.ciudadSolar ?? resultado.ubicacion} />
+                <SummaryRow label="Municipio"          value={resultado.ciudadSolar || String(resultado.ubicacion || '').split(',')[0]} />
+                <SummaryRow label="Departamento"       value={resultado.departamentoSolar || '—'} />
+                <SummaryRow label="Cómo nos conoció"   value={resultado.conociste || '—'} />
                 <SummaryRow label="Tipo de solicitud"  value={resultado.tipoSolicitud} />
                 <SummaryRow label="Tipo de techo"      value={resultado.tipoTecho} />
                 <SummaryRow label="Sistema de interés" value={resultado.sistemaInteres} />
