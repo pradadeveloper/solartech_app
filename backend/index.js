@@ -451,7 +451,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // 4-7. Análisis financiero y propuesta económica: dependen de la modalidad
   // (recursos propios o PPA). Modelos en finanzas.js, los mismos de la propuesta web.
   const entradasFin = entradasDesde({ ...resultados, tipoDocumento: data.tipoDocumento });
-  const anios = (v) => (v == null ? '-' : `${Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 })} anos`);
+  const anios = (v) => (v == null ? '-' : `${Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 })} años`);
   const pct = (v) => (v == null ? '-' : `${(v * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 })}%`);
 
   if (esPPA) {
@@ -464,7 +464,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     infoRow('Inversion del cliente', '$0', true);
     infoRow('Tarifa actual del operador de red', `${cop(Math.round(ppa.tarifaRed1))} / kWh`);
     infoRow(`Tarifa PPA Solartech (${pct(ppa.descuento)} de descuento)`, `${cop(Math.round(ppa.tarifaPPA1))} / kWh`, true);
-    infoRow('Plazo del contrato', `${ppa.plazo} anos`);
+    infoRow('Plazo del contrato', `${ppa.plazo} años`);
     infoRow('Indexacion de la tarifa', `IPC (supuesto ${pct(ppa.indexacion)} anual)`);
     infoRow('Al terminar el contrato', 'Los equipos pasan a ser suyos');
     gap(6);
@@ -473,14 +473,48 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     infoRow('Factura evitada al operador (mes 1)', cop(Math.round(ppa.facturaRedMensual1)));
     infoRow('Pago estimado a Solartech (mes 1)', cop(Math.round(ppa.pagoMensual1)));
     infoRow('Ahorro del primer mes', cop(Math.round(ppa.ahorroMensual1)), true);
-    infoRow('Ahorro acumulado a 5 anos', cop(Math.round(ppa.acumulado5)));
-    infoRow('Ahorro acumulado a 10 anos', cop(Math.round(ppa.acumulado10)));
-    infoRow(`Ahorro acumulado durante el contrato (${ppa.plazo} anos)`, cop(Math.round(ppa.ahorroContrato)), true);
-    infoRow('Ahorro acumulado a 25 anos (con equipos propios)', cop(Math.round(ppa.acumulado25)));
+    infoRow('Ahorro acumulado a 5 años', cop(Math.round(ppa.acumulado5)));
+    infoRow('Ahorro acumulado a 10 años', cop(Math.round(ppa.acumulado10)));
+    infoRow(`Ahorro acumulado durante el contrato (${ppa.plazo} años)`, cop(Math.round(ppa.ahorroContrato)), true);
+    infoRow('Ahorro acumulado a 25 años (con equipos propios)', cop(Math.round(ppa.acumulado25)));
     gap(6);
 
-    gap(8);
-    para('Ahorro calculado con toda la generacion valorada a la tarifa del operador de red, indexacion anual igual para ambas tarifas y una perdida de rendimiento de los paneles de 0,55% por ano.', 10, 7.5, COLOR_MUTED);
+    // Tabla año a año (años representativos)
+    checkY(18 * 10 + 60);   // título y tabla en la misma página
+    sectionHeader('PROYECCIÓN DEL AHORRO');
+    const cols = [
+      { t: 'Año', w: 0.08 }, { t: 'Tarifa red $/kWh', w: 0.18 }, { t: 'Tarifa PPA $/kWh', w: 0.18 },
+      { t: 'Generacion kWh', w: 0.18 }, { t: 'Ahorro del año', w: 0.19 }, { t: 'Acumulado', w: 0.19 },
+    ];
+    const filas = ppa.anios.filter((a) => [1, 2, 3, 5, 10, ppa.plazo, ppa.plazo + 1, 20, 25].includes(a.anio));
+    const rH = 18;
+    checkY(rH * (filas.length + 1) + 6);
+    let cx = margin;
+    page.drawRectangle({ x: margin, y: y - rH, width: cW, height: rH, color: COLOR_LIGHT });
+    cols.forEach((c) => {
+      page.drawText(c.t, { x: cx + 4, y: y - 12, size: 7.5, font: fontBold, color: COLOR_MUTED });
+      cx += c.w * cW;
+    });
+    y -= rH;
+    filas.forEach((a) => {
+      const vals = [
+        String(a.anio),
+        Math.round(a.tarifaRed).toLocaleString('es-CO'),
+        a.tarifaPPA ? Math.round(a.tarifaPPA).toLocaleString('es-CO') : 'Equipos suyos',
+        Math.round(a.kwh).toLocaleString('es-CO'),
+        cop(Math.round(a.ahorro)),
+        cop(Math.round(a.acumulado)),
+      ];
+      cx = margin;
+      page.drawLine({ start: { x: margin, y: y - rH }, end: { x: margin + cW, y: y - rH }, thickness: 0.5, color: COLOR_BORDER_INNER });
+      vals.forEach((v, i) => {
+        page.drawText(v, { x: cx + 4, y: y - 12, size: 8, font, color: COLOR_TEXT });
+        cx += cols[i].w * cW;
+      });
+      y -= rH;
+    });
+    gap(14);
+    para('Ahorro calculado con toda la generacion valorada a la tarifa del operador de red, indexacion anual igual para ambas tarifas y una perdida de rendimiento de los paneles de 0,55% por año.', 10, 7.5, COLOR_MUTED);
     gap(6);
 
     checkY(46 + 4 * 18 + 10);   // la lista completa en una sola página
@@ -497,20 +531,20 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     newPage();
     gap(4);
     sectionHeader('ANALISIS FINANCIERO');
-    infoRow('Ahorro mensual estimado (ano 1)', cop(resultados.ahorroMensual));
-    infoRow('Ahorro anual estimado (ano 1)', cop(resultados.ahorroAnual));
+    infoRow('Ahorro mensual estimado (año 1)', cop(resultados.ahorroMensual));
+    infoRow('Ahorro anual estimado (año 1)', cop(resultados.ahorroAnual));
     infoRow(rp.esEmpresa ? 'Retorno de la inversion (despues de impuestos)' : 'Retorno de la inversion', anios(rp.retornoAnios), true);
-    infoRow('Ganancia neta acumulada a 10 anos', cop(Math.round(rp.ganancia10)));
-    infoRow('Ganancia neta acumulada a 25 anos', cop(Math.round(rp.ganancia25)));
-    infoRow(`Valor presente neto a 25 anos (tasa ${pct(rp.supuestos.tasaDescuento)})`, cop(Math.round(rp.vpn25)));
-    infoRow('Tasa interna de retorno a 25 anos', pct(rp.tir25));
+    infoRow('Ganancia neta acumulada a 10 años', cop(Math.round(rp.ganancia10)));
+    infoRow('Ganancia neta acumulada a 25 años', cop(Math.round(rp.ganancia25)));
+    infoRow(`Valor presente neto a 25 años (tasa ${pct(rp.supuestos.tasaDescuento)})`, cop(Math.round(rp.vpn25)));
+    infoRow('Tasa interna de retorno a 25 años', pct(rp.tir25));
     gap(14);
-    para(`Supuestos: alza de la tarifa ${pct(rp.supuestos.incrementoTarifa)} anual, perdida de rendimiento de los paneles ${(rp.supuestos.degradacion * 100).toLocaleString('es-CO', { maximumFractionDigits: 2 })}% anual, mantenimiento anual indexado y reposicion de inversores en el ano ${rp.supuestos.reposicionAnio}.${rp.esEmpresa ? ` Incluye el efecto en renta (${pct(rp.supuestos.tasaImpuesto)}).` : ''}`, 10, 7.5, COLOR_MUTED);
+    para(`Supuestos: alza de la tarifa ${pct(rp.supuestos.incrementoTarifa)} anual, perdida de rendimiento de los paneles ${(rp.supuestos.degradacion * 100).toLocaleString('es-CO', { maximumFractionDigits: 2 })}% anual, mantenimiento anual indexado y reposicion de inversores en el año ${rp.supuestos.reposicionAnio}.${rp.esEmpresa ? ` Incluye el efecto en renta (${pct(rp.supuestos.tasaImpuesto)}).` : ''}`, 10, 7.5, COLOR_MUTED);
     gap(6);
 
     if (rp.beneficiosTributarios) {
       sectionHeader('BENEFICIOS TRIBUTARIOS LEY 1715');
-      infoRow('Depreciacion acelerada (3 anos)', cop(Math.round(rp.beneficiosTributarios.depreciacion)));
+      infoRow('Depreciacion acelerada (3 años)', cop(Math.round(rp.beneficiosTributarios.depreciacion)));
       infoRow('Deduccion especial del 50% en renta', cop(Math.round(rp.beneficiosTributarios.deduccion)));
       infoRow('Menor impuesto de renta (total)', cop(Math.round(rp.beneficiosTributarios.total)), true);
       gap(14);
@@ -565,9 +599,9 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
 
   // Tarjetas visuales para los 3 indicadores ambientales
   const statCards = [
-    { icon: '🌳', label: 'Arboles equivalentes', value: `${safe(resultados.arbolesEquivalentes)}`, unit: 'arboles/ano' },
-    { icon: '💨', label: 'CO2 evitado',           value: `${safe(resultados.co2EvitadoToneladas)}`, unit: 'ton/ano'   },
-    { icon: '⛽', label: 'Gasolina evitada',       value: `${safe(resultados.galonesGasolinaEvitados)}`, unit: 'galones/ano' },
+    { icon: '🌳', label: 'Arboles equivalentes', value: `${safe(resultados.arbolesEquivalentes)}`, unit: 'arboles/año' },
+    { icon: '💨', label: 'CO2 evitado',           value: `${safe(resultados.co2EvitadoToneladas)}`, unit: 'ton/año'   },
+    { icon: '⛽', label: 'Gasolina evitada',       value: `${safe(resultados.galonesGasolinaEvitados)}`, unit: 'galones/año' },
   ];
   const cardW = (cW - 12) / 3;
   const cardH = 56;
@@ -583,7 +617,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   y -= cardH + 8;
 
   gap(4);
-  para('Al elegir energia solar contribuye activamente a la reduccion de emisiones de CO2 y a la independencia energetica de Colombia. Su sistema generara energia limpia por mas de 25 anos.', 10, 8.5, COLOR_MUTED);
+  para('Al elegir energia solar contribuye activamente a la reduccion de emisiones de CO2 y a la independencia energetica de Colombia. Su sistema generara energia limpia por mas de 25 años.', 10, 8.5, COLOR_MUTED);
   gap(8);
 
   // // Banner hogar después de impacto ambiental
@@ -660,12 +694,12 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   sectionHeader('GARANTIAS');
   {
     const col1Items = [
-      ['Paneles solares - rendimiento', 'Garantia de producto 12 anos. Rendimiento mayor al 80% por 25 anos.'],
-      ['Inversor', 'Garantia de fabrica 5 anos (extensible a 10 segun fabricante).'],
-      ['Estructura de montaje', 'Garantia estructural 10 anos contra corrosion y deformacion.'],
+      ['Paneles solares - rendimiento', 'Garantia de producto 12 años. Rendimiento mayor al 80% por 25 años.'],
+      ['Inversor', 'Garantia de fabrica 5 años (extensible a 10 segun fabricante).'],
+      ['Estructura de montaje', 'Garantia estructural 10 años contra corrosion y deformacion.'],
     ];
     const col2Items = [
-      ['Instalacion electrica', 'Garantia de mano de obra 2 anos segun norma RETIE.'],
+      ['Instalacion electrica', 'Garantia de mano de obra 2 años segun norma RETIE.'],
       ['Soporte post-instalacion', '12 meses de soporte tecnico y monitoreo remoto incluidos.'],
     ];
 
@@ -863,7 +897,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
   // Condiciones del PPA: hoja PPA del Cotizador WEB (B68:B73) más las de operación del contrato.
   const condicionesPPA = [
     'Las tarifas presentadas son de referencia y no son vinculantes hasta la firma del contrato de suministro de energia (PPA).',
-    `La tarifa PPA se indexa mensualmente con el IPC durante los ${calcularPPA(entradasDesde(resultados), cfg).plazo} anos del contrato. Al terminar el plazo, los equipos se ceden al cliente sin costo adicional.`,
+    `La tarifa PPA se indexa mensualmente con el IPC durante los ${calcularPPA(entradasDesde(resultados), cfg).plazo} años del contrato. Al terminar el plazo, los equipos se ceden al cliente sin costo adicional.`,
     'Solartech asume la inversion, la instalacion, la operacion y el mantenimiento del sistema durante la vigencia del contrato.',
     'Los ahorros proyectados no incluyen la devolucion de excedentes a la red y dependen de la radiacion solar real, que varia segun las condiciones climaticas.',
     'El proyecto no incluye lineas de vida, apantallamiento ni analisis estructural de la cubierta; estos se definen en la visita tecnica.',
@@ -881,7 +915,7 @@ async function generarPDF(data, resultados, asesor = {}, cfg = {}) {
     'El sistema fotovoltaico no esta disenado para operar en ausencia del suministro de la red electrica (sistema on-grid), por lo cual su funcionamiento depende de la presencia activa de dicha red.',
     'Las cubiertas tipo losa de concreto deberan soportar una carga minima de 50 kg/m2, mientras que las cubiertas en teja deberan soportar una carga minima de 17 kg/m2.',
     'La presente cotizacion contempla la instalacion del cableado en tuberia expuesta. Cualquier requerimiento de canalizacion oculta o soluciones esteticas adicionales podra generar costos adicionales.',
-    'Condiciones de garantia del sistema: Paneles solares: 15 anos. Inversores: 5 anos. Instalacion: 5 anos. La validez de las garantias estara sujeta a la ejecucion de mantenimientos preventivos anuales con Solartech.',
+    'Condiciones de garantia del sistema: Paneles solares: 15 años. Inversores: 5 años. Instalacion: 5 años. La validez de las garantias estara sujeta a la ejecucion de mantenimientos preventivos anuales con Solartech.',
     'En caso de que el comprador sea monousuario (con transformador propio) y desee realizar la legalizacion del sistema con entrega de excedentes al operador de red, debera cumplir con la Resolucion CREG 174 de 2021 (Cap. 4, Art. 19), la CREG 038 de 2014, la CREG 015 de 2018 y las normas del operador de red RA8-028 / RA8-030.',
     'Los valores de ahorro proyectados son estimativos y dependen de variables externas como la radiacion solar, el costo del kWh y la remuneracion definida por el operador de red para los excedentes de energia.',
     'El valor del contrato de respaldo es referencial y se ha calculado bajo el supuesto de un respaldo del 20% de la capacidad instalada. El cliente podra elegir respaldar desde 1 kW hasta el 100% de la capacidad instalada.',
